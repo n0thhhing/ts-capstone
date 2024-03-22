@@ -1,0 +1,10 @@
+{
+  "name": "capstone-wrapper",
+  "module": "build/wrapper.js",
+  "type": "module",
+  "devDependencies": {
+    "@types/bun": "latest",
+    "typescript": "^5.0.0",
+    "@types/node": "latest"
+  }
+}
