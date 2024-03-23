@@ -72,7 +72,7 @@ while (disassembler.disasm_iter(data)) {
 
 // OPT_MNEMONIC
 const mnObj = {
-  id: 191, // the id returned in the insn object, in this case, it's movz, you can also find more in the constants file
+  id: 191, // the id returned in the insn object, in this case, its movz, you can also find more in the constants file
   name: "foo", // the new name of the mnemonic
 };
 disassembler.option(cs.OPT_MNEMONIC, mnObj);
@@ -150,8 +150,8 @@ For detailed documentation on available constants and methods, refer to the sour
 
 ## Credits
 
-[capstone](https://github.com/capstone-engine/capstone)
-[emscripten](https://emscripten.org/docs/getting_started/downloads.html#sdk-download-and-install)
+- [capstone](https://github.com/capstone-engine/capstone)
+- [emscripten](https://emscripten.org/docs/getting_started/downloads.html#sdk-download-and-install)
 
 ## Contributing
 

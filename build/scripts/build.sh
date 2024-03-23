@@ -5,11 +5,13 @@ EXPORTED_FUNCTIONS=(
 	strncpy
 	cs_close
 	cs_disasm
+	cs_disasm_iter
 	cs_errno
 	cs_free
 	cs_group_name
 	cs_insn_group
 	cs_insn_name
+	cs_malloc
 	cs_open
 	cs_option
 	cs_reg_name
@@ -36,11 +38,13 @@ EMSCRIPTEN_SETTINGS=(
 	-s WASM=0
 	-s ALLOW_MEMORY_GROWTH=1
 	-s MODULARIZE=1
-	-s ASSERTIONS
+	-s WASM_ASYNC_COMPILATION=0
+	-s ASSERTIONS=0
+	#   -fvectorize
+	#	-flto
 	-v
-	-O3
-	-Os
+	-O2
 	--memory-init-file 0
 )
 
-emcc src/capstone.cpp build/libcapstone.a ${EMSCRIPTEN_SETTINGS[*]} -o build/capstone.js
+emcc build/libcapstone.a ${EMSCRIPTEN_SETTINGS[*]} -o src/capstone.js

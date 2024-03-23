@@ -2,6 +2,7 @@
   "name": "capstone-wrapper",
   "module": "build/wrapper.js",
   "type": "module",
+  "types": "src/types/wrapper.d.ts",
   "devDependencies": {
     "@types/bun": "latest",
     "typescript": "^5.0.0",

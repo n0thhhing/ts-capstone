@@ -11,7 +11,7 @@
     "moduleResolution": "bundler",
     "allowImportingTsExtensions": true,
     "verbatimModuleSyntax": true,
-    "noEmit": true,
+    //  "noEmit": true,
 
     /* Linting */
     "skipLibCheck": true,
@@ -21,6 +21,8 @@
 
     /* Declarations */
     "declaration": true,
-    "typeRoots": ["./node_modules/@types"]
-  }
+    "declarationDir": "src/types",
+    "emitDeclarationOnly": true
+  },
+  "include": ["src"]
 }

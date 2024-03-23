@@ -57,6 +57,6 @@ OUT_FILE="$CURRENT_DIR/src/constants.js"
 echo "" >"$OUT_FILE"
 for filePath in "${EXPORTED_CONSTANTS[@]}"; do
 	fullPath="$CURRENT_DIR/$CAPSTONE_DIR/$filePath"
-	code=$(sed -E 's/^([^#[:blank:]]+)/cs.\1/g; s/^(.* = [A-Za-z_])/\/\/ \1/g; s/#/\/\//g' "$fullPath")
+	code=$(sed -E 's/^([^#[:blank:]]+)/export const \1/g; s/^(.* = [A-Za-z_])/\/\/ \1/g; s/#/\/\//g' "$fullPath")
 	echo "$code" >>"$OUT_FILE"
 done
