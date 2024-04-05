@@ -1,7 +1,8 @@
 .PHONY: format
 format:
+	-rm **/*bak
 	prettier -w --ignore-unknown *
-	shfmt -w build/scripts/build.sh build/scripts/compile.sh
+	shfmt -w build/scripts/*.sh
 
 .PHONY: build
 build: build/libcapstone.a
@@ -12,8 +13,13 @@ compile:
 	sh build/scripts/compile.sh
 
 .PHONY: bundle
-bundle: src/wrapper.ts build/capstone.js src/constants.js
+bundle: src/wrapper.ts src/capstone.js
 	bun build/scripts/bundle.ts
+
+.PHONY: type
+type:
+	-tsc src/wrapper.ts src/memory.ts src/structures.ts --downlevelIteration true --declaration --outDir src --emitDeclarationOnly --allowJs true --esModuleInterop true
+	bun build/scripts/declare.ts
 
 .DEFAULT_GOAL := help
 

@@ -1,30 +1,254 @@
-import Module from "./capstone.js";
-import * as constants from "./constants.js";
+/* most comments taken from @https://d-capstone.dpldocs.info and @https://github.com/capstone-engine/capstone */
+
+import { freemem } from 'os';
+import Module from './capstone';
+import { Memory } from './memory';
+
 
 // @ts-ignore
 const Wrapper = new Module();
-interface cs_insn {
-  id: number;
-  address: number;
-  size: number;
-  mnemonic: string;
-  op_str: string;
-  bytes: number[];
+
+type cs_err = number; // All type of errors encountered by Capstone API. These are values returned by cs_errno()
+type cs_arch = number; // Architecture type
+type cs_mode = number; // Mode type
+type cs_opt_type = number; // Runtime option for the disassembled engine
+type cs_opt_value = number; // Runtime option value (associated with option type above)
+type cs_group_type = number; // Common instruction groups - to be consistent across all architectures.
+type cs_op_type = number; // Common instruction operand types - to be consistent across all architectures
+type cs_ac_type = number; // Common instruction operand access types - to be consistent across all architectures. It is possible to combine access types, for example: CS_AC_READ | CS_AC_WRITE
+type cs_regs = Array<number>; // Type of array to keep the list of registers
+type csh = number; // Handle using with all API
+type ptr = number; // Points to a specific memory address
+
+// operands for x86 instructions
+interface cs_x86_op {
+  type: // operand type
+  | 0 // CS_OP_INVALID (Uninitialized).
+    | 1 // CS_OP_REG (Register operand).
+    | 2 // CS_OP_IMM (Immediate operand).
+    | 3; // CS_OP_MEM (Memory operand).
+  reg?: number; // register value for REG operand
+  imm?: number; // immediate value for IMM operand
+  mem?: {
+    // base/index/scale/disp value for MEM operand
+    segment: number; // segment register (or X86_REG_INVALID if irrelevant)
+    base: number; // base register (or X86_REG_INVALID if irrelevant)
+    index: number; // index register (or X86_REG_INVALID if irrelevant)
+    scale: number; // scale for index register
+    disp: number; // displacement value
+  };
+  size: number; // size of this operand (in bytes).
+  access: number; // How is this operand accessed? (READ, WRITE or READ|WRITE)
+  avx_bcast: number; // AVX broadcast type, or 0 if irrelevant
+  avx_zero_opmask: boolean; // AVX zero opmask {z}
 }
 
-type cs_err = number;
-type cs_arch = number;
-type cs_mode = number;
-type cs_opt_type = number;
-type cs_opt_value = number;
-type cs_group_type = number;
-type cs_op_type = number;
-type cs_ac_type = number;
-type csh = number;
-type ptr = number;
+// X86 architecture, including 16-bit, 32-bit & 64-bit mode
+interface cs_x86 {
+  prefix: Array<number>; // Instruction prefix, which can be up to 4 bytes. A prefix byte gets value 0 when irrelevant. prefix[0] indicates REP/REPNE/LOCK prefix (See X86_PREFIX_REP/REPNE/LOCK above) prefix[1] indicates segment override (irrelevant for x86_64): See X86_PREFIX_CS/SS/DS/ES/FS/GS above. prefix[2] indicates operand-size override (X86_PREFIX_OPSIZE) prefix[3] indicates address-size override (X86_PREFIX_ADDRSIZE)
+  opcode: Array<number>; // Instruction opcode, which can be from 1 to 4 bytes in size. This contains VEX opcode as well. An trailing opcode byte gets value 0 when irrelevant.
+  rex: number; // REX prefix: only a non-zero value is relevant for x86_64
+  addr_size: number; // Address size, which can be overridden with above prefix[5].
+  modrm: number; //ModR/M byte
+  sib: number; // SIB value, or 0 when irrelevant.
+  disp: number; // Displacement value, valid if encoding.disp_offset != 0
+  sib_index: number; // SIB index register, or X86_REG_INVALID when irrelevant.
+  sib_scale: number; // SIB scale, only applicable if sib_index is valid.
+  sib_base: number; // SIB base register, or X86_REG_INVALID when irrelevant.
+  xop_cc: number; // XOP Code Condition
+  sse_cc: number; // SSE Code Condition
+  avx_cc: number; // AVX Code Condition
+  avx_sae: boolean; // AVX Suppress all Exception
+  avx_rm: number; // AVX static rounding mode
+  eflags?: number; // EFLAGS updated by this instruction. This can be formed from OR combination of X86_EFLAGS_* symbols in x86.h
+  fpu_flags?: number; // FPU_FLAGS updated by this instruction. This can be formed from OR combination of X86_FPU_FLAGS_* symbols in x86.h
+  op_count: number; // Number of operands of this instruction, or 0 when instruction has no operand
+  operands: Array<cs_x86_op>; // operands for this instruction.
+  encoding: {
+    // encoding information
+    modrm_offset: number; // ModR/M offset, or 0 when irrelevant
+    disp_offset: number; // Displacement offset, or 0 when irrelevant.
+    disp_size: number;
+    imm_offset: number; // Immediate offset, or 0 when irrelevant.
+    imm_size: number;
+  };
+}
+
+// operands for arm64 instructions.
+interface cs_arm64_op {
+  vector_index: number; // Vector Index for some vector operands (or -1 if irrelevant)
+  vas: number; // Vector Arrangement Specifier
+  vess: number; // Vector Element Size Specifier
+  shift: {
+    type: number; // shifter type of this operand
+    value: number; // shifter value of this operand
+  };
+  ext: number; // extender type of this operand
+  type: // operand type
+  | 0 // CS_OP_INVALID (Uninitialized).
+    | 1 // CS_OP_REG (Register operand).
+    | 2 // CS_OP_IMM (Immediate operand).
+    | 3 // CS_OP_MEM (Memory operand).
+    | 4 // CS_OP_FP (Floating-Point operand).
+    | 64 // C-Immediate
+    | 65 // MRS register operand.
+    | 66 // MSR register operand.
+    | 67 // PState operand.
+    | 68 // SYS operand for IC/DC/AT/TLBI instructions.
+    | 69 // Prefetch operand (PRFM).
+    | 70; // Memory barrier operand (ISB/DMB/DSB instructions).
+  reg?: number; // register value for REG operand
+  imm?: number; // immediate value, or index for C-IMM or IMM operand
+  fp?: number; // floating point value for FP operand
+  mem?: {
+    // base/index/scale/disp value for MEM operand
+    base: number; // base register
+    index: number; // index register
+    disp: number; // displacement/offset value
+  };
+  pstate?: number; // PState field of MSR instruction.
+  sys?: number; // IC/DC/AT/TLBI operation (see arm64_ic_op, arm64_dc_op, arm64_at_op, arm64_tlbi_op)
+  prefetch?: number; // PRFM operation.
+  barrier?: number; // Memory barrier operation (ISB/DMB/DSB instructions).
+  access: number; // How is this operand accessed? (READ, WRITE or READ|WRITE)
+}
+
+// ARM64 architecture (aka AArch64)
+interface cs_arm64 {
+  cc: number; // conditional code for this insn
+  update_flags: boolean; // does this insn update flags?
+  writeback: boolean; // does this insn request writeback? 'True' means 'yes'
+  op_count: number; // Number of operands of this instruction, or 0 when instruction has no operand.
+  operands: Array<cs_arm64_op>; // operands for this instruction.
+}
+
+// ARM architecture (including Thumb/Thumb2)
+interface cs_arm {
+  usermode: boolean; // User-mode registers to be loaded (for LDM/STM instructions)
+  vector_size: number; // Scalar size for vector instructions
+  vector_data: number; // Data type for elements of vector instructions
+  cps_mode: number; // CPS mode for CPS instruction
+  cps_flag: number; // CPS mode for CPS instruction
+  cc: number; // conditional code for this insn
+  update_flag: boolean; // does this insn update flags?
+  writeback: boolean; // does this insn write-back?
+  mem_barrier: number; // Option for some memory barrier instructions
+  op_count: number; // Number of operands of this instruction, or 0 when instruction has no operand.
+  operands: Array<any>; // operands for this instruction.
+}
+
+// M68K architecture
+interface cs_mips {
+  op_count: number; // operands for this instruction.
+  operands: Array<any>; // Number of operands of this instruction, or 0 when instruction has no operand.
+}
+
+// MIPS architecture
+interface cs_m68k {
+  operands: Array<any>; // operands for this instruction.
+  op_size: {
+    // Operation size of the current instruction (NOT the actually size of instruction)
+    type: number;
+    cpu_size?: number;
+    fpu_size?: number;
+  };
+  op_count: number; // number of operands for the instruction
+}
+
+// PowerPC architecture
+interface cs_ppc {
+  bc: number; // branch code for branch instructions
+  bh: number; // branch hint for branch instructions
+  update_cr0: boolean; // if update_cr0 = True, then this 'dot' insn updates CR0
+  op_count: number; // Number of operands of this instruction, or 0 when instruction has no operand.
+  operands: Array<any>; // operands for this instruction.
+}
+
+// Sparc architecture
+interface cs_sparc {
+  cc: number; // code condition for this insn
+  hint: number; // branch hint: encoding as bitwise OR of sparc_hint.
+  op_count: number; // Number of operands of this instruction, or 0 when instruction has no operand.
+  operands: Array<any>; // operands for this instruction.
+}
+
+// SystemZ architecture
+interface cs_sysz {
+  cc: number; // Code condition
+  op_count: number; // Number of operands of this instruction, or 0 when instruction has no operand.
+  operands: Array<any>; // operands for this instruction.
+}
+
+// XCore architecture
+interface cs_xcore {
+  op_count: number; // Number of operands of this instruction, or 0 when instruction has no operand.
+  operands: Array<any>; // operands for this instruction.
+}
+
+// TMS320C64x architecture
+interface cs_tms320c64x {
+  op_count: number;
+  operands: Array<any>; // operands for this instruction.
+  condition: {
+    reg: number;
+    zero: number;
+  };
+  funit: {
+    unit: number;
+    side: number;
+    crosspath: number;
+  };
+  parallel: number;
+}
+
+// M680X architecture
+interface cs_m680x {
+  flags: number; // See: M680X instruction flags
+  op_count: number; // number of operands for the instruction or 0
+  operands: Array<any>; // operands for this insn.
+}
+
+// Ethereum architecture
+interface cs_evm {
+  pop: number; // number of items popped from the stack
+  push: number; // number of items pushed into the stack
+  fee: number; // gas fee for the instruction
+}
+
+// Detail information of disassembled instruction
+interface cs_insn {
+  id: number; // Instruction ID (basically a numeric ID for the instruction mnemonic) Find the instruction id in the 'ARCH_insn' enum in the header file of corresponding architecture, such as 'arm_insn' in arm.h for ARM, 'x86_insn' in x86.h for X86, etc... This information is available even when CS_OPT_DETAIL = CS_OPT_OFF NOTE: in Skipdata mode, "data" instruction has 0 for this id field.
+  address: number; // Address (EIP) of this instruction This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
+  size: number; // Size of this instruction This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
+  mnemonic: string; // Ascii text of instruction mnemonic This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
+  op_str: string; // Ascii text of instruction operands This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
+  bytes: Array<number>; // Machine bytes of this instruction, with number of bytes indicated by @size above This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
+  detail?: cs_detail; // cs_detail object
+}
+
+// cs_detail object. NOTE: detail object is only valid when both requirements below are met: (1) CS_OP_DETAIL = CS_OPT_ON (2) Engine is not in Skipdata mode (CS_OP_SKIPDATA option set to CS_OPT_ON)
+interface cs_detail {
+  regs_read: Array<number>; // list of implicit registers read by this insn
+  regs_read_count: number; // number of implicit registers read by this insn
+  regs_write: Array<number>; // list of implicit registers modified by this insn
+  regs_write_count: number; // number of implicit registers modified by this insn
+  groups: Array<number>; // list of group this instruction belong to
+  groups_count: number; // number of groups this insn belongs to
+  x86?: cs_x86; // X86 architecture, including 16-bit, 32-bit & 64-bit mode
+  arm?: cs_arm; // ARM64 architecture (aka AArch64)
+  arm64?: cs_arm64; // ARM architecture (including Thumb/Thumb2)
+  m68k?: cs_m68k; // M68K architecture
+  mips?: cs_mips; // MIPS architecture
+  ppc?: cs_ppc; // PowerPC architecture
+  sparc?: cs_sparc; // Sparc architecture
+  synz?: cs_sysz; // SystemZ architecture
+  xcore?: cs_xcore; // XCore architecture
+  tms320c64x?: cs_tms320c64x; // TMS320C64x architecture
+  m680x?: cs_m680x; // M680X architecture
+  evm?: cs_evm; // Ethereum architecture
+}
 
 namespace cs {
-  Object.assign(cs, constants);
   // Return codes
   export const ERR_OK: cs_err = 0; // No error: everything was fine
   export const ERR_MEM: cs_err = 1; // Out-Of-Memory error: cs_open(), cs_disasm(), cs_disasm_iter()
@@ -56,11 +280,17 @@ namespace cs {
   export const ARCH_TMS320C64X: cs_arch = 9; // TMS320C64x architecture
   export const ARCH_M680X: cs_arch = 10; // 680X architecture;
   export const ARCH_EVM: cs_arch = 11; // Ethereum architecture
-  export const ARCH_MAX: cs_arch = 12; // The maximum architecture value.
+  export const ARCH_MOS65XX: cs_arch = 12; // MOS65XX architecture (including MOS6502)
+  export const ARCH_WASM: cs_arch = 13; // WebAssembly architecture
+  export const ARCH_BPF: cs_arch = 14; // Berkeley Packet Filter architecture (including eBPF)
+  export const ARCH_RISCV: cs_arch = 15; // RISCV architecture
+  export const ARCH_SH: cs_arch = 16; // SH architecture
+  export const ARCH_TRICORE: cs_arch = 17; // TriCore architecture
+  export const ARCH_MAX: cs_arch = 18; // The maximum architecture value.
   export const ARCH_ALL: cs_arch = 0xffff; // Represents a mask that includes all architecture values.
 
   // Modes
-  export const MODE_LITTLE_ENDIAN: cs_mode = 0; // Little-Endian mode (default mode)
+  export const MODE_LITTLE_ENDIAN: cs_mode = 0; // little-endian mode (default mode)
   export const MODE_ARM: cs_mode = 0; // 32-bit ARM
   export const MODE_16: cs_mode = 1 << 1; // 16-bit mode (X86)
   export const MODE_32: cs_mode = 1 << 2; // 32-bit mode (X86)
@@ -71,28 +301,58 @@ namespace cs {
   export const MODE_MICRO: cs_mode = 1 << 4; // MicroMips mode (MIPS)
   export const MODE_MIPS3: cs_mode = 1 << 5; // Mips III ISA
   export const MODE_MIPS32R6: cs_mode = 1 << 6; // Mips32r6 ISA
-  export const MODE_MIPSGP64: cs_mode = 1 << 7; // General Purpose Registers are 64-bit wide (MIPS)
+  export const MODE_MIPS2: cs_mode = 1 << 7; // Mips II ISA
   export const MODE_V9: cs_mode = 1 << 4; // SparcV9 mode (Sparc)
   export const MODE_QPX: cs_mode = 1 << 4; // Quad Processing eXtensions mode (PPC)
+  export const MODE_SPE: cs_mode = 1 << 5; // Signal Processing Engine mode (PPC)
+  export const MODE_BOOKE: cs_mode = 1 << 6; // Book-E mode (PPC)
+  export const MODE_PS: cs_mode = 1 << 7; // Paired-singles mode (PPC)
   export const MODE_M68K_000: cs_mode = 1 << 1; // M68K 68000 mode
   export const MODE_M68K_010: cs_mode = 1 << 2; // M68K 68010 mode
   export const MODE_M68K_020: cs_mode = 1 << 3; // M68K 68020 mode
   export const MODE_M68K_030: cs_mode = 1 << 4; // M68K 68030 mode
   export const MODE_M68K_040: cs_mode = 1 << 5; // M68K 68040 mode
   export const MODE_M68K_060: cs_mode = 1 << 6; // M68K 68060 mode
-  export const MODE_BIG_ENDIAN: cs_mode = 1 << 31; // Big-Endian mode
-  export const MODE_MIPS32: cs_mode = 1 << 2; // Mips32 ISA (Mips)
-  export const MODE_MIPS64: cs_mode = 1 << 3; // Mips64 ISA (Mips)
+  export const MODE_BIG_ENDIAN: cs_mode = 1 << 31; // big-endian mode
+  export const MODE_MIPS32: cs_mode = MODE_32; // Mips32 ISA (Mips)
+  export const MODE_MIPS64: cs_mode = MODE_64; // Mips64 ISA (Mips)
   export const MODE_M680X_6301: cs_mode = 1 << 1; // M680X Hitachi 6301,6303 mode
   export const MODE_M680X_6309: cs_mode = 1 << 2; // M680X Hitachi 6309 mode
-  export const MODE_M680X_6800: cs_mode = 1 << 3; // M680X Hitachi 6800,6802 mode
-  export const MODE_M680X_6801: cs_mode = 1 << 4; // M680X Hitachi 6801,6803 mode
-  export const MODE_M680X_6805: cs_mode = 1 << 5; // Motorola/Freescale 6805 mode
-  export const MODE_M680X_6808: cs_mode = 1 << 6; // Motorola/Freescale/NXP 68HC08 mode
+  export const MODE_M680X_6800: cs_mode = 1 << 3; // M680X Motorola 6800,6802 mode
+  export const MODE_M680X_6801: cs_mode = 1 << 4; // M680X Motorola 6801,6803 mode
+  export const MODE_M680X_6805: cs_mode = 1 << 5; // M680X Motorola/Freescale 6805 mode
+  export const MODE_M680X_6808: cs_mode = 1 << 6; // M680X Motorola/Freescale/NXP 68HC08 mode
   export const MODE_M680X_6809: cs_mode = 1 << 7; // M680X Motorola 6809 mode
-  export const MODE_M680X_6811: cs_mode = 1 << 8; // Motorola/Freescale/NXP 68HC11 mode
-  export const MODE_M680X_CPU12: cs_mode = 1 << 9; // Motorola/Freescale/NXP CPU12
-  export const MODE_M680X_HCS08: cs_mode = 1 << 10; // M68HC12/HCS12 mode
+  export const MODE_M680X_6811: cs_mode = 1 << 8; // M680X Motorola/Freescale/NXP 68HC11 mode
+  export const MODE_M680X_CPU12: cs_mode = 1 << 9; // M680X Motorola/Freescale/NXP CPU12
+  export const MODE_M680X_HCS08: cs_mode = 1 << 10; // M680X Freescale/NXP HCS08 mode
+  export const MODE_BPF_CLASSIC: cs_mode = 0; // Classic BPF mode (default)
+  export const MODE_BPF_EXTENDED: cs_mode = 1 << 0; // Extended BPF mode
+  export const MODE_RISCV32: cs_mode = 1 << 0; // RISCV RV32G
+  export const MODE_RISCV64: cs_mode = 1 << 1; // RISCV RV64G
+  export const MODE_RISCVC: cs_mode = 1 << 2; // RISCV compressed instructure mode
+  export const MODE_MOS65XX_6502: cs_mode = 1 << 1; // MOS65XXX MOS 6502
+  export const MODE_MOS65XX_65C02: cs_mode = 1 << 2; // MOS65XXX WDC 65c02
+  export const MODE_MOS65XX_W65C02: cs_mode = 1 << 3; // MOS65XXX WDC W65c02
+  export const MODE_MOS65XX_65816: cs_mode = 1 << 4; // MOS65XXX WDC 65816, 8-bit m/x
+  export const MODE_MOS65XX_65816_LONG_M: cs_mode = 1 << 5; // MOS65XXX WDC 65816, 16-bit m, 8-bit x
+  export const MODE_MOS65XX_65816_LONG_X: cs_mode = 1 << 6; // MOS65XXX WDC 65816, 8-bit m, 16-bit x
+  export const MODE_MOS65XX_65816_LONG_MX: cs_mode =
+    MODE_MOS65XX_65816_LONG_M | MODE_MOS65XX_65816_LONG_X;
+  export const MODE_SH2: cs_mode = 1 << 1; // SH2
+  export const MODE_SH2A: cs_mode = 1 << 2; // SH2A
+  export const MODE_SH3: cs_mode = 1 << 3; // SH3
+  export const MODE_SH4: cs_mode = 1 << 4; // SH4
+  export const MODE_SH4A: cs_mode = 1 << 5; // SH4A
+  export const MODE_SHFPU: cs_mode = 1 << 6; // w/ FPU
+  export const MODE_SHDSP: cs_mode = 1 << 7; // w/ DSP
+  export const MODE_TRICORE_110: cs_mode = 1 << 1; // Tricore 1.1
+  export const MODE_TRICORE_120: cs_mode = 1 << 2; // Tricore 1.2
+  export const MODE_TRICORE_130: cs_mode = 1 << 3; // Tricore 1.3
+  export const MODE_TRICORE_131: cs_mode = 1 << 4; // Tricore 1.3.1
+  export const MODE_TRICORE_160: cs_mode = 1 << 5; // Tricore 1.6
+  export const MODE_TRICORE_161: cs_mode = 1 << 6; // Tricore 1.6.1
+  export const MODE_TRICORE_162: cs_mode = 1 << 7; // Tricore 1.6.2
 
   // Runtime option for the disassembled engine
   export const OPT_INVALID: cs_opt_type = 0; // No option specified
@@ -104,6 +364,7 @@ namespace cs {
   export const OPT_SKIPDATA_SETUP: cs_opt_type = 6; // Setup user-defined function for SKIPDATA option
   export const OPT_MNEMONIC: cs_opt_type = 7; // Customize instruction mnemonic
   export const OPT_UNSIGNED: cs_opt_type = 8; // print immediate operands in unsigned form
+  export const OPT_NO_BRANCH_OFFSET: cs_opt_type = 9; // ARM, prints branch immediates without offset.
 
   // Capstone option value
   export const OPT_OFF: cs_opt_value = 0; // Turn OFF an option - default option of CS_OPT_DETAIL
@@ -143,46 +404,51 @@ namespace cs {
   export const SUPPORT_X86_REDUCE = 0xffff + 2;
 
   // Manifest Constants
-  export const CS_MNEMONIC_SIZE = 32;
-  export const CS_INSN_SIZE = 232;
+  export const MNEMONIC_SIZE = 32;
+  export const INSN_SIZE = 240;
+  export const M68K_OPERAND_COUNT = 4;
+  export const M680X_OPERAND_COUNT = 9;
+  export const MAX_IMPL_W_REGS = 20;
+  export const MAX_IMPL_R_REGS = 20;
+  export const MAX_NUM_GROUPS = 8;
 
   export function version(): string {
-    const majorPtr: number = Wrapper._malloc(4);
-    const minorPtr: number = Wrapper._malloc(4);
+    const majorPtr: number = Memory.malloc(4);
+    const minorPtr: number = Memory.malloc(4);
     Wrapper.ccall(
-      "cs_version",
-      "number",
-      ["pointer", "pointer"],
+      'cs_version',
+      'number',
+      ['pointer', 'pointer'],
       [majorPtr, minorPtr],
     );
-    const major = Wrapper.getValue(majorPtr, "i32");
-    const minor = Wrapper.getValue(minorPtr, "i32");
-    Wrapper._free(majorPtr);
-    Wrapper._free(minorPtr);
+    const major: number = Wrapper.getValue(majorPtr, 'i32');
+    const minor: number = Wrapper.getValue(minorPtr, 'i32');
+    Memory.free(majorPtr);
+    Memory.free(minorPtr);
     return `${major}.${minor}`;
   }
 
   export function support(query: number): boolean {
     var ret: boolean = Wrapper.ccall(
-      "cs_support",
-      "number",
-      ["number"],
+      'cs_support',
+      'number',
+      ['number'],
       [query],
     );
     return Boolean(ret);
   }
 
   export function strerror(code: number): string {
-    return Wrapper.ccall("cs_strerror", "string", ["number"], [code]);
+    return Wrapper.ccall('cs_strerror', 'string', ['number'], [code]);
   }
 
   export function errno(handle: number): cs_err {
-    return Wrapper.ccall("cs_errno", "number", ["pointer"], [handle]);
+    return Wrapper.ccall('cs_errno', 'number', ['pointer'], [handle]);
   }
 
   export class Capstone {
-    public arch: cs_arch;
-    public mode: cs_mode;
+    private arch: cs_arch;
+    private mode: cs_mode;
     private handlePtr: ptr;
 
     constructor(arch: number, mode: number) {
@@ -190,33 +456,52 @@ namespace cs {
       this.mode = mode;
       this.handlePtr = 0;
       this.open();
+      this.init(arch);
     }
 
-    private setI64(pointer: ptr, value: number): void {
-      Wrapper.HEAPU32[(pointer >> 2) + 1] = (value / 4294967296) | 0; // upper
-      Wrapper.HEAPU32[pointer >> 2] = value | 0; // lower
-    }
+    private init(arch: cs_arch) {
+      const archMappings: { [key: number]: string } = {
+        [cs.ARCH_ARM]: 'arm',
+        [cs.ARCH_ARM64]: 'arm64',
+        [cs.ARCH_AARCH64]: 'arm64',
+        [cs.ARCH_MIPS]: 'mips',
+        [cs.ARCH_X86]: 'x86',
+        [cs.ARCH_PPC]: 'ppc',
+        [cs.ARCH_SPARC]: 'sparc',
+        [cs.ARCH_XCORE]: 'xcore',
+        [cs.ARCH_TMS320C64X]: 'tms320c64x',
+        [cs.ARCH_M680X]: 'm680x',
+        [cs.ARCH_M68K]: 'm68k',
+        [cs.ARCH_EVM]: 'evm',
+        [cs.ARCH_MOS65XX]: 'mos65xx',
+        [cs.ARCH_WASM]: 'wasm',
+        [cs.ARCH_BPF]: 'bpf',
+        [cs.ARCH_RISCV]: 'riscv',
+        [cs.ARCH_SH]: 'sh',
+        [cs.ARCH_TRICORE]: 'tricore',
+        [cs.ARCH_MAX]: 'all',
+        [cs.ARCH_ALL]: 'all',
+      };
 
-    private getI64(pointer: ptr): number {
-      return (
-        Wrapper.HEAPU32[(pointer >> 2) + 1] * 4294967296 +
-        (Wrapper.HEAPU32[pointer >> 2] | 0)
-      ); // combine upper and lower 32
+      const constants: { [key: string]: number } = require(
+        `./constants/${archMappings[arch]}_const`,
+      );
+
+      for (const key in constants) {
+        cs[key] = constants[key];
+      }
     }
 
     private dereferenceInsn(insnPtr: ptr): cs_insn {
-      const insnId: number = Wrapper.getValue(insnPtr, "i32");
-      const insnAddr: number = this.getI64(insnPtr + 8);
-      const insnSize: number = Wrapper.getValue(insnPtr + 16, "i16");
-      const insnMn: string = Wrapper.UTF8ToString(insnPtr + 34);
-      const insnOp: string = Wrapper.UTF8ToString(insnPtr + 66);
-      const insnBytes = [];
+      const insnId: number = Memory.getValue(insnPtr, 'i32');
+      const insnAddr: number = Memory.getValue(insnPtr + 8, 'i64');
+      const insnSize: number = Memory.getValue(insnPtr + 16, 'i16');
+      const insnMn: string = Wrapper.UTF8ToString(insnPtr + 42);
+      const insnOp: string = Wrapper.UTF8ToString(insnPtr + 66 + 8);
+      const insnBytes: Array<number> = [];
 
       for (let j = 0; j < insnSize; j++) {
-        let byte = Wrapper.getValue(insnPtr + 18 + j, "i8");
-        if (byte < 0) {
-          byte += 256;
-        }
+        const byte = Memory.getValue(insnPtr + 18 + j, 'u8');
         insnBytes.push(byte);
       }
 
@@ -229,84 +514,691 @@ namespace cs {
         bytes: insnBytes,
       };
 
+      const detailPtr: ptr = Memory.getValue(insnPtr + 238, '*');
+      if (detailPtr != 0) insn.detail = this.getDetail(detailPtr);
       return insn;
+    }
+
+    // TODO
+    private getDetail(pointer: ptr): cs_detail {
+      const detail: any = {};
+      const archInfoPtr: ptr = pointer + 96;
+      const regs_read_count: number = Memory.getValue(pointer + 40, 'ubyte');
+      const regs_write_count: number = Memory.getValue(pointer + 82, 'ubyte');
+      const groups_count: number = Memory.getValue(pointer + 91, 'ubyte');
+
+      detail.regs_write = [];
+      detail.groups = [];
+      detail.regs_read = [];
+      detail.regs_read_count = regs_read_count;
+      detail.regs_write_count = regs_write_count;
+      detail.groups_count = groups_count;
+
+      for (let i = 0; i < regs_read_count; i++) {
+        detail.regs_read[i] = Memory.getValue(pointer + 0 + i, 'ushort');
+      }
+
+      for (let i = 0; i < regs_write_count; i++) {
+        detail.regs_write[i] = Memory.getValue(pointer + 42 + i, 'ushort');
+      }
+
+      for (let i = 0; i < groups_count; i++) {
+        detail.groups[i] = Memory.getValue(pointer + 83 + i, 'ubyte');
+      }
+
+      let arch: any;
+      let op: any;
+      let opPtr: number;
+
+      switch (this.arch) {
+        case ARCH_X86:
+          detail.x86 = {};
+          arch = detail.x86;
+          arch.prefix = [];
+          arch.opcode = [];
+          const encodingPtr: ptr = pointer + 552;
+          for (let i = 0; i < 4; i++) {
+            arch.prefix[i] = Memory.getValue(archInfoPtr + i, 'ubyte');
+            arch.opcode[i] = Memory.getValue(archInfoPtr + i + 4, 'ubyte');
+          }
+          arch.rex = Memory.getValue(archInfoPtr + 8, 'ubyte');
+          arch.addr_size = Memory.getValue(archInfoPtr + 9, 'ubyte');
+          arch.modrm = Memory.getValue(archInfoPtr + 10, 'ubyte');
+          arch.sib = Memory.getValue(archInfoPtr + 12, 'ubyte');
+          arch.disp = Memory.getValue(archInfoPtr + 16, 'long');
+          arch.sib_index = Memory.getValue(archInfoPtr + 24, 'i32');
+          arch.sib_scale = Memory.getValue(archInfoPtr + 28, 'byte');
+          arch.sib_base = Memory.getValue(archInfoPtr + 29, 'i32');
+          arch.xop_cc = Memory.getValue(archInfoPtr + 33, 'i32');
+          arch.sse_cc = Memory.getValue(archInfoPtr + 37, 'i32');
+          arch.avx_cc = Memory.getValue(archInfoPtr + 41, 'i32');
+          arch.avx_sae = Memory.getValue(archInfoPtr + 45, 'bool');
+          arch.avx_rm = Memory.getValue(archInfoPtr + 46, 'i32');
+          arch.eflags = Memory.getValue(archInfoPtr + 50, 'ulong');
+          arch.fpu_flags = Memory.getValue(archInfoPtr + 56, 'ulong');
+          arch.op_count = Memory.getValue(archInfoPtr + 64, 'ubyte');
+          arch.encoding = {};
+          arch.operands = [];
+          arch.encoding.modrm_offset = Memory.getValue(encodingPtr, 'ubyte');
+          arch.encoding.disp_offset = Memory.getValue(encodingPtr + 1, 'ubyte');
+          arch.encoding.disp_size = Memory.getValue(encodingPtr + 2, 'ubyte');
+          arch.encoding.imm_offset = Memory.getValue(encodingPtr + 3, 'ubyte');
+          arch.encoding.imm_size = Memory.getValue(encodingPtr + 4, 'ubyte');
+
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 72 + i * 48;
+            op.type = Memory.getValue(opPtr, 'i32');
+            switch (op.type) {
+              case cs.X86_OP_REG:
+                op.reg = Memory.getValue(opPtr + 8, 'i32');
+                break;
+              case cs.X86_OP_IMM:
+                op.imm = Memory.getValue(opPtr + 8, 'i64');
+                break;
+              case cs.X86_OP_MEM:
+                op.mem = {
+                  segment: Memory.getValue(opPtr + 8, 'i32'),
+                  base: Memory.getValue(opPtr + 12, 'i32'),
+                  index: Memory.getValue(opPtr + 16, 'i32'),
+                  scale: Memory.getValue(opPtr + 20, 'i32'),
+                  disp: Memory.getValue(opPtr + 24, 'i64'),
+                };
+                break;
+            }
+            op.size = Memory.getValue(opPtr + 32, 'ubyte');
+            op.access = Memory.getValue(opPtr + 33, 'ubyte');
+            op.avx_bcast = Memory.getValue(opPtr + 36, 'i32');
+            op.avx_zero_opmask = Memory.getValue(opPtr + 40, 'bool');
+            arch.operands[i] = op;
+          }
+          break;
+        case cs.ARCH_ARM:
+          detail.arm = {};
+          arch = detail.arm;
+          arch.operands = [];
+          arch.usermode = Memory.getValue(archInfoPtr, 'bool');
+          arch.vector_size = Memory.getValue(archInfoPtr + 4, 'i32');
+          arch.vector_data = Memory.getValue(archInfoPtr + 9, 'i32');
+          arch.cps_mode = Memory.getValue(archInfoPtr + 12, 'i32');
+          arch.cps_flag = Memory.getValue(archInfoPtr + 16, 'i32');
+          arch.cc = Memory.getValue(archInfoPtr + 20, 'i32');
+          arch.update_flags = Memory.getValue(archInfoPtr + 24, 'bool');
+          arch.writeback = Memory.getValue(archInfoPtr + 25, 'bool');
+          arch.mem_barrier = Memory.getValue(archInfoPtr + 28, 'i32');
+          arch.op_count = Memory.getValue(archInfoPtr + 32, 'ubyte');
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 36 + i * 36;
+            op.vector_index = Memory.getValue(opPtr + 0, 'i32');
+            op.shift = {
+              type: Memory.getValue(opPtr + 4, 'i32'),
+              value: Memory.getValue(opPtr + 8, 'u32'),
+            };
+            op.type = Memory.getValue(opPtr + 12, 'i32');
+            switch (op.type) {
+              case cs.ARM_OP_REG:
+                op.reg = Memory.getValue(opPtr + 16, 'i32');
+                break;
+              case cs.ARM_OP_IMM:
+                op.imm = Memory.getValue(opPtr + 16, 'i32');
+                break;
+              case cs.ARM_OP_FP:
+                op.fp = Memory.getValue(opPtr + 16, 'double');
+                break;
+              case cs.ARM_OP_SETEND:
+                op.setend = Memory.getValue(opPtr + 16, 'i32');
+                break;
+              case cs.ARM_OP_MEM:
+                op.mem = {
+                  base: Memory.getValue(opPtr + 16, 'i32'),
+                  index: Memory.getValue(opPtr + 20, 'i32'),
+                  scale: Memory.getValue(opPtr + 24, 'i32'),
+                  disp: Memory.getValue(opPtr + 28, 'i32'),
+                };
+                break;
+            }
+            op.subtracted = Memory.getValue(archInfoPtr + 32, 'bool');
+            op.access = Memory.getValue(archInfoPtr + 33, 'ubyte');
+            op.neon_lane = Memory.getValue(archInfoPtr + 34, 'ubyte');
+            arch.operands[i] = op;
+          }
+          break;
+        case ARCH_ARM64:
+          detail.arm64 = {};
+          arch = detail.arm64;
+          arch.operands = [];
+          arch.cc = Memory.getValue(archInfoPtr, 'i32');
+          arch.update_flags = Memory.getValue(archInfoPtr + 4, 'bool');
+          arch.writeback = Memory.getValue(archInfoPtr + 4, 'bool');
+          arch.op_count = Memory.getValue(archInfoPtr + 6, 'i8');
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 8 + i * 40;
+            op.vector_index = Memory.getValue(opPtr + 0, 'i32');
+            op.vas = Memory.getValue(opPtr + 4, 'i32');
+            op.vess = Memory.getValue(opPtr + 8, 'i32');
+            op.shift = {
+              type: Memory.getValue(opPtr + 12, 'i32'),
+              value: Memory.getValue(opPtr + 16, 'i32'),
+            };
+            op.ext = Memory.getValue(opPtr + 20, 'i32');
+            op.type = Memory.getValue(opPtr + 24, 'i32');
+            switch (op.type) {
+              case cs.ARM64_OP_REG:
+                op.reg = Memory.getValue(opPtr + 28, 'i32');
+                break;
+              case cs.ARM64_OP_IMM:
+                op.imm = Memory.getValue(opPtr + 28, 'i64');
+                break;
+              case cs.ARM64_OP_FP:
+                op.fp = Memory.getValue(opPtr + 28, 'double');
+                break;
+              case cs.ARM64_OP_PSTATE:
+                op.pstate = Memory.getValue(opPtr + 28, 'i32');
+                break;
+              case cs.ARM64_OP_SYS:
+                op.sys = Memory.getValue(opPtr + 28, 'i32');
+                break;
+              case cs.ARM64_OP_BARRIER:
+                op.barrier = Memory.getValue(opPtr + 28, 'i32');
+                break;
+              case cs.ARM64_OP_PREFETCH:
+                op.prefetch = Memory.getValue(opPtr + 28, 'i32');
+                break;
+              case cs.ARM64_OP_MEM:
+                op.mem = {
+                  base: Memory.getValue(opPtr + 28, 'i32'),
+                  index: Memory.getValue(opPtr + 32, 'i32'),
+                  disp: Memory.getValue(opPtr + 36, 'i32'),
+                };
+                break;
+            }
+            arch.operands[i] = op;
+          }
+          break;
+        case ARCH_M68K:
+          detail.m68k = {};
+          arch = detail.m68k;
+          arch.operands = [];
+          arch.op_count = Memory.getValue(archInfoPtr + 232, 'ubyte');
+          arch.op_size = {
+            type: Memory.getValue(archInfoPtr + 224, 'i32'),
+          };
+          switch (arch.op_size.type) {
+            case cs.M68K_SIZE_TYPE_CPU:
+              arch.op_size.cpu_size = Memory.getValue(archInfoPtr + 228, 'i32');
+              break;
+            case cs.M68K_SIZE_TYPE_FPU:
+              arch.op_size.fpu_size = Memory.getValue(archInfoPtr + 228, 'i32');
+              break;
+          }
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + i * 56;
+            op.mem = {
+              base_reg: Memory.getValue(opPtr + 8, 'i32'),
+              index_reg: Memory.getValue(opPtr + 8 + 4, 'i32'),
+              in_base_reg: Memory.getValue(opPtr + 8 + 8, 'i32'),
+              in_disp: Memory.getValue(opPtr + 8 + 12, 'u32'),
+              out_disp: Memory.getValue(opPtr + 8 + 16, 'i32'),
+              disp: Memory.getValue(opPtr + 8 + 20, 'short'),
+              scale: Memory.getValue(opPtr + 8 + 22, 'ubyte'),
+              bitfield: Memory.getValue(opPtr + 8 + 23, 'ubyte'),
+              width: Memory.getValue(opPtr + 8 + 24, 'ubyte'),
+              offset: Memory.getValue(opPtr + 8 + 25, 'ubyte'),
+              index_size: Memory.getValue(opPtr + 8 + 26, 'ubyte'),
+            };
+            arch.br_disp = {
+              disp: Memory.getValue(opPtr + 8 + 27, 'i32'),
+              disp_size: Memory.getValue(opPtr + 8 + 31, 'ubyte'),
+            };
+            arch.register_bits = Memory.getValue(opPtr + 8 + 32, 'i32');
+            op.address_mode = Memory.getValue(opPtr + 8 + 36, 'i32');
+            op.type = Memory.getValue(opPtr + 48, 'i32');
+            switch (op.type) {
+              case cs.M68K_OP_REG:
+                op.reg = Memory.getValue(opPtr + 0, 'i32');
+                break;
+              case cs.M68K_OP_IMM:
+                op.imm = Memory.getValue(opPtr + 0, 'ulong');
+                break;
+              case cs.M68K_OP_FP_DOUBLE:
+                op.dimm = Memory.getValue(opPtr + 0, 'double');
+                break;
+              case cs.M68K_OP_FP_SINGLE:
+                op.simm = Memory.getValue(opPtr + 0, 'float');
+                break;
+              case cs.M68K_OP_REG_PAIR:
+                op.reg_pair = {
+                  reg_0: Memory.getValue(opPtr + 0, 'i32'),
+                  reg_1: Memory.getValue(opPtr + 4, 'i32'),
+                };
+                break;
+            }
+            arch.operands[i] = op;
+          }
+          break;
+        case ARCH_MIPS:
+          detail.mips = {};
+          arch = detail.mips;
+          arch.operands = [];
+          arch.op_count = Memory.getValue(archInfoPtr, 'ubyte');
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 4 + i * 16;
+            op.type = Memory.getValue(opPtr + 0, 'i32');
+            switch (op.type) {
+              case cs.MIPS_OP_REG:
+                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                break;
+              case cs.MIPS_OP_IMM:
+                op.imm = Memory.getValue(opPtr + 4, 'long');
+                break;
+              case cs.MIPS_OP_MEM:
+                op.mem = {
+                  base: Memory.getValue(opPtr + 4, 'i32'),
+                  disp: Memory.getValue(opPtr + 8, 'long'),
+                };
+                break;
+            }
+            arch.operands[i] = op;
+          }
+          break;
+        case ARCH_PPC:
+          detail.ppc = {};
+          arch = detail.ppc;
+          arch.operands = [];
+          arch.bc = Memory.getValue(archInfoPtr + 0, 'i32');
+          arch.bh = Memory.getValue(archInfoPtr + 4, 'i32');
+          arch.update_cr0 = Memory.getValue(archInfoPtr + 8, 'bool');
+          arch.op_count = Memory.getValue(archInfoPtr + 0x09, 'ubyte');
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 10 + i * 16;
+            op.type = Memory.getValue(opPtr, 'i32');
+            switch (op.type) {
+              case cs.PPC_OP_REG:
+                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                break;
+              case cs.PPC_OP_IMM:
+                op.imm = Memory.getValue(opPtr + 4, 'long');
+                break;
+              case cs.PPC_OP_CRX:
+                op.crx = {
+                  scale: Memory.getValue(opPtr + 4, 'u32'),
+                  reg: Memory.getValue(opPtr + 8, 'i32'),
+                  cond: Memory.getValue(opPtr + 12, 'i32'),
+                };
+                break;
+              case cs.PPC_OP_MEM:
+                op.mem = {
+                  base: Memory.getValue(opPtr + 4, 'i32'),
+                  disp: Memory.getValue(opPtr + 8, 'i32'),
+                };
+                break;
+            }
+            arch.operands[i] = op;
+          }
+          break;
+        case ARCH_SPARC:
+          detail.sparc = {};
+          arch = detail.sparc;
+          arch.operands = [];
+          arch.cc = Memory.getValue(archInfoPtr + 0, 'i32');
+          arch.hint = Memory.getValue(archInfoPtr + 4, 'i32');
+          arch.op_count = Memory.getValue(archInfoPtr + 8, 'ubyte');
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 9 + i * 12;
+            op.type = Memory.getValue(opPtr + 0, 'i32');
+            switch (op.type) {
+              case cs.SPARC_OP_REG:
+                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                break;
+              case cs.SPARC_OP_IMM:
+                op.imm = Memory.getValue(opPtr + 4, 'long');
+                break;
+              case cs.SPARC_OP_MEM:
+                op.mem = {
+                  base: Memory.getValue(opPtr + 4, 'ubyte'),
+                  index: Memory.getValue(opPtr + 5, 'ubyte'),
+                  disp: Memory.getValue(opPtr + 8, 'i32'),
+                };
+                break;
+            }
+            arch.operands[i] = op;
+          }
+          break;
+        case ARCH_SYSZ:
+          detail.synz = {};
+          arch = detail.synz;
+          arch.operands = [];
+          arch.cc = Memory.getValue(archInfoPtr + 0, 'i32');
+          arch.op_count = Memory.getValue(archInfoPtr + 4, 'ubyte');
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 8 + i * 24;
+            op.type = Memory.getValue(opPtr + 0, 'i32');
+            switch (op.type) {
+              case cs.SYSZ_OP_REG:
+                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                break;
+              case cs.SYSZ_OP_IMM:
+                op.imm = Memory.getValue(opPtr + 4, 'long');
+                break;
+              case cs.SYSZ_OP_MEM:
+                op.mem = {
+                  base: Memory.getValue(opPtr + 4, 'ubyte'),
+                  index: Memory.getValue(opPtr + 5, 'ubyte'),
+                  length: Memory.getValue(opPtr + 8, 'ulong'),
+                  disp: Memory.getValue(opPtr + 16, 'long'),
+                };
+                break;
+            }
+            arch.operands[i] = op;
+          }
+          break;
+        case ARCH_XCORE:
+          detail.xcore = {};
+          arch = detail.xcore;
+          arch.operands = [];
+          arch.op_count = Memory.getValue(archInfoPtr + 0, 'ubyte');
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 4 + i * 16;
+            op.type = Memory.getValue(opPtr + 0, 'i32');
+            switch (op.type) {
+              case cs.XCORE_OP_REG:
+                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                break;
+              case cs.XCORE_OP_IMM:
+                op.imm = Memory.getValue(opPtr + 4, 'i32');
+                break;
+              case cs.XCORE_OP_MEM:
+                op.mem = {
+                  base: Memory.getValue(opPtr + 4, 'ubyte'),
+                  index: Memory.getValue(opPtr + 5, 'ubyte'),
+                  disp: Memory.getValue(opPtr + 8, 'i32'),
+                  direct: Memory.getValue(opPtr + 12, 'i32'),
+                };
+                break;
+            }
+            arch.operands[i] = op;
+          }
+          break;
+        case ARCH_TMS320C64X:
+          detail.tms320c64x = {};
+          arch = detail.tms320c64x;
+          arch = detail.m68k;
+          arch.op_count = Memory.getValue(archInfoPtr + 0, 'ubyte');
+          arch.condition = {
+            reg: Memory.getValue(archInfoPtr + 260, 'i32'),
+            zero: Memory.getValue(archInfoPtr + 264, 'i32'),
+          };
+          arch.funit = {
+            unit: Memory.getValue(archInfoPtr + 268, 'u32'),
+            side: Memory.getValue(archInfoPtr + 272, 'u32'),
+            crosspath: Memory.getValue(archInfoPtr + 276, 'u32'),
+          };
+          arch.parallel = Memory.getValue(archInfoPtr + 280, 'u32');
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 4 + i * 32;
+            op.type = Memory.getValue(opPtr, 'i32');
+            switch (op.type) {
+              case cs.TMS320C64X_OP_REG:
+                op.reg = Memory.getValue(opPtr + 4, 'u32');
+                break;
+              case cs.TMS320C64X_OP_IMM:
+                op.imm = Memory.getValue(opPtr + 4, 'i32');
+                break;
+              case cs.TMS320C64X_OP_MEM:
+                op.mem = {
+                  base: Memory.getValue(opPtr + 4, 'u32'),
+                  disp: Memory.getValue(opPtr + 8, 'i32'),
+                  unit: Memory.getValue(opPtr + 12, 'i32'),
+                  scaled: Memory.getValue(opPtr + 16, 'i32'),
+                  disptype: Memory.getValue(opPtr + 20, 'i32'),
+                  direction: Memory.getValue(opPtr + 24, 'i32'),
+                  mdofiy: Memory.getValue(opPtr + 28, 'i32'),
+                };
+                break;
+            }
+            arch.operands[i] = op;
+          }
+          break;
+        case ARCH_M680X:
+          arch.m680x = {};
+          arch = arch.m680x;
+          arch = detail.m68k;
+          arch.flags = Memory.getValue(archInfoPtr + 0, 'ubyte');
+          arch.op_count = Memory.getValue(archInfoPtr + 1, 'ubyte');
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 4 + i * 24;
+            op.type = Memory.getValue(opPtr, 'i32');
+            op.size = Memory.getValue(opPtr + 20, 'ubyte');
+            op.access = Memory.getValue(opPtr + 21, 'ubyte');
+            switch (op.type) {
+              case cs.M680X_OP_IMMEDIATE:
+                op.imm = Memory.getValue(opPtr + 4, 'i32');
+                break;
+              case cs.M680X_OP_REGISTER:
+                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                break;
+              case cs.M680X_OP_INDEXED:
+                op.idx = {
+                  base_reg: Memory.getValue(opPtr + 4, 'i32'),
+                  offset_reg: Memory.getValue(opPtr + 8, 'i32'),
+                  offset: Memory.getValue(opPtr + 12, 'short'),
+                  offset_addr: Memory.getValue(opPtr + 14, 'ushort'),
+                  offset_bits: Memory.getValue(opPtr + 16, 'ubyte'),
+                  inc_dec: Memory.getValue(opPtr + 17, 'byte'),
+                  flags: Memory.getValue(opPtr + 18, 'ubyte'),
+                };
+                break;
+              case cs.M680X_OP_RELATIVE:
+                op.rel = {
+                  address: Memory.getValue(opPtr + 4, 'ushort'),
+                  offset: Memory.getValue(opPtr + 6, 'short'),
+                };
+                break;
+              case cs.M680X_OP_EXTENDED:
+                op.ext = {
+                  address: Memory.getValue(opPtr + 4, 'ushort'),
+                  indirect: Memory.getValue(opPtr + 6, 'bool'),
+                };
+                break;
+              case cs.M680X_OP_DIRECT:
+                op.direct_addr = Memory.getValue(opPtr + 4, 'ubyte');
+                break;
+              case cs.M680X_OP_CONSTANT:
+                op.const_val = Memory.getValue(opPtr + 4, 'ubyte');
+                break;
+            }
+            arch.operands[i] = op;
+          }
+          break;
+        case ARCH_EVM:
+          detail.evm = {};
+          arch = detail.evm;
+          arch.pop = Memory.getValue(archInfoPtr + 0, 'ubyte');
+          arch.push = Memory.getValue(archInfoPtr + 1, 'ubyte');
+          arch.fee = Memory.getValue(archInfoPtr + 2, 'ubyte');
+          break;
+        case ARCH_MOS65XX:
+          detail.mos65xx = {};
+          arch = detail.mos65xx;
+          arch.operands = [];
+          arch.am = Memory.getValue(archInfoPtr + 0, 'i32');
+          arch.modifies_flags = Memory.getValue(archInfoPtr + 4, 'bool');
+          arch.op_count = Memory.getValue(archInfoPtr + 5, 'ubyte');
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 8 + i * 8;
+            op.type = Memory.getValue(opPtr, 'i32');
+            switch (op.type) {
+              case cs.MOS65XX_OP_REG:
+                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                break;
+              case cs.MOS65XX_OP_IMM:
+                op.imm = Memory.getValue(opPtr + 4, 'i32');
+                break;
+              case cs.MOS65XX_OP_MEM:
+                op.mem = Memory.getValue(opPtr + 4, 'i32');
+                break;
+            }
+            arch.operands[i] = op;
+          }
+          break;
+        case ARCH_WASM:
+          detail.wasm = {};
+          arch = detail.wasm;
+          arch.operands = [];
+          arch.op_count = Memory.getValue(archInfoPtr + 0, 'ubyte');
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 8 + i * 32;
+            op.type = Memory.getValue(opPtr, 'i32');
+            op.size = Memory.getValue(opPtr + 4, 'i32');
+            switch (op.type) {
+              case cs.WASM_OP_INT7:
+                op.int7 = Memory.getValue(opPtr + 8, 'ubyte');
+                break;
+              case cs.WASM_OP_VARUINT32:
+                op.varuint32 = Memory.getValue(opPtr + 8, 'u32');
+                break;
+              case cs.WASM_OP_VARUINT64:
+                op.varuint64 = Memory.getValue(opPtr + 8, 'u64');
+                break;
+              case cs.WASM_OP_UINT32:
+                op.uint32 = Memory.getValue(opPtr + 8, 'u32');
+                break;
+              case cs.WASM_OP_UINT64:
+                op.uint64 = Memory.getValue(opPtr + 8, 'u64');
+                break;
+              case cs.WASM_OP_IMM:
+                op.imm = [];
+                for (let i = 0; i < 2; i++)
+                  op.imm[i] = Memory.getValue(opPtr + 8 + i, 'u32');
+                break;
+              case cs.WASM_OP_BRTABLE:
+                op.brtable = {
+                  length: Memory.getValue(opPtr + 8, 'u32'),
+                  address: Memory.getValue(opPtr + 12, 'u64'),
+                  default_target: Memory.getValue(opPtr + 12 + 64, 'u32'),
+                };
+                break;
+            }
+            arch.operands[i] = op;
+          }
+          break;
+        case ARCH_BPF:
+          arch.bpf = {};
+          arch = arch.bpf;
+          arch.operands = [];
+          arch.op_count = Memory.getValue(archInfoPtr + 0, 'ubyte');
+          for (let i = 0; i < arch.op_count; i++) {
+            op = {};
+            opPtr = archInfoPtr + 8 + i * 24;
+            arch.operands[i] = op
+          }
+          break;
+        case ARCH_RISCV:
+          arch.riscv = {};
+          arch = arch.riscv;
+          arch.operands = [];
+          break;
+        case ARCH_SH:
+          detail.sh = {};
+          arch = detail.sh;
+          arch.operands = [];
+          break;
+        case ARCH_TRICORE:
+          detail.tricore = {};
+          arch = detail.tricore;
+          arch.operands = [];
+          break;
+      }
+      return detail;
     }
 
     public option(
       option: cs_opt_type,
       value: cs_opt_value | boolean | { id: number; name: string },
     ): void {
-      const handle: csh = Wrapper.getValue(this.handlePtr, "*");
-      if (typeof value === "boolean") {
-        if (value) value = OPT_ON;
-        else value = OPT_OFF;
-      }
+      const handle: csh = Memory.getValue(this.handlePtr, '*');
+
       if (!handle) {
         return;
       }
 
-      let objPtr: ptr = 0;
+      let opVal: any = 0;
 
       if (option === OPT_MNEMONIC) {
         if (
-          typeof value !== "object" ||
+          typeof value !== 'object' ||
           value === null ||
-          typeof value.id !== "number" ||
-          typeof value.name !== "string"
+          typeof value.id !== 'number' ||
+          typeof value.name !== 'string'
         ) {
           throw new Error(
-            "When using cs.OPT_MNEMONIC, the value parameter needs to be an object: { id: number, name: string }",
+            'When using cs.OPT_MNEMONIC, the value parameter needs to be an object with the following properties,: { id: number, name: string }',
           );
         }
 
-        const strPtr: ptr = Wrapper._malloc(value.name.length + 1);
+        const strPtr: ptr = Memory.malloc(value.name.length + 1);
         for (let i = 0; i < value.name.length; i++) {
-          Wrapper.setValue(strPtr + i, value.name.charCodeAt(i), "i8");
+          Memory.setValue(strPtr + i, value.name.charCodeAt(i), 'i8');
         }
-        Wrapper.setValue(strPtr + value.name.length, 0, "i8");
+        Memory.setValue(strPtr + value.name.length, 0, 'i8');
 
-        objPtr = Wrapper._malloc(8);
-        Wrapper.setValue(objPtr, value.id, "i32");
-        Wrapper.setValue(objPtr + 4, strPtr, "i32");
+        const objPtr = Memory.malloc(8);
+        Memory.setValue(objPtr, value.id, 'i32');
+        Memory.setValue(objPtr + 4, strPtr, 'i32');
+
+        opVal = objPtr;
+      } else {
+        opVal = typeof value === 'boolean' ? (value ? OPT_ON : OPT_OFF) : value;
       }
 
       const ret: cs_err = Wrapper.ccall(
-        "cs_option",
-        "number",
-        ["pointer", "number", "number"],
-        [handle, option, option === OPT_MNEMONIC ? objPtr : value],
+        'cs_option',
+        'number',
+        ['pointer', 'number', 'number'],
+        [handle, option, opVal],
       );
 
       if (ret !== ERR_OK) {
         const error = new Error(
-          "capstone: Function cs_option failed with code " +
-            ret +
-            ":\n" +
-            strerror(ret),
+          `capstone: Function cs_option failed with code ${ret}:\n${strerror(
+            ret,
+          )}`,
         );
         throw error;
       }
 
-      if (objPtr !== 0) {
-        Wrapper._free(Wrapper.getValue(objPtr, "*"));
-        Wrapper._free(objPtr);
+      if (option === OPT_MNEMONIC && opVal !== 0) {
+        Memory.free(Memory.getValue(opVal, '*'));
+        Memory.free(opVal);
       }
     }
 
     private open(): void {
-      this.handlePtr = Wrapper._malloc(4);
+      this.handlePtr = Memory.malloc(4);
       const ret: cs_err = Wrapper.ccall(
-        "cs_open",
-        "number",
-        ["number", "number", "number"],
+        'cs_open',
+        'number',
+        ['number', 'number', 'number'],
         [this.arch, this.mode, this.handlePtr],
       );
       if (ret != ERR_OK) {
-        Wrapper.setValue(this.handlePtr, 0, "*");
+        Memory.setValue(this.handlePtr, 0, '*');
         const error =
-          "capstone: Function cs_open failed with code " +
+          'capstone: Function cs_open failed with code ' +
           ret +
-          ":\n" +
+          ':\n' +
           strerror(ret);
         throw error;
       }
@@ -314,105 +1206,105 @@ namespace cs {
 
     public close(): void {
       const ret: cs_err = Wrapper.ccall(
-        "cs_close",
-        "number",
-        ["pointer"],
+        'cs_close',
+        'number',
+        ['pointer'],
         [this.handlePtr],
       );
       if (ret != ERR_OK) {
         const error =
-          "capstone: Function cs_close failed with code " +
+          'capstone: Function cs_close failed with code ' +
           ret +
-          ":\n" +
+          ':\n' +
           strerror(ret);
         throw error;
       }
-      Wrapper._free(this.handlePtr);
+
+      Memory.allocatedMemory.delete(this.handlePtr);
+
+      if (Memory.allocatedMemory.size !== 0)
+        Memory.free(Memory.allocatedMemory);
     }
 
     public disasm(
-      buffer: Buffer | number[] | Uint8Array,
+      buffer: Buffer | Array<number> | Uint8Array,
       addr: number,
       maxLen?: number,
     ): cs_insn[] {
-      const handle: csh = Wrapper.getValue(this.handlePtr, "i32");
+      const handle: csh = Memory.getValue(this.handlePtr, 'i32');
       const bufferLen: number = buffer.length;
-      const bufferPtr: ptr = Wrapper._malloc(bufferLen);
-      const insnPtr: ptr = Wrapper._malloc(4);
+      const bufferPtr: ptr = Memory.malloc(bufferLen);
+      const insnPtr: ptr = Memory.malloc(4);
 
       Wrapper.writeArrayToMemory(buffer, bufferPtr);
 
       const insnCount: number = Wrapper.ccall(
-        "cs_disasm",
-        "number",
-        ["number", "number", "number", "number", "number", "number"],
+        'cs_disasm',
+        'number',
+        ['number', 'number', 'number', 'number', 'number', 'number'],
         [handle, bufferPtr, bufferLen, addr, 0, maxLen || 0, insnPtr],
       );
 
       if (insnCount > 0) {
-        const insnArrayPtr: ptr = Wrapper.getValue(insnPtr, "i32");
+        const insnArrayPtr: ptr = Memory.getValue(insnPtr, 'i32');
         const instructions: cs_insn[] = [];
 
         for (let i = 0; i < insnCount; i++) {
-          const insnOffset: ptr = insnArrayPtr + i * CS_INSN_SIZE;
+          const insnOffset: ptr = insnArrayPtr + i * INSN_SIZE;
           const insn: cs_insn = this.dereferenceInsn(insnOffset);
           instructions.push(insn);
         }
+        Memory.free([insnPtr, bufferPtr]);
         return instructions;
       } else {
-        Wrapper._free(insnPtr);
+        Memory.free([insnPtr, bufferPtr]);
 
         const code: cs_err = cs.errno(handle);
         const error =
-          "capstone: Function cs_disasm failed with code " +
+          'capstone: Function cs_disasm failed with code ' +
           code +
-          ":\n" +
+          ':\n' +
           strerror(code);
         throw error;
       }
-
-      this.close();
     }
 
     public disasm_iter(data: {
-      buffer: Buffer | number[] | Uint8Array;
+      buffer: Buffer | Array<number> | Uint8Array;
       addr: number;
       insn: {} | cs_insn | null;
     }): boolean {
       const { buffer, addr } = data;
-      const handle: csh = Wrapper.getValue(this.handlePtr, "i32");
+      const handle: csh = Wrapper.getValue(this.handlePtr, 'i32');
       const bufferLen: number = buffer.length;
-      const codeMem: ptr = Wrapper._malloc(buffer.length);
-      const castPtr: ptr = Wrapper._malloc(42);
+      const codeMem: ptr = Memory.malloc(buffer.length);
+      const castPtr: ptr = Memory.malloc(42);
       const codePtr: ptr = castPtr;
       const sizePtr: ptr = castPtr + 8;
       const addrPtr: ptr = castPtr + 16;
       const insnPtr: ptr = Wrapper._cs_malloc(4);
 
-      Wrapper.setValue(sizePtr, bufferLen, "i32");
-      this.setI64(addrPtr, addr);
+      Memory.setValue(addrPtr, addr, 'i64');
+      Memory.setValue(sizePtr, bufferLen, 'i32');
       Wrapper.writeArrayToMemory(buffer, codeMem);
-      Wrapper.setValue(codePtr, codeMem, "i32");
+      Memory.setValue(codePtr, codeMem, 'i32');
 
       const ret: boolean = Wrapper.ccall(
-        "cs_disasm_iter",
-        "boolean",
-        ["number", "number", "number", "number", "pointer"],
+        'cs_disasm_iter',
+        'boolean',
+        ['number', 'number', 'number', 'number', 'pointer'],
         [handle, codePtr, sizePtr, addrPtr, insnPtr],
       );
 
       if (ret) {
-        const newAddr: number = this.getI64(addrPtr);
-        const newSize: number = Wrapper.getValue(sizePtr, "i16");
+        const newAddr: number = Memory.getValue(addrPtr, 'i64');
+        const newSize: number = Memory.getValue(sizePtr, 'i16');
         const newBytes = [];
         for (let j = 0; j < newSize; j++) {
-          let byte = Wrapper.getValue(
-            Wrapper.getValue(codePtr, "i32") + j,
-            "i8",
+          const byte = Memory.getValue(
+            Memory.getValue(codePtr, 'i32') + j,
+            'u8',
           );
-          if (byte < 0) {
-            byte += 256;
-          }
           newBytes.push(byte);
         }
 
@@ -422,30 +1314,71 @@ namespace cs {
         data.addr = newAddr;
         data.insn = insn;
       }
-      Wrapper._free(codeMem);
-      Wrapper._free(castPtr);
-      Wrapper._free(insnPtr);
+      Memory.free(codeMem);
+      Memory.free(castPtr);
+      Memory.free(insnPtr);
 
       return ret;
     }
 
-    public reg_name(reg_id: number): string {
-      const handle: csh = Wrapper.getValue(this.handlePtr, "*");
+    public regs_access(
+      insn: cs_insn,
+      regs_read: cs_regs,
+      regs_read_count: number,
+      regs_write: cs_regs,
+      regs_write_count: number,
+    ): cs_err {
+      throw 'TODO';
+    }
+
+    public op_count(insn: cs_insn, op_type: number): number {
+      throw 'TODO';
+    }
+
+    public op_index(insn: cs_insn, op_type: number, position: number): number {
+      throw 'TODO';
+    }
+
+    public insn_group(insn: cs_insn, group_id: number): boolean {
+      throw 'TODO';
+    }
+
+    public reg_read(insn: cs_insn, reg_id: number): boolean {
+      throw 'TODO';
+    }
+
+    public reg_write(insn: cs_insn, reg_id: number): boolean {
+      throw 'TODO';
+    }
+
+    public group_name(group_id: number): string {
+      const handle: csh = Memory.getValue(this.handlePtr, '*');
       const ret: string = Wrapper.ccall(
-        "cs_reg_name",
-        "string",
-        ["pointer", "number"],
+        'cs_group_name',
+        'string',
+        ['pointer', 'number'],
+        [handle, group_id],
+      );
+      return ret;
+    }
+
+    public reg_name(reg_id: number): string {
+      const handle: csh = Memory.getValue(this.handlePtr, '*');
+      const ret: string = Wrapper.ccall(
+        'cs_reg_name',
+        'string',
+        ['pointer', 'number'],
         [handle, reg_id],
       );
       return ret;
     }
 
     public insn_name(insn_id: number): string {
-      const handle: csh = Wrapper.getValue(this.handlePtr, "*");
+      const handle: csh = Memory.getValue(this.handlePtr, '*');
       const ret: string = Wrapper.ccall(
-        "cs_insn_name",
-        "string",
-        ["pointer", "number"],
+        'cs_insn_name',
+        'string',
+        ['pointer', 'number'],
         [handle, insn_id],
       );
       return ret;
@@ -453,5 +1386,66 @@ namespace cs {
   }
 }
 
+declare namespace cs {
+  const X86_OP_REG: number;
+  const X86_OP_IMM: number;
+  const X86_OP_MEM: number;
+  const ARM64_OP_REG: number;
+  const ARM64_OP_IMM: number;
+  const ARM64_OP_FP: number;
+  const ARM64_OP_PSTATE: number;
+  const ARM64_OP_SYS: number;
+  const ARM64_OP_BARRIER: number;
+  const ARM64_OP_PREFETCH: number;
+  const ARM64_OP_MEM: number;
+  const M68K_OP_REG: number;
+  const M68K_OP_IMM: number;
+  const M68K_OP_FP_DOUBLE: number;
+  const M68K_OP_FP_SINGLE: number;
+  const M68K_OP_REG_PAIR: number;
+  const MIPS_OP_REG: number;
+  const MIPS_OP_IMM: number;
+  const MIPS_OP_MEM: number;
+  const PPC_OP_REG: number;
+  const PPC_OP_IMM: number;
+  const PPC_OP_CRX: number;
+  const PPC_OP_MEM: number;
+  const SPARC_OP_REG: number;
+  const SPARC_OP_IMM: number;
+  const SPARC_OP_MEM: number;
+  const SYSZ_OP_REG: number;
+  const SYSZ_OP_IMM: number;
+  const SYSZ_OP_MEM: number;
+  const XCORE_OP_REG: number;
+  const XCORE_OP_IMM: number;
+  const XCORE_OP_MEM: number;
+  const ARM_OP_REG: number;
+  const ARM_OP_IMM: number;
+  const ARM_OP_FP: number;
+  const ARM_OP_SETEND: number;
+  const ARM_OP_MEM: number;
+  const M68K_SIZE_TYPE_CPU: number;
+  const M68K_SIZE_TYPE_FPU: number;
+  const TMS320C64X_OP_REG: number;
+  const TMS320C64X_OP_IMM: number;
+  const TMS320C64X_OP_MEM: number;
+  const M680X_OP_IMMEDIATE: number;
+  const M680X_OP_REGISTER: number;
+  const M680X_OP_INDEXED: number;
+  const M680X_OP_RELATIVE: number;
+  const M680X_OP_EXTENDED: number;
+  const M680X_OP_DIRECT: number;
+  const M680X_OP_CONSTANT: number;
+  const MOS65XX_OP_REG: number;
+  const MOS65XX_OP_IMM: number;
+  const MOS65XX_OP_MEM: number;
+  const WASM_OP_INT7: number;
+  const WASM_OP_VARUINT32: number;
+  const WASM_OP_VARUINT64: number;
+  const WASM_OP_UINT32: number;
+  const WASM_OP_UINT64: number;
+  const WASM_OP_IMM: number;
+  const WASM_OP_BRTABLE: number;
+}
 export default cs;
 export { Wrapper };

@@ -23,6 +23,5 @@
     "declaration": true,
     "declarationDir": "src/types",
     "emitDeclarationOnly": true
-  },
-  "include": ["src"]
+  }
 }

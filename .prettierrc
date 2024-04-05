@@ -1,0 +1,20 @@
+{
+  "useTabs": false,
+  "tabWidth": 2,
+  "requirePragma": false,
+  "semi": true,
+  "quoteProps": "as-needed",
+  "bracketSpacing": true,
+  "trailingComma": "all",
+  "jsxBracketSameLine": false,
+  "printWidth": 80,
+  "singleQuote": true,
+    "overrides": [
+    {
+      "files": ".*rc",
+      "options": {
+        "parser": "json"
+      }
+    }
+  ]
+}

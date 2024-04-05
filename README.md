@@ -9,7 +9,7 @@ soon..
 ## Example
 
 ```javascript
-import cs from "./path/to/wrapper.js";
+import cs from './path/to/wrapper.js';
 
 const arch = cs.ARCH_ARM64; // or cs.ARCH_AARCH64
 const mode = cs.MODE_ARCH;
@@ -71,58 +71,66 @@ while (disassembler.disasm_iter(data)) {
 // options
 
 // OPT_MNEMONIC
-const mnObj = {
-  id: 191, // the id returned in the insn object, in this case, its movz, you can also find more in the constants file
-  name: "foo", // the new name of the mnemonic
-};
-disassembler.option(cs.OPT_MNEMONIC, mnObj);
-// now every time disasm (or disasm_iter) comes across
+
+// every time disasm (or disasm_iter) comes across
 // a movz instruction in the span of your disassembler instance,
 // movz will be aliased to foo, the id will still remain the same as movz
+const mnObj = {
+  id: 191, // the id returned in the insn object, in this case, its movz, you can also find more in the constants file
+  name: 'foo', // the new name of the mnemonic
+};
+disassembler.option(cs.OPT_MNEMONIC, mnObj);
 
 // OPT_MODE
-disassembler.option(cs.OPT_MODE, cs.MODE_LITTLE_ENDIAN);
+
 // after using this, your disassembler mode will be MODE_LITTLE_ENDIAN until the instance is closed or changed again
+disassembler.option(cs.OPT_MODE, cs.MODE_LITTLE_ENDIAN);
 
 // OPT_SYNTAX
 disassembler.option(cs.OPT_SYNTAX, OPT_SYNTAX_INTEL); // Default assembly syntax of all platforms (CS_OPT_SYNTAX)
 
 // OPT_SKIPDATA
-disassembler.option(cs.OPT_SKIPDATA, true /* true/false/OPT_ON/OPT_OFF */);
+
 // When disassembling binary code, there are often sections that contain
 // non-executable data, such as ASCII strings, data structures, or other
 // non-instruction bytes. By using CS_OPT_SKIPDATA, you can instruct
 // Capstone to skip over these non-instruction bytes and only disassemble the actual instructions.
+disassembler.option(cs.OPT_SKIPDATA, true /* true/false/OPT_ON/OPT_OFF */);
 
 // NOT IMPLEMENTED
 // OPT_SKIPDATA_SETUP, OPT_UNSIGNED, OPT_MEM, OPT_DETAIL
 
 // support
-cs.support(cs.MODE_LITTLE_ENDIAN);
+
 // this will return a boolean, true if valid
 // and false if not, in this case it will return true
+cs.support(cs.MODE_LITTLE_ENDIAN);
 
 // version
+
+// this should be 5.0, eventually
 cs.version();
-// this should be 4.0, eventually I will use 5.0
 
 // reg_name
-disassembler.reg_name(183); // should return w15
+
 // currently because OPT_DETAIL isn't implemented
 // you cannot get these ids unless you look at the constants
 // or you use another binding
+disassembler.reg_name(183); // should return w15
 
 // insn_name
-disassembler.insn_name(191); // movz
+
 // this returns the name of the mnemonic corresponding to the id
 // the id can be found either from the constants file or from disassembly results
+disassembler.insn_name(191); // movz
 
 // close
-disassembler.close();
+
 // this closes the Capstone instance, because we are binding c to JS
-// we now have to free unused pointers, JS usually has garbage collection
+// we now have to free unused values, JS usually has garbage collection
 // but C does not, so we have to free the disassembler instance from memory
 // manually after it's no longer in use
+disassembler.close();
 ```
 
 you can also take a look at the [tests](src/tests)
@@ -173,21 +181,6 @@ Before submitting a pull request, ensure that:
 
 Once your pull request is submitted, it will be reviewed by me. Thank you
 
-## Editing Documentation
-
-If you want to edit the documentation for the Capstone module, please follow these guidelines:
-
-1. **Accuracy**: Ensure that any changes made to the documentation accurately reflect the functionality or behavior of the module.
-2. **Clarity**: Use clear and concise language to explain concepts, methods, and usage examples. Avoid jargon or overly technical language that may be difficult for users to understand.
-3. **Consistency**: Maintain consistency in formatting, style, and terminology throughout the documentation. Follow the existing patterns and conventions to ensure coherence.
-4. **Completeness**: Make sure that the documentation covers all relevant aspects of the module, including available constants, methods, and usage instructions. If you add new features or options, update the documentation accordingly.
-5. **Examples**: Include code examples wherever possible to illustrate usage patterns and demonstrate how to use the module effectively. Ensure that examples are relevant, accurate, and easy to follow.
-6. **Documentation Comments**: If you're editing source code comments, ensure they are informative, clear, and follow the appropriate formatting conventions.
-7. **Review**: Before submitting your changes, review the documentation to check for any errors, typos, or inconsistencies. It's helpful to have someone else review your changes as well to ensure quality.
-8. **Versioning**: If your changes are specific to a particular version of the module, indicate this clearly in the documentation. If applicable, provide information about backward compatibility or deprecated features.
-9. **Documentation Structure**: If you're making structural changes to the documentation, ensure that the organization and layout remain logical and intuitive for users to navigate.
-10. **Commit Messages**: Use clear and descriptive commit messages when committing your changes. This helps maintain a clear history of changes and makes it easier to track modifications over time.
-
 ## Issues
 
 If you encounter any bugs, have questions, or want to suggest new features for the Capstone wrapper, please open an issue on the GitHub repository.
@@ -201,7 +194,3 @@ Before opening a new issue, please ensure that:
 When opening a new issue, please use a clear and descriptive title and provide as much context as possible to help understand the issue or suggestion.
 
 Thank you for your contribution!
-
-## notes
-
-- idk why i did all this, i dont expect any contribution

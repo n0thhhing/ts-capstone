@@ -1,8 +1,6 @@
 EXPORTED_FUNCTIONS=(
 	malloc
 	free
-	strlen
-	strncpy
 	cs_close
 	cs_disasm
 	cs_disasm_iter
@@ -20,6 +18,9 @@ EXPORTED_FUNCTIONS=(
 	cs_version
 )
 METHODS=(
+	#stringToNewUTF8
+	#POINTER_SIZE
+	addFunction
 	cwrap
 	ccall
 	getValue
@@ -39,11 +40,16 @@ EMSCRIPTEN_SETTINGS=(
 	-s ALLOW_MEMORY_GROWTH=1
 	-s MODULARIZE=1
 	-s WASM_ASYNC_COMPILATION=0
-	-s ASSERTIONS=0
+	-s ASSERTIONS=2
+	-s SAFE_HEAP=1
+	-s STACK_OVERFLOW_CHECK=2
+	# -s ALLOW_TABLE_GROWTH
+	# --profiling
+	#   -s SPLIT_MODULE
 	#   -fvectorize
-	#	-flto
+	#   -flto
 	-v
-	-O2
+	-O3
 	--memory-init-file 0
 )
 
