@@ -40,6 +40,15 @@
 #define TMS320C64X                                                             \
   "\x01\xac\x88\x40\x81\xac\x88\x43\x00\x00\x00\x00\x02\x90\x32\x96\x02\x80"   \
   "\x46\x9e\x05\x3c\x83\xe6\x0b\x0c\x8b\x24"
+#define XCORE                                                                  \
+  "\xfe\x0f\xfe\x17\x13\x17\xc6\xfe\xec\x17\x97\xf8\xec\x4f\x1f\xfd\xec\x37"   \
+  "\x07\xf2\x45\x5b\xf9\xfa\x02\x06\x1b\x10\x09\xfd\xec\xa7"
+#define CPU12                                                                  \
+  "\x00\x04\x01\x00\x0c\x00\x80\x0e\x00\x80\x00\x11\x1e\x10\x00\x80\x00"       \
+  "\x3b\x4a\x10\x00\x04\x4b\x01\x04\x4f\x7f\x80\x00\x8f\x10\x00\xb7\x52"       \
+  "\xb7\xb1\xa6\x67\xa6\xfe\xa6\xf7\x18\x02\xe2\x30\x39\xe2\x10\x00"           \
+  "\x18\x0c\x30\x39\x10\x00\x18\x11\x18\x12\x10\x00\x18\x19\x00\x18\x1e\x00"   \
+  "\x18\x3e\x18\x3f\x00"
 
 int main(void) {
   csh x86handle;
@@ -221,6 +230,62 @@ int main(void) {
     }
   }
 
+  csh xcorehandle;
+  cs_insn *xcoreinsn;
+  size_t xcorecount;
+
+  if (cs_open(CS_ARCH_XCORE, CS_MODE_BIG_ENDIAN, &xcorehandle) != CS_ERR_OK)
+    return -1;
+  cs_option(xcorehandle, CS_OPT_DETAIL, CS_OPT_ON);
+  xcorecount = cs_disasm(xcorehandle, (uint8_t *)XCORE, sizeof(XCORE) - 1,
+                         0x1000, 0, &xcoreinsn);
+  if (xcorecount > 0) {
+    size_t j;
+
+    printf("\x1b[31mxcore\x1b[0m\n");
+    for (j = 0; j < xcorecount; j++) {
+      cs_detail *detail = xcoreinsn[j].detail;
+      printf("regs_read_count: %d\n", detail->regs_read_count);
+      cs_xcore *xcore = &(detail->xcore);
+      for (int i = 0; i < xcore->op_count; i++) {
+        cs_xcore_op *op = &(xcore->operands[i]);
+        switch ((int)op->type) {
+        default:
+          break;
+        case XCORE_OP_REG:
+          printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
+                 cs_reg_name(xcorehandle, op->reg), op->reg);
+          break;
+        case XCORE_OP_IMM:
+          printf("\t\toperands[%u].type: IMM = 0x%x(%d)\n", i, op->imm,
+                 op->imm);
+          break;
+        case XCORE_OP_MEM:
+          printf("base: %d\n", op->mem.base);
+          printf("index: %d\n", op->mem.index);
+          printf("disp: %d\n", op->mem.disp);
+          printf("direct: %d\n", op->mem.direct);
+          printf("\t\toperands[%u].type: MEM\n", i);
+          if (op->mem.base != XCORE_REG_INVALID)
+            printf("\t\t\toperands[%u].mem.base: REG = %s(%d)\n", i,
+                   cs_reg_name(xcorehandle, op->mem.base), op->mem.base);
+          if (op->mem.index != XCORE_REG_INVALID)
+            printf("\t\t\toperands[%u].mem.index: REG = %s(%d)\n", i,
+                   cs_reg_name(xcorehandle, op->mem.index), op->mem.index);
+          if (op->mem.disp != 0)
+            printf("\t\t\toperands[%u].mem.disp: 0x%x(%d)\n", i, op->mem.disp,
+                   op->mem.disp);
+          if (op->mem.direct != 1)
+            printf("\t\t\toperands[%u].mem.direct: -1(%d)\n", i,
+                   op->mem.direct);
+
+          break;
+        }
+      }
+      printf("\n\n");
+    }
+  }
+
   csh tms320c64xhandle;
   cs_insn *tms320c64xinsn;
   size_t tms320c64xcount;
@@ -314,6 +379,131 @@ int main(void) {
       printf("\n\n");
     }
   }
+
+  static const char *s_access[] = {
+      "UNCHANGED",
+      "READ",
+      "WRITE",
+      "READ | WRITE",
+  };
+  csh m680xhandle;
+  cs_insn *m680xinsn;
+  size_t m680xcount;
+
+  if (cs_open(CS_ARCH_M680X, CS_MODE_M680X_CPU12, &m680xhandle) != CS_ERR_OK)
+    return -1;
+  cs_option(m680xhandle, CS_OPT_DETAIL, CS_OPT_ON);
+  m680xcount = cs_disasm(m680xhandle, (uint8_t *)CPU12, sizeof(CPU12) - 1,
+                         0x1000, 0, &m680xinsn);
+  if (m680xcount > 0) {
+    size_t j;
+
+    printf("\x1b[31mm680x\x1b[0m\n");
+    for (j = 0; j < m680xcount; j++) {
+      cs_detail *detail = m680xinsn[j].detail;
+      printf("regs_read_count: %d\n", detail->regs_read_count);
+      printf("count: %d\n", m680xcount);
+      printf("flags: %d\n", detail->m680x.flags);
+      cs_m680x *m680x = &(detail->m680x);
+      for (int i = 0; i < m680x->op_count; i++) {
+        cs_m680x_op *op = &(m680x->operands[i]);
+        const char *comment;
+
+        switch ((int)op->type) {
+        default:
+          break;
+
+        case M680X_OP_REGISTER:
+          comment = "";
+
+          if ((i == 0 && (m680x->flags & M680X_FIRST_OP_IN_MNEM)) ||
+              ((i == 1 && (m680x->flags & M680X_SECOND_OP_IN_MNEM))))
+            comment = " (in mnemonic)";
+
+          printf("\t\toperands[%u].type: REGISTER = %s%s(%d)\n", i,
+                 cs_reg_name(m680xhandle, op->reg), comment, op->reg);
+          break;
+
+        case M680X_OP_CONSTANT:
+          printf("\t\toperands[%u].type: CONSTANT = %u(%d)\n", i, op->const_val,
+                 op->const_val);
+          break;
+
+        case M680X_OP_IMMEDIATE:
+          printf("\t\toperands[%u].type: IMMEDIATE = #%d(%d)\n", i, op->imm,
+                 op->imm);
+          break;
+
+        case M680X_OP_DIRECT:
+          printf("\t\toperands[%u].type: DIRECT = 0x%02x(%d)\n", i,
+                 op->direct_addr, op->direct_addr);
+          break;
+
+        case M680X_OP_EXTENDED:
+          printf("\t\toperands[%u].type: EXTENDED %s = 0x%04x(%d)\n", i,
+                 op->ext.indirect ? "true" : "false", op->ext.address,
+                 op->ext.address);
+          break;
+
+        case M680X_OP_RELATIVE:
+          printf("\t\toperands[%u].type: RELATIVE addr = 0x%04x(%d)\n", i,
+                 op->rel.address, op->rel.address);
+          printf("\t\toperands[%u].type: RELATIVE offset = %d\n", i,
+                 op->rel.offset);
+          break;
+
+        case M680X_OP_INDEXED:
+          printf("base_reg: %d\n", op->idx.base_reg);
+          printf("offset_reg: %d\n", op->idx.offset_reg);
+          printf("offset: %d\n", op->idx.offset);
+          printf("offset_addr: %d\n", op->idx.offset_addr);
+          printf("offset_bits: %d\n", op->idx.offset_bits);
+          printf("inc_dec: %d\n", op->idx.inc_dec);
+          printf("flags: %d\n", op->idx.flags);
+          printf("\t\toperands[%u].type: INDEXED%s\n", i,
+                 (op->idx.flags & M680X_IDX_INDIRECT) ? " INDIRECT" : "");
+
+          if (op->idx.base_reg != M680X_REG_INVALID)
+            printf("\t\t\tbase register: %s\n",
+                   cs_reg_name(m680xhandle, op->idx.base_reg));
+
+          if (op->idx.offset_reg != M680X_REG_INVALID)
+            printf("\t\t\toffset register: %s\n",
+                   cs_reg_name(m680xhandle, op->idx.offset_reg));
+
+          if ((op->idx.offset_bits != 0) &&
+              (op->idx.offset_reg == M680X_REG_INVALID) && !op->idx.inc_dec) {
+            printf("\t\t\toffset: %d\n", op->idx.offset);
+
+            if (op->idx.base_reg == M680X_REG_PC)
+              printf("\t\t\toffset address: 0x%x\n", op->idx.offset_addr);
+
+            printf("\t\t\toffset bits: %u\n", op->idx.offset_bits);
+          }
+
+          if (op->idx.inc_dec) {
+            const char *post_pre =
+                op->idx.flags & M680X_IDX_POST_INC_DEC ? "post" : "pre";
+            const char *inc_dec =
+                (op->idx.inc_dec > 0) ? "increment" : "decrement";
+
+            printf("\t\t\t%s %s: %d\n", post_pre, inc_dec,
+                   abs(op->idx.inc_dec));
+          }
+
+          break;
+        }
+
+        if (op->size != 0)
+          printf("\t\t\tsize: %u\n", op->size);
+
+        if (op->access != CS_AC_INVALID)
+          printf("\t\t\taccess: %s(%d)\n", s_access[op->access], op->access);
+      }
+      printf("\n\n");
+    }
+  }
+
   csh evmhandle;
   cs_insn *evminsn;
   size_t evmcount;

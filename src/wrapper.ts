@@ -819,9 +819,9 @@ namespace cs {
           }
           break;
         case ARCH_M680X:
-          arch.m680x = {};
-          arch = arch.m680x;
-          arch = detail.m68k;
+          detail.m680x = {};
+          arch = detail.m680x;
+          arch.operands = [];
           arch.flags = Memory.getValue(archInfoPtr + 0, 'ubyte');
           arch.op_count = Memory.getValue(archInfoPtr + 1, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
