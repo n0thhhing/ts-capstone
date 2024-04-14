@@ -44,7 +44,7 @@ const instructions = d.disasm(buffer, offset);
 
 // Display results;
 instructions.forEach(function (instr) {
-  console.log(require("util").inspect(instr, { depth: null }));
+  console.log(require('util').inspect(instr, { depth: null }));
 });
 
 d.close();

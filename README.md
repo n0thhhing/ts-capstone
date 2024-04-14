@@ -176,7 +176,7 @@ cs.version(); // 5.0
 
 // This returns the name of the group
 // that an instruction can belong to
-// These groups can be found in the 
+// These groups can be found in the
 // constants directory or the detail obj
 // when CS_DETAIL is turned on.
 disassembler.group_name(2) // call
@@ -252,6 +252,7 @@ git clone https://github.com/capstone-engine/capstone
 
 2. Make sure you have bun and emsdk installed
 3. Install dependancies
+
 ```shell
 npm i -D
 ```
@@ -270,18 +271,12 @@ The makefile provides some commands for necessary builds, which includes
 ### Initializing
 
 ```javascript
-import Module from "./capstone.js"; // capstone.js should be in the src directory after building
+import Module from './capstone.js'; // capstone.js should be in the src directory after building
 
 const Capstone = new Module();
 // Use as necessary
 // ...
 ```
-
-### Extra info
-
-For more information on the build system and the API,
-see [BUILD.md](./build/BUILD.md), this provides info on the functions I have made
-to make developing easier.
 
 ## Contributing
 
