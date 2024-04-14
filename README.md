@@ -1,6 +1,7 @@
 # ts-capstone
 
-This module provides thin bindings for the Capstone disassembly framework.
+This module provides thin bindings for the
+Capstone disassembly framework using emscripten
 
 ```bash
 # soon this will be a npm package
