@@ -1,4 +1,4 @@
-# Capstone binding
+# ts-capstone
 
 This module provides thin bindings for the Capstone disassembly framework.
 
