@@ -90,27 +90,27 @@ combine_files() {
 }
 
 FILES=(
-	'src/constants/evm_const.js'
-	'src/constants/mos65xx_const.js'
-	'src/constants/sysz_const.js'
-	'src/constants/x86_const.js'
-	'src/constants/arm64_const.js'
-	'src/constants/m680x_const.js'
-	'src/constants/ppc_const.js'
-	'src/constants/tms320c64x_const.js'
-	'src/constants/xcore_const.js'
-	'src/constants/arm_const.js'
-	'src/constants/m68k_const.js'
-	'src/constants/riscv_const.js'
-	'src/constants/tricore_const.js'
-	'src/constants/bpf_const.js'
-	'src/constants/mips_const.js'
-	'src/constants/sparc_const.js'
-	'src/constants/wasm_const.js'
+	'src/constants/evm_const.ts'
+	'src/constants/mos65xx_const.ts'
+	'src/constants/sysz_const.ts'
+	'src/constants/x86_const.ts'
+	'src/constants/arm64_const.ts'
+	'src/constants/m680x_const.ts'
+	'src/constants/ppc_const.ts'
+	'src/constants/tms320c64x_const.ts'
+	'src/constants/xcore_const.ts'
+	'src/constants/arm_const.ts'
+	'src/constants/m68k_const.ts'
+	'src/constants/riscv_const.ts'
+	'src/constants/tricore_const.ts'
+	'src/constants/bpf_const.ts'
+	'src/constants/mips_const.ts'
+	'src/constants/sparc_const.ts'
+	'src/constants/wasm_const.ts'
 )
 for filePath in "${EXPORTED_CONSTANTS[@]}"; do
 	fileName=$(basename "$filePath" .py)
-	OUT_FILE="$CURRENT_DIR/src/constants/$fileName.js"
+	OUT_FILE="$CURRENT_DIR/src/constants/$fileName.ts"
 	fullPath="$CURRENT_DIR/$CAPSTONE_DIR/$filePath"
 	code=$(sed -E 's/^([^#[:blank:]]+)/export const \1/g; s/^(.* = [A-Za-z_])/\/\/ \1/g; s/#/\/\//g; s/.*from.*//g' "$fullPath")
 	echo "$code" >"$OUT_FILE"

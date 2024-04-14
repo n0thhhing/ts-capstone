@@ -376,7 +376,9 @@ export namespace Memory {
     };
 
     const returnSignature: string = typeMap[returnType];
-    const argSignatures: Array<string> = argumentTypes.map((type) => typeMap[type]);
+    const argSignatures: Array<string> = argumentTypes.map(
+      (type) => typeMap[type],
+    );
 
     const signature: string = returnSignature + argSignatures.join('');
     const funcPtr: ptr = Wrapper.addFunction(func, signature);

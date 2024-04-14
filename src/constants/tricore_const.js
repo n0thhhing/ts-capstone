@@ -1,8 +1,8 @@
 // For Capstone Engine. AUTO-GENERATED FILE, DO NOT EDIT [tricore_const.py]
-// export const TRICORE_OP_INVALID = CS_OP_INVALID
-// export const TRICORE_OP_REG = CS_OP_REG
-// export const TRICORE_OP_IMM = CS_OP_IMM
-// export const TRICORE_OP_MEM = CS_OP_MEM
+export const TRICORE_OP_INVALID = 0;
+export const TRICORE_OP_REG = 1;
+export const TRICORE_OP_IMM = 2;
+export const TRICORE_OP_MEM = 128;
 export const TRICORE_OP_COUNT = 8;
 
 export const TRICORE_REG_INVALID = 0;

@@ -3,7 +3,6 @@ import { expect, test } from 'bun:test';
 
 test('disasm_iter ARM', () => {
   const armDisassembler = new cs.Capstone(cs.ARCH_ARM, cs.MODE_THUMB);
-  armDisassembler.option(cs.OPT_DETAIL, true);
   // prettier-ignore
   const armBuffer = [
     0x4f, 0xf0, 0x00, 0x01, // 0x1000 mov.w r1, #0
@@ -91,7 +90,6 @@ test('disasm_iter ARM', () => {
 
 test('disasm_iter ARM64', () => {
   const arm64Disassembler = new cs.Capstone(1, 0);
-  arm64Disassembler.option(cs.OPT_DETAIL, true);
   // prettier-ignore
   const arm64Buffer = [  
     0xf5, 0x53, 0xbe, 0xa9, // 0x4db43dc stp x21, x20, [sp, #-0x20]!

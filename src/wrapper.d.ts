@@ -9,153 +9,6 @@ type cs_group_type = number;
 type cs_op_type = number;
 type cs_ac_type = number;
 type cs_regs = Array<number>;
-interface cs_x86_op {
-    type: 0 | 1 | 2 | 3;
-    reg?: number;
-    imm?: number;
-    mem?: {
-        segment: number;
-        base: number;
-        index: number;
-        scale: number;
-        disp: number;
-    };
-    size: number;
-    access: number;
-    avx_bcast: number;
-    avx_zero_opmask: boolean;
-}
-interface cs_x86 {
-    prefix: Array<number>;
-    opcode: Array<number>;
-    rex: number;
-    addr_size: number;
-    modrm: number;
-    sib: number;
-    disp: number;
-    sib_index: number;
-    sib_scale: number;
-    sib_base: number;
-    xop_cc: number;
-    sse_cc: number;
-    avx_cc: number;
-    avx_sae: boolean;
-    avx_rm: number;
-    eflags?: number;
-    fpu_flags?: number;
-    op_count: number;
-    operands: Array<cs_x86_op>;
-    encoding: {
-        modrm_offset: number;
-        disp_offset: number;
-        disp_size: number;
-        imm_offset: number;
-        imm_size: number;
-    };
-}
-interface cs_arm64_op {
-    vector_index: number;
-    vas: number;
-    vess: number;
-    shift: {
-        type: number;
-        value: number;
-    };
-    ext: number;
-    type: 0 | 1 | 2 | 3 | 4 | 64 | 65 | 66 | 67 | 68 | 69 | 70;
-    reg?: number;
-    imm?: number;
-    fp?: number;
-    mem?: {
-        base: number;
-        index: number;
-        disp: number;
-    };
-    pstate?: number;
-    sys?: number;
-    prefetch?: number;
-    barrier?: number;
-    access: number;
-}
-interface cs_arm64 {
-    cc: number;
-    update_flags: boolean;
-    writeback: boolean;
-    op_count: number;
-    operands: Array<cs_arm64_op>;
-}
-interface cs_arm {
-    usermode: boolean;
-    vector_size: number;
-    vector_data: number;
-    cps_mode: number;
-    cps_flag: number;
-    cc: number;
-    update_flag: boolean;
-    writeback: boolean;
-    mem_barrier: number;
-    op_count: number;
-    operands: Array<any>;
-}
-interface cs_mips {
-    op_count: number;
-    operands: Array<any>;
-}
-interface cs_m68k {
-    operands: Array<any>;
-    op_size: {
-        type: number;
-        cpu_size?: number;
-        fpu_size?: number;
-    };
-    op_count: number;
-}
-interface cs_ppc {
-    bc: number;
-    bh: number;
-    update_cr0: boolean;
-    op_count: number;
-    operands: Array<any>;
-}
-interface cs_sparc {
-    cc: number;
-    hint: number;
-    op_count: number;
-    operands: Array<any>;
-}
-interface cs_sysz {
-    cc: number;
-    op_count: number;
-    operands: Array<any>;
-}
-interface cs_xcore {
-    op_count: number;
-    operands: Array<any>;
-}
-interface cs_tms320c64x {
-    op_count: number;
-    operands: Array<any>;
-    condition: {
-        reg: number;
-        zero: number;
-    };
-    funit: {
-        unit: number;
-        side: number;
-        crosspath: number;
-    };
-    parallel: number;
-}
-interface cs_m680x {
-    flags: number;
-    op_count: number;
-    operands: Array<any>;
-}
-interface cs_evm {
-    pop: number;
-    push: number;
-    fee: number;
-}
 interface cs_insn {
     id: number;
     address: number;
@@ -172,18 +25,25 @@ interface cs_detail {
     regs_write_count: number;
     groups: Array<number>;
     groups_count: number;
-    x86?: cs_x86;
-    arm?: cs_arm;
-    arm64?: cs_arm64;
-    m68k?: cs_m68k;
-    mips?: cs_mips;
-    ppc?: cs_ppc;
-    sparc?: cs_sparc;
-    synz?: cs_sysz;
-    xcore?: cs_xcore;
-    tms320c64x?: cs_tms320c64x;
-    m680x?: cs_m680x;
-    evm?: cs_evm;
+    writeback: boolean;
+    x86?: any;
+    arm?: any;
+    arm64?: any;
+    m68k?: any;
+    mips?: any;
+    ppc?: any;
+    sparc?: any;
+    synz?: any;
+    xcore?: any;
+    tms320c64x?: any;
+    m680x?: any;
+    evm?: any;
+    mos65xx?: any;
+    wasm?: any;
+    bpf?: any;
+    riscv?: any;
+    sh?: any;
+    tricore?: any;
 }
 declare namespace cs {
     const ARM64_AT_S12E0R: number;
@@ -14623,6 +14483,7 @@ declare namespace cs {
     const INSN_SIZE = 240;
     const M68K_OPERAND_COUNT = 4;
     const M680X_OPERAND_COUNT = 9;
+    const TRICORE_OP_COUNT = 8;
     const MAX_IMPL_W_REGS = 20;
     const MAX_IMPL_R_REGS = 20;
     const MAX_NUM_GROUPS = 8;
@@ -14637,6 +14498,7 @@ declare namespace cs {
         constructor(arch: number, mode: number);
         private init;
         private dereferenceInsn;
+        private referenceInsn;
         private getDetail;
         option(option: cs_opt_type, value: cs_opt_value | boolean | {
             id: number;
@@ -14678,6 +14540,9 @@ declare namespace cs {
     const M68K_OP_FP_DOUBLE: number;
     const M68K_OP_FP_SINGLE: number;
     const M68K_OP_REG_PAIR: number;
+    const M68K_OP_REG_BITS: number;
+    const M68K_OP_BR_DISP: number;
+    const M68K_OP_MEM: number;
     const MIPS_OP_REG: number;
     const MIPS_OP_IMM: number;
     const MIPS_OP_MEM: number;
@@ -14704,6 +14569,7 @@ declare namespace cs {
     const TMS320C64X_OP_REG: number;
     const TMS320C64X_OP_IMM: number;
     const TMS320C64X_OP_MEM: number;
+    const TMS320C64X_OP_REGPAIR: number;
     const M680X_OP_IMMEDIATE: number;
     const M680X_OP_REGISTER: number;
     const M680X_OP_INDEXED: number;
@@ -14721,6 +14587,22 @@ declare namespace cs {
     const WASM_OP_UINT64: number;
     const WASM_OP_IMM: number;
     const WASM_OP_BRTABLE: number;
+    const BPF_OP_REG: number;
+    const BPF_OP_IMM: number;
+    const BPF_OP_OFF: number;
+    const BPF_OP_MEM: number;
+    const BPF_OP_MMEM: number;
+    const BPF_OP_MSH: number;
+    const BPF_OP_EXT: number;
+    const RISCV_OP_REG: number;
+    const RISCV_OP_IMM: number;
+    const RISCV_OP_MEM: number;
+    const SH_OP_REG: number;
+    const SH_OP_IMM: number;
+    const SH_OP_MEM: number;
+    const TRICORE_OP_REG: number;
+    const TRICORE_OP_IMM: number;
+    const TRICORE_OP_MEM: number;
 }
 export default cs;
 export { Wrapper };
