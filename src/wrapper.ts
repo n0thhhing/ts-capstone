@@ -43,7 +43,7 @@ interface cs_detail {
   mips?: any; // MIPS architecture
   ppc?: any; // PowerPC architecture
   sparc?: any; // Sparc architecture
-  synz?: any; // SystemZ architecture
+  sysz?: any; // SystemZ architecture
   xcore?: any; // XCore architecture
   tms320c64x?: any; // TMS320C64x architecture
   m680x?: any; // M680X architecture
@@ -277,6 +277,7 @@ namespace cs {
         [cs.ARCH_X86]: 'x86',
         [cs.ARCH_PPC]: 'ppc',
         [cs.ARCH_SPARC]: 'sparc',
+        [cs.ARCH_SYSZ]: 'sysz',
         [cs.ARCH_XCORE]: 'xcore',
         [cs.ARCH_TMS320C64X]: 'tms320c64x',
         [cs.ARCH_M680X]: 'm680x',
@@ -418,17 +419,22 @@ namespace cs {
           arch.eflags = Memory.getValue(archInfoPtr + 50, 'ulong');
           arch.fpu_flags = Memory.getValue(archInfoPtr + 56, 'ulong');
           arch.op_count = Memory.getValue(archInfoPtr + 64, 'ubyte');
-          arch.encoding = {};
+          arch.encoding = {
+            modrm_offset: Memory.getValue(encodingPtr, 'ubyte'),
+            disp_offset: Memory.getValue(encodingPtr + 1, 'ubyte'),
+            disp_size: Memory.getValue(encodingPtr + 2, 'ubyte'),
+            imm_offset: Memory.getValue(encodingPtr + 3, 'ubyte'),
+            imm_size: Memory.getValue(encodingPtr + 4, 'ubyte'),
+          };
           arch.operands = [];
-          arch.encoding.modrm_offset = Memory.getValue(encodingPtr, 'ubyte');
-          arch.encoding.disp_offset = Memory.getValue(encodingPtr + 1, 'ubyte');
-          arch.encoding.disp_size = Memory.getValue(encodingPtr + 2, 'ubyte');
-          arch.encoding.imm_offset = Memory.getValue(encodingPtr + 3, 'ubyte');
-          arch.encoding.imm_size = Memory.getValue(encodingPtr + 4, 'ubyte');
 
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
             opPtr = archInfoPtr + 72 + i * 48;
+            op.size = Memory.getValue(opPtr + 32, 'ubyte');
+            op.access = Memory.getValue(opPtr + 33, 'ubyte');
+            op.avx_bcast = Memory.getValue(opPtr + 36, 'i32');
+            op.avx_zero_opmask = Memory.getValue(opPtr + 40, 'bool');
             op.type = Memory.getValue(opPtr, 'i32');
             switch (op.type) {
               case cs.X86_OP_REG:
@@ -447,10 +453,6 @@ namespace cs {
                 };
                 break;
             }
-            op.size = Memory.getValue(opPtr + 32, 'ubyte');
-            op.access = Memory.getValue(opPtr + 33, 'ubyte');
-            op.avx_bcast = Memory.getValue(opPtr + 36, 'i32');
-            op.avx_zero_opmask = Memory.getValue(opPtr + 40, 'bool');
             arch.operands[i] = op;
           }
           break;
@@ -466,22 +468,29 @@ namespace cs {
           arch.cc = Memory.getValue(archInfoPtr + 20, 'i32');
           arch.update_flags = Memory.getValue(archInfoPtr + 24, 'bool');
           arch.writeback = Memory.getValue(archInfoPtr + 25, 'bool');
+          arch.post_index = Memory.getValue(archInfoPtr + 26, 'bool');
           arch.mem_barrier = Memory.getValue(archInfoPtr + 28, 'i32');
           arch.op_count = Memory.getValue(archInfoPtr + 32, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 36 + i * 36;
+            opPtr = archInfoPtr + 40 + i * 48;
             op.vector_index = Memory.getValue(opPtr + 0, 'i32');
             op.shift = {
               type: Memory.getValue(opPtr + 4, 'i32'),
               value: Memory.getValue(opPtr + 8, 'u32'),
             };
+            op.subtracted = Memory.getValue(opPtr + 40, 'bool');
+            op.access = Memory.getValue(opPtr + 41, 'ubyte');
+            op.neon_lane = Memory.getValue(opPtr + 42, 'i8');
             op.type = Memory.getValue(opPtr + 12, 'i32');
             switch (op.type) {
+              case cs.ARM_OP_SYSREG:
               case cs.ARM_OP_REG:
                 op.reg = Memory.getValue(opPtr + 16, 'i32');
                 break;
               case cs.ARM_OP_IMM:
+              case cs.ARM_OP_PIMM:
+              case cs.ARM_OP_PIMM:
                 op.imm = Memory.getValue(opPtr + 16, 'i32');
                 break;
               case cs.ARM_OP_FP:
@@ -496,12 +505,10 @@ namespace cs {
                   index: Memory.getValue(opPtr + 20, 'i32'),
                   scale: Memory.getValue(opPtr + 24, 'i32'),
                   disp: Memory.getValue(opPtr + 28, 'i32'),
+                  lshift: Memory.getValue(opPtr + 32, 'i32'),
                 };
                 break;
             }
-            op.subtracted = Memory.getValue(archInfoPtr + 32, 'bool');
-            op.access = Memory.getValue(archInfoPtr + 33, 'ubyte');
-            op.neon_lane = Memory.getValue(archInfoPtr + 34, 'ubyte');
             arch.operands[i] = op;
           }
           break;
@@ -511,47 +518,61 @@ namespace cs {
           arch.operands = [];
           arch.cc = Memory.getValue(archInfoPtr, 'i32');
           arch.update_flags = Memory.getValue(archInfoPtr + 4, 'bool');
-          arch.writeback = Memory.getValue(archInfoPtr + 4, 'bool');
-          arch.op_count = Memory.getValue(archInfoPtr + 6, 'i8');
+          arch.writeback = Memory.getValue(archInfoPtr + 5, 'bool');
+          arch.post_index = Memory.getValue(archInfoPtr + 6, 'bool');
+          arch.op_count = Memory.getValue(archInfoPtr + 7, 'i8');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 8 + i * 40;
+            opPtr = archInfoPtr + 8 + i * 56;
             op.vector_index = Memory.getValue(opPtr + 0, 'i32');
             op.vas = Memory.getValue(opPtr + 4, 'i32');
-            op.vess = Memory.getValue(opPtr + 8, 'i32');
             op.shift = {
-              type: Memory.getValue(opPtr + 12, 'i32'),
-              value: Memory.getValue(opPtr + 16, 'i32'),
+              type: Memory.getValue(opPtr + 8, 'i32'),
+              value: Memory.getValue(opPtr + 12, 'i32'),
             };
-            op.ext = Memory.getValue(opPtr + 20, 'i32');
-            op.type = Memory.getValue(opPtr + 24, 'i32');
+            op.ext = Memory.getValue(opPtr + 16, 'i32');
+            op.access = Memory.getValue(opPtr + 48, 'i32');
+            op.type = Memory.getValue(opPtr + 20, 'i32');
             switch (op.type) {
               case cs.ARM64_OP_REG:
-                op.reg = Memory.getValue(opPtr + 28, 'i32');
+              case cs.ARM64_OP_REG_MRS:
+              case cs.ARM64_OP_REG_MSR:
+                op.reg = Memory.getValue(opPtr + 32, 'i32');
                 break;
               case cs.ARM64_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 28, 'i64');
+              case cs.ARM64_OP_CIMM:
+                op.imm = Memory.getValue(opPtr + 32, 'i64');
                 break;
               case cs.ARM64_OP_FP:
-                op.fp = Memory.getValue(opPtr + 28, 'double');
+                op.fp = Memory.getValue(opPtr + 32, 'double');
                 break;
               case cs.ARM64_OP_PSTATE:
-                op.pstate = Memory.getValue(opPtr + 28, 'i32');
+                op.pstate = Memory.getValue(opPtr + 32, 'i32');
                 break;
               case cs.ARM64_OP_SYS:
-                op.sys = Memory.getValue(opPtr + 28, 'i32');
+                op.sys = Memory.getValue(opPtr + 32, 'i32');
+                break;
+              case cs.ARM64_OP_SVCR:
+                op.svcr = Memory.getValue(opPtr + 24, 'i32');
                 break;
               case cs.ARM64_OP_BARRIER:
-                op.barrier = Memory.getValue(opPtr + 28, 'i32');
+                op.barrier = Memory.getValue(opPtr + 32, 'i32');
                 break;
               case cs.ARM64_OP_PREFETCH:
-                op.prefetch = Memory.getValue(opPtr + 28, 'i32');
+                op.prefetch = Memory.getValue(opPtr + 32, 'i32');
                 break;
               case cs.ARM64_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 28, 'i32'),
-                  index: Memory.getValue(opPtr + 32, 'i32'),
-                  disp: Memory.getValue(opPtr + 36, 'i32'),
+                  base: Memory.getValue(opPtr + 32, 'i32'),
+                  index: Memory.getValue(opPtr + 36, 'i32'),
+                  disp: Memory.getValue(opPtr + 40, 'i32'),
+                };
+                break;
+              case cs.ARM64_OP_SME_INDEX:
+                op.sme_index = {
+                  reg: Memory.getValue(opPtr + 32, 'i32'),
+                  base: Memory.getValue(opPtr + 36, 'i32'),
+                  disp: Memory.getValue(opPtr + 40, 'i32'),
                 };
                 break;
             }
@@ -633,19 +654,19 @@ namespace cs {
           arch.op_count = Memory.getValue(archInfoPtr, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 4 + i * 16;
+            opPtr = archInfoPtr + 8 + i * 24;
             op.type = Memory.getValue(opPtr + 0, 'i32');
             switch (op.type) {
               case cs.MIPS_OP_REG:
-                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                op.reg = Memory.getValue(opPtr + 8, 'i32');
                 break;
               case cs.MIPS_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 4, 'long');
+                op.imm = Memory.getValue(opPtr + 8, 'long');
                 break;
               case cs.MIPS_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 4, 'i32'),
-                  disp: Memory.getValue(opPtr + 8, 'long'),
+                  base: Memory.getValue(opPtr + 8, 'i32'),
+                  disp: Memory.getValue(opPtr + 12, 'long'),
                 };
                 break;
             }
@@ -659,29 +680,29 @@ namespace cs {
           arch.bc = Memory.getValue(archInfoPtr + 0, 'i32');
           arch.bh = Memory.getValue(archInfoPtr + 4, 'i32');
           arch.update_cr0 = Memory.getValue(archInfoPtr + 8, 'bool');
-          arch.op_count = Memory.getValue(archInfoPtr + 0x09, 'ubyte');
+          arch.op_count = Memory.getValue(archInfoPtr + 9, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 10 + i * 16;
+            opPtr = archInfoPtr + 16 + i * 24;
             op.type = Memory.getValue(opPtr, 'i32');
             switch (op.type) {
               case cs.PPC_OP_REG:
-                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                op.reg = Memory.getValue(opPtr + 8, 'i32');
                 break;
               case cs.PPC_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 4, 'long');
+                op.imm = Memory.getValue(opPtr + 8, 'long');
                 break;
               case cs.PPC_OP_CRX:
                 op.crx = {
-                  scale: Memory.getValue(opPtr + 4, 'u32'),
-                  reg: Memory.getValue(opPtr + 8, 'i32'),
-                  cond: Memory.getValue(opPtr + 12, 'i32'),
+                  scale: Memory.getValue(opPtr + 8, 'u32'),
+                  reg: Memory.getValue(opPtr + 12, 'i32'),
+                  cond: Memory.getValue(opPtr + 16, 'i32'),
                 };
                 break;
               case cs.PPC_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 4, 'i32'),
-                  disp: Memory.getValue(opPtr + 8, 'i32'),
+                  base: Memory.getValue(opPtr + 8, 'i32'),
+                  disp: Memory.getValue(opPtr + 12, 'i32'),
                 };
                 break;
             }
@@ -697,20 +718,20 @@ namespace cs {
           arch.op_count = Memory.getValue(archInfoPtr + 8, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 9 + i * 12;
+            opPtr = archInfoPtr + 16 + i * 16;
             op.type = Memory.getValue(opPtr + 0, 'i32');
             switch (op.type) {
               case cs.SPARC_OP_REG:
-                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                op.reg = Memory.getValue(opPtr + 8, 'i32');
                 break;
               case cs.SPARC_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 4, 'long');
+                op.imm = Memory.getValue(opPtr + 8, 'long');
                 break;
               case cs.SPARC_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 4, 'ubyte'),
-                  index: Memory.getValue(opPtr + 5, 'ubyte'),
-                  disp: Memory.getValue(opPtr + 8, 'i32'),
+                  base: Memory.getValue(opPtr + 8, 'ubyte'),
+                  index: Memory.getValue(opPtr + 9, 'ubyte'),
+                  disp: Memory.getValue(opPtr + 12, 'i32'),
                 };
                 break;
             }
@@ -718,28 +739,28 @@ namespace cs {
           }
           break;
         case ARCH_SYSZ:
-          detail.synz = {};
-          arch = detail.synz;
+          detail.sysz = {};
+          arch = detail.sysz;
           arch.operands = [];
           arch.cc = Memory.getValue(archInfoPtr + 0, 'i32');
           arch.op_count = Memory.getValue(archInfoPtr + 4, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 8 + i * 24;
+            opPtr = archInfoPtr + 8 + i * 32;
             op.type = Memory.getValue(opPtr + 0, 'i32');
             switch (op.type) {
               case cs.SYSZ_OP_REG:
-                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                op.reg = Memory.getValue(opPtr + 8, 'i32');
                 break;
               case cs.SYSZ_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 4, 'long');
+                op.imm = Memory.getValue(opPtr + 8, 'i64');
                 break;
               case cs.SYSZ_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 4, 'ubyte'),
-                  index: Memory.getValue(opPtr + 5, 'ubyte'),
-                  length: Memory.getValue(opPtr + 8, 'ulong'),
-                  disp: Memory.getValue(opPtr + 16, 'long'),
+                  base: Memory.getValue(opPtr + 8, 'ubyte'),
+                  index: Memory.getValue(opPtr + 9, 'ubyte'),
+                  length: Memory.getValue(opPtr + 16, 'ulong'),
+                  disp: Memory.getValue(opPtr + 24, 'long'),
                 };
                 break;
             }
@@ -937,7 +958,7 @@ namespace cs {
                 op.brtable = {
                   length: Memory.getValue(opPtr + 8, 'u32'),
                   address: Memory.getValue(opPtr + 12, 'u64'),
-                  default_target: Memory.getValue(opPtr + 12 + 64, 'u32'),
+                  default_target: Memory.getValue(opPtr + 20, 'u32'),
                 };
                 break;
             }
@@ -1023,16 +1044,16 @@ namespace cs {
             op.type = Memory.getValue(opPtr + 0, 'i32');
             switch (op.type) {
               case cs.SH_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 4, 'i64');
+                op.imm = Memory.getValue(opPtr + 8, 'i64');
                 break;
               case cs.SH_OP_REG:
-                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                op.reg = Memory.getValue(opPtr + 8, 'i32');
                 break;
               case cs.SH_OP_MEM:
                 op.mem = {
-                  address: Memory.getValue(opPtr + 4, 'i32'),
-                  reg: Memory.getValue(opPtr + 8, 'i32'),
-                  disp: Memory.getValue(opPtr + 12, 'i32'),
+                  address: Memory.getValue(opPtr + 8, 'i32'),
+                  reg: Memory.getValue(opPtr + 12, 'i32'),
+                  disp: Memory.getValue(opPtr + 16, 'i32'),
                 };
                 break;
             }
@@ -1337,6 +1358,9 @@ declare namespace cs {
   const X86_OP_IMM: number;
   const X86_OP_MEM: number;
   const ARM64_OP_REG: number;
+  const ARM64_OP_REG_MRS: number;
+  const ARM64_OP_REG_MSR: number;
+  const ARM64_OP_CIMM: number;
   const ARM64_OP_IMM: number;
   const ARM64_OP_FP: number;
   const ARM64_OP_PSTATE: number;
@@ -1344,6 +1368,8 @@ declare namespace cs {
   const ARM64_OP_BARRIER: number;
   const ARM64_OP_PREFETCH: number;
   const ARM64_OP_MEM: number;
+  const ARM64_OP_SVCR: number;
+  const ARM64_OP_SME_INDEX: number;
   const M68K_OP_REG: number;
   const M68K_OP_IMM: number;
   const M68K_OP_FP_DOUBLE: number;

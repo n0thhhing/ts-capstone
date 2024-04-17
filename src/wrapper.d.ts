@@ -33,7 +33,7 @@ interface cs_detail {
   mips?: any;
   ppc?: any;
   sparc?: any;
-  synz?: any;
+  sysz?: any;
   xcore?: any;
   tms320c64x?: any;
   m680x?: any;
@@ -14544,6 +14544,9 @@ declare namespace cs {
   const X86_OP_IMM: number;
   const X86_OP_MEM: number;
   const ARM64_OP_REG: number;
+  const ARM64_OP_REG_MRS: number;
+  const ARM64_OP_REG_MSR: number;
+  const ARM64_OP_CIMM: number;
   const ARM64_OP_IMM: number;
   const ARM64_OP_FP: number;
   const ARM64_OP_PSTATE: number;
@@ -14551,6 +14554,8 @@ declare namespace cs {
   const ARM64_OP_BARRIER: number;
   const ARM64_OP_PREFETCH: number;
   const ARM64_OP_MEM: number;
+  const ARM64_OP_SVCR: number;
+  const ARM64_OP_SME_INDEX: number;
   const M68K_OP_REG: number;
   const M68K_OP_IMM: number;
   const M68K_OP_FP_DOUBLE: number;

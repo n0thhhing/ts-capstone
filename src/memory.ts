@@ -142,8 +142,28 @@ export namespace Memory {
       case 'int64_t':
       case 'long':
       case 'ulong':
-        Wrapper.HEAP32[pointer >> 2] = value; // Low 32 bits
+        /*Wrapper.HEAP32[pointer >> 2] = value; // Low 32 bits
         Wrapper.HEAP32[(pointer + 4) >> 2] = Math.floor(value / 4294967296); // High 32 bits
+        */
+        let tempDouble, tempI64;
+        (tempI64 = [
+          value >>> 0,
+          ((tempDouble = value),
+          +Math.abs(tempDouble) >= +1
+            ? tempDouble > +0
+              ? (Math.min(+Math.floor(tempDouble / +4294967296), +4294967295) |
+                  0) >>>
+                0
+              : ~~+Math.ceil(
+                  (tempDouble - +(~~tempDouble >>> 0)) / +4294967296,
+                ) >>> 0
+            : 0),
+        ]),
+          (Wrapper.HEAP32[pointer >> 2] = tempI64[0]),
+          (Wrapper.HEAP32[(pointer + 4) >> 2] = tempI64[1]);
+        break;
+      case 'float':
+        Wrapper.HEAPF32[pointer >> 2] = value;
         break;
       case 'i8*':
       case '*':
@@ -190,9 +210,10 @@ export namespace Memory {
       case 'u64':
       case 'long':
       case 'ulong':
-        const low = Wrapper.HEAP32[pointer >> 2]; // Low 32 bits
+        /*const low = Wrapper.HEAP32[pointer >> 2]; // Low 32 bits
         const high = Wrapper.HEAP32[(pointer + 4) >> 2]; // High 32 bits
-        value = low + high * 4294967296; // Combine high and low bits
+        value = low + high * 4294967296; // Combine high and low bits*/
+        value = Wrapper.HEAP32[pointer >> 2];
         break;
       case 'i8*':
       case '*':
