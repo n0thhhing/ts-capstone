@@ -1,5 +1,5 @@
 /// <reference types="node" />
-declare const Wrapper: any;
+declare const Wrapper: wasm_module;
 type cs_err = number;
 type cs_arch = number;
 type cs_mode = number;
@@ -9,6 +9,49 @@ type cs_group_type = number;
 type cs_op_type = number;
 type cs_ac_type = number;
 type cs_regs = Array<number>;
+type csh = number;
+type ptr = number;
+type wasm_arg = 'number' | 'string' | 'array' | 'boolean' | 'pointer' | null;
+type wasm_t = 'i8' | 'i16' | 'i32' | 'i64' | 'float' | 'double' | 'i8*' | '*';
+interface wasm_module {
+  ready: Promise<void>;
+  inspect: Function;
+  HEAP8: Int8Array;
+  HEAP16: Int16Array;
+  HEAPU8: Uint8Array;
+  HEAPU16: Uint16Array;
+  HEAP32: Int32Array;
+  HEAPU32: Uint32Array;
+  HEAPF32: Float32Array;
+  HEAPF64: Float64Array;
+  _cs_free: (insn: ptr, count: number) => void;
+  _cs_malloc: (handle: csh) => ptr;
+  _malloc: (size: number) => ptr;
+  _free: (pointer: ptr) => void;
+  ccall: (
+    ident: string, // name of C function
+    returnType: wasm_arg, // return type
+    argTypes: Array<wasm_arg>, // argument types
+    args: Array<any>, // arguments
+    opts?: {
+      async: boolean;
+    },
+  ) => any;
+  cwrap: (
+    ident: string, // name of C function
+    returnType: wasm_arg, // return type
+    argTypes: Array<wasm_arg>,
+  ) => any;
+  addFunction: (func: Function, sig: string) => any;
+  setValue: (ptr: number, value: any, type: wasm_t) => void;
+  getValue: (ptr: number, type: wasm_t) => any;
+  UTF8ToString: (ptr: number, maxBytesToRead?: number) => string;
+  stringToNewUTF8: (str: string, outPtr: ptr, maxBytesToWrite: number) => any;
+  writeArrayToMemory: (
+    array: Array<number> | Uint8Array | Buffer,
+    buffer: ptr,
+  ) => void;
+}
 interface cs_insn {
   id: number;
   address: number;
@@ -44,6 +87,15 @@ interface cs_detail {
   riscv?: any;
   sh?: any;
   tricore?: any;
+}
+interface cs_opt_skipdata {
+  mnemonic: string | null;
+  callback: Function | null;
+  user_data: object;
+}
+interface cs_opt_mnem {
+  id: number;
+  mnemonic: string | null;
 }
 declare namespace cs {
   const ARM64_AT_S12E0R: number;
@@ -1457,20 +1509,7 @@ declare namespace cs {
   const ARM64_INS_ZERO: number;
   const ARM64_INS_ZIP1: number;
   const ARM64_INS_ZIP2: number;
-  const ARM64_OP_BARRIER: number;
-  const ARM64_OP_CIMM: number;
-  const ARM64_OP_FP: number;
-  const ARM64_OP_IMM: number;
   const ARM64_OP_INVALID: number;
-  const ARM64_OP_MEM: number;
-  const ARM64_OP_PREFETCH: number;
-  const ARM64_OP_PSTATE: number;
-  const ARM64_OP_REG: number;
-  const ARM64_OP_REG_MRS: number;
-  const ARM64_OP_REG_MSR: number;
-  const ARM64_OP_SME_INDEX: number;
-  const ARM64_OP_SVCR: number;
-  const ARM64_OP_SYS: number;
   const ARM64_PRFM_INVALID: number;
   const ARM64_PRFM_PLDL1KEEP: number;
   const ARM64_PRFM_PLDL1STRM: number;
@@ -3588,14 +3627,7 @@ declare namespace cs {
   const ARM_MB_ST: number;
   const ARM_MB_SY: number;
   const ARM_OP_CIMM: number;
-  const ARM_OP_FP: number;
-  const ARM_OP_IMM: number;
   const ARM_OP_INVALID: number;
-  const ARM_OP_MEM: number;
-  const ARM_OP_PIMM: number;
-  const ARM_OP_REG: number;
-  const ARM_OP_SETEND: number;
-  const ARM_OP_SYSREG: number;
   const ARM_REG_APSR: number;
   const ARM_REG_APSR_NZCV: number;
   const ARM_REG_CPSR: number;
@@ -3925,14 +3957,7 @@ declare namespace cs {
   const BPF_INS_XADDW: number;
   const BPF_INS_XOR: number;
   const BPF_INS_XOR64: number;
-  const BPF_OP_EXT: number;
-  const BPF_OP_IMM: number;
   const BPF_OP_INVALID: number;
-  const BPF_OP_MEM: number;
-  const BPF_OP_MMEM: number;
-  const BPF_OP_MSH: number;
-  const BPF_OP_OFF: number;
-  const BPF_OP_REG: number;
   const BPF_REG_A: number;
   const BPF_REG_ENDING: number;
   const BPF_REG_INVALID: number;
@@ -4473,14 +4498,7 @@ declare namespace cs {
   const M680X_OFFSET_BITS_9: number;
   const M680X_OFFSET_NONE: number;
   const M680X_OPERAND_COUNT: number;
-  const M680X_OP_CONSTANT: number;
-  const M680X_OP_DIRECT: number;
-  const M680X_OP_EXTENDED: number;
-  const M680X_OP_IMMEDIATE: number;
-  const M680X_OP_INDEXED: number;
   const M680X_OP_INVALID: number;
-  const M680X_OP_REGISTER: number;
-  const M680X_OP_RELATIVE: number;
   const M680X_REG_0: number;
   const M680X_REG_A: number;
   const M680X_REG_B: number;
@@ -4916,19 +4934,11 @@ declare namespace cs {
   const M68K_INS_UNLK: number;
   const M68K_INS_UNPK: number;
   const M68K_OPERAND_COUNT: number;
-  const M68K_OP_BR_DISP: number;
   const M68K_OP_BR_DISP_SIZE_BYTE: number;
   const M68K_OP_BR_DISP_SIZE_INVALID: number;
   const M68K_OP_BR_DISP_SIZE_LONG: number;
   const M68K_OP_BR_DISP_SIZE_WORD: number;
-  const M68K_OP_FP_DOUBLE: number;
-  const M68K_OP_FP_SINGLE: number;
-  const M68K_OP_IMM: number;
   const M68K_OP_INVALID: number;
-  const M68K_OP_MEM: number;
-  const M68K_OP_REG: number;
-  const M68K_OP_REG_BITS: number;
-  const M68K_OP_REG_PAIR: number;
   const M68K_REG_A0: number;
   const M68K_REG_A1: number;
   const M68K_REG_A2: number;
@@ -4977,8 +4987,6 @@ declare namespace cs {
   const M68K_REG_URP: number;
   const M68K_REG_USP: number;
   const M68K_REG_VBR: number;
-  const M68K_SIZE_TYPE_CPU: number;
-  const M68K_SIZE_TYPE_FPU: number;
   const M68K_SIZE_TYPE_INVALID: number;
   const MIPS_GRP_BITCOUNT: number;
   const MIPS_GRP_BRANCH_RELATIVE: number;
@@ -5649,10 +5657,7 @@ declare namespace cs {
   const MIPS_INS_XOR: number;
   const MIPS_INS_XOR16: number;
   const MIPS_INS_XORI: number;
-  const MIPS_OP_IMM: number;
   const MIPS_OP_INVALID: number;
-  const MIPS_OP_MEM: number;
-  const MIPS_OP_REG: number;
   const MIPS_REG_0: number;
   const MIPS_REG_1: number;
   const MIPS_REG_10: number;
@@ -5923,10 +5928,7 @@ declare namespace cs {
   const MOS65XX_INS_WDM: number;
   const MOS65XX_INS_XBA: number;
   const MOS65XX_INS_XCE: number;
-  const MOS65XX_OP_IMM: number;
   const MOS65XX_OP_INVALID: number;
-  const MOS65XX_OP_MEM: number;
-  const MOS65XX_OP_REG: number;
   const MOS65XX_REG_ACC: number;
   const MOS65XX_REG_B: number;
   const MOS65XX_REG_DP: number;
@@ -7697,11 +7699,7 @@ declare namespace cs {
   const PPC_INS_XXSPLTIB: number;
   const PPC_INS_XXSPLTW: number;
   const PPC_INS_XXSWAPD: number;
-  const PPC_OP_CRX: number;
-  const PPC_OP_IMM: number;
   const PPC_OP_INVALID: number;
-  const PPC_OP_MEM: number;
-  const PPC_OP_REG: number;
   const PPC_REG_CARRY: number;
   const PPC_REG_CR0: number;
   const PPC_REG_CR0EQ: number;
@@ -8248,10 +8246,7 @@ declare namespace cs {
   const RISCV_INS_WFI: number;
   const RISCV_INS_XOR: number;
   const RISCV_INS_XORI: number;
-  const RISCV_OP_IMM: number;
   const RISCV_OP_INVALID: number;
-  const RISCV_OP_MEM: number;
-  const RISCV_OP_REG: number;
   const RISCV_REG_ENDING: number;
   const RISCV_REG_F0_32: number;
   const RISCV_REG_F0_64: number;
@@ -8677,10 +8672,7 @@ declare namespace cs {
   const SPARC_INS_XNORCC: number;
   const SPARC_INS_XOR: number;
   const SPARC_INS_XORCC: number;
-  const SPARC_OP_IMM: number;
   const SPARC_OP_INVALID: number;
-  const SPARC_OP_MEM: number;
-  const SPARC_OP_REG: number;
   const SPARC_REG_ENDING: number;
   const SPARC_REG_F0: number;
   const SPARC_REG_F1: number;
@@ -11165,10 +11157,7 @@ declare namespace cs {
   const SYSZ_INS_XY: number;
   const SYSZ_INS_ZAP: number;
   const SYSZ_OP_ACREG: number;
-  const SYSZ_OP_IMM: number;
   const SYSZ_OP_INVALID: number;
-  const SYSZ_OP_MEM: number;
-  const SYSZ_OP_REG: number;
   const SYSZ_REG_0: number;
   const SYSZ_REG_1: number;
   const SYSZ_REG_10: number;
@@ -11457,11 +11446,7 @@ declare namespace cs {
   const TMS320C64X_MEM_MOD_NO: number;
   const TMS320C64X_MEM_MOD_POST: number;
   const TMS320C64X_MEM_MOD_PRE: number;
-  const TMS320C64X_OP_IMM: number;
   const TMS320C64X_OP_INVALID: number;
-  const TMS320C64X_OP_MEM: number;
-  const TMS320C64X_OP_REG: number;
-  const TMS320C64X_OP_REGPAIR: number;
   const TMS320C64X_REG_A0: number;
   const TMS320C64X_REG_A1: number;
   const TMS320C64X_REG_A10: number;
@@ -12202,15 +12187,8 @@ declare namespace cs {
   const WASM_INS_SET_LOCAL: number;
   const WASM_INS_TEE_LOCAL: number;
   const WASM_INS_UNREACHABLE: number;
-  const WASM_OP_BRTABLE: number;
-  const WASM_OP_IMM: number;
-  const WASM_OP_INT7: number;
   const WASM_OP_INVALID: number;
   const WASM_OP_NONE: number;
-  const WASM_OP_UINT32: number;
-  const WASM_OP_UINT64: number;
-  const WASM_OP_VARUINT32: number;
-  const WASM_OP_VARUINT64: number;
   const X86_AVX_BCAST_16: number;
   const X86_AVX_BCAST_2: number;
   const X86_AVX_BCAST_4: number;
@@ -13909,10 +13887,7 @@ declare namespace cs {
   const X86_INS_XSHA256: number;
   const X86_INS_XSTORE: number;
   const X86_INS_XTEST: number;
-  const X86_OP_IMM: number;
   const X86_OP_INVALID: number;
-  const X86_OP_MEM: number;
-  const X86_OP_REG: number;
   const X86_PREFIX_ADDRSIZE: number;
   const X86_PREFIX_CS: number;
   const X86_PREFIX_DS: number;
@@ -14315,10 +14290,7 @@ declare namespace cs {
   const XCORE_INS_WAITEU: number;
   const XCORE_INS_XOR: number;
   const XCORE_INS_ZEXT: number;
-  const XCORE_OP_IMM: number;
   const XCORE_OP_INVALID: number;
-  const XCORE_OP_MEM: number;
-  const XCORE_OP_REG: number;
   const XCORE_REG_CP: number;
   const XCORE_REG_DP: number;
   const XCORE_REG_ED: number;
@@ -14461,6 +14433,7 @@ declare namespace cs {
   const OPT_SYNTAX_ATT: cs_opt_value;
   const OPT_SYNTAX_NOREGNAME: cs_opt_value;
   const OPT_SYNTAX_MASM: cs_opt_value;
+  const OPT_SYNTAX_MOTOROLA: cs_opt_value;
   const GRP_INVALID: cs_group_type;
   const GRP_JUMP: cs_group_type;
   const GRP_CALL: cs_group_type;
@@ -14494,28 +14467,22 @@ declare namespace cs {
   class Capstone {
     private arch;
     private mode;
-    private handlePtr;
+    private handle_ptr;
     constructor(arch: number, mode: number);
     private init;
-    private dereferenceInsn;
-    private referenceInsn;
-    private getDetail;
+    private deref;
+    private ref;
+    private get_detail;
     option(
       option: cs_opt_type,
-      value:
-        | cs_opt_value
-        | boolean
-        | {
-            id: number;
-            name: string;
-          },
+      value: cs_opt_value | boolean | cs_opt_mnem | cs_opt_skipdata,
     ): void;
     private open;
     close(): void;
     disasm(
       buffer: Buffer | Array<number> | Uint8Array,
       addr: number,
-      maxLen?: number,
+      max_len?: number,
     ): cs_insn[];
     disasm_iter(data: {
       buffer: Buffer | Array<number> | Uint8Array;
@@ -14582,9 +14549,11 @@ declare namespace cs {
   const XCORE_OP_MEM: number;
   const ARM_OP_REG: number;
   const ARM_OP_IMM: number;
+  const ARM_OP_PIMM: number;
   const ARM_OP_FP: number;
   const ARM_OP_SETEND: number;
   const ARM_OP_MEM: number;
+  const ARM_OP_SYSREG: number;
   const M68K_SIZE_TYPE_CPU: number;
   const M68K_SIZE_TYPE_FPU: number;
   const TMS320C64X_OP_REG: number;
@@ -14626,4 +14595,19 @@ declare namespace cs {
   const TRICORE_OP_MEM: number;
 }
 export default cs;
-export { Wrapper };
+export {
+  Wrapper,
+  cs_opt_skipdata,
+  cs_opt_mnem,
+  cs_insn,
+  cs_detail,
+  cs_arch,
+  cs_mode,
+  cs_err,
+  cs_opt_type,
+  cs_opt_value,
+  cs_group_type,
+  cs_op_type,
+  cs_ac_type,
+  cs_regs,
+};

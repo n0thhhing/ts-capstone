@@ -1,7 +1,4 @@
-# ts-capstone
-
-This module provides thin bindings for the
-Capstone disassembly framework using emscripten
+This module provides thin bindings for the Capstone disassembly framework.
 
 ```bash
 # soon this will be a npm package
@@ -109,18 +106,26 @@ while (disassembler.disasm_iter(data)) {
 // a movz instruction in the span of your
 // disassembler instance, movz will be aliased to
 // foo, the id will still remain the same as movz.
+// To reset the mnemonic, recall this with the same
+// id, but with mnemonic set to null(JavaScript null)
 const mnObj = {
-  id: 191, // the id returned in the insn object, in this case, its movz, you can also find more in the constants file.
-  name: "foo", // the new name of the mnemonic
+  id: 191, // the id returned in the insn object, in this case, its movz, you can also find more in the constants directory.
+  mnemonic: "foo", // the new name of the mnemonic, or null
 };
-disassembler.option(cs.OPT_MNEMONIC, mnObj);
+disassembler.option(
+  cs.OPT_MNEMONIC,
+  mnObj
+);
 
 // OPT_MODE
 
 // after using this, your disassembler mode
 // will be MODE_LITTLE_ENDIAN until the
 // instance is closed or changed again.
-disassembler.option(cs.OPT_MODE, cs.MODE_LITTLE_ENDIAN);
+disassembler.option(
+  cs.OPT_MODE,
+  cs.MODE_LITTLE_ENDIAN
+);
 
 // OPT_SYNTAX
 
@@ -154,9 +159,9 @@ disassembler.option(
 
 // NOT IMPLEMENTED
 
-// OPT_SKIPDATA_SETUP,
-// OPT_UNSIGNED,
-// OPT_MEM
+// OPT_SKIPDATA_SETUP: will need to implement a way to create the callback this needs, while still keeping as little memory management as possible.
+// OPT_UNSIGNED: to little documentation.
+// OPT_MEM: unnecessary because you won't need to worry about any memory management.
 
 // support
 
@@ -216,6 +221,21 @@ constants, you can find them in either the [wrapper.ts](src/wrapper.ts)
 file or the [constants](src/constants) or things like register ids, options,
 error codes, groups, opcodes, manifest constants, ect
 
+## Compatibility
+
+Although all core functions have been implemented to
+the best of my ability some helper functions and options
+haven't and soon will if they are relivant, all of this includes
+the following.
+
+| Case             | Compatibility |                                                            Notes |
+| :--------------- | :-----------: | ---------------------------------------------------------------: |
+| Detail           |      ✅       |                    Everything has also been checked and verified |
+| Architectures    |      ✅       |                                        Eveything relative to 5.0 |
+| Options          |      ❌       |                        OPT_MEM, OPT_SKIPDATA_SETUP, OPT_UNSIGNED |
+| Helper functions |      ❌       | reg_read, reg_write, insn_group, op_index, op_count, regs_access |
+| Web              |      ❔       |                                                         untested |
+
 ## TODO
 
 - [ ] Implement all the options
@@ -226,6 +246,8 @@ error codes, groups, opcodes, manifest constants, ect
 - [x] Make dedicated types
 - [x] Add support for all architectures
 - [x] Update capstone to 5.0
+- [ ] JSDoc
+- [ ] Better error handling
 
 ## Documentation
 
@@ -277,6 +299,12 @@ const Capstone = new Module();
 // Use as necessary
 // ...
 ```
+
+### Extra info
+
+For more information on the build system and the API,
+see [BUILD.md](./build/BUILD.md), this provides info on the functions I have made
+to make developing easier.
 
 ## Contributing
 

@@ -1,6 +1,6 @@
 import { Wrapper } from './wrapper';
 
-type CTypes =
+type native_t =
   | 'i8'
   | 'int8_t'
   | 'i16'
@@ -37,75 +37,78 @@ type CTypes =
   | 'char'
   | 'char*'
   | 'boolean';
-type CArrType<T extends CTypes> = `${T}[${number}]`;
-type DependantType = `${CArrType<CTypes>}->${string}`;
+type arr_t<T extends native_t> = `${T}[${number}]`;
+type depend_t = `${arr_t<native_t>}->${string}`;
 type ptr = number;
-type WasmSigType = 'void' | 'int' | 'long' | 'float' | 'double';
+type wasm_t = 'void' | 'int' | 'long' | 'float' | 'double';
 
-interface JsCallback {
+interface js_callback {
   pointer: ptr;
   free: () => void;
 }
 
-interface StructTypes {
+interface struct_t {
   [key: string]:
     | `padding[${number}]`
-    | CTypes
-    | CArrType<CTypes>
-    | DependantType
-    | StructTypes
+    | native_t
+    | arr_t<native_t>
+    | depend_t
+    | struct_t
     | ((pointer: number, struct: any) => { offset: number; entry: any });
 }
 
-const functionTypeCache: Map<Function, { offset: number; entry: any }> =
-  new Map();
+const fn_cache: Map<Function, { offset: number; entry: any }> = new Map();
 
 export namespace Memory {
-  export const allocatedMemory: Set<ptr> = new Set<ptr>();
+  export const allocations: Set<ptr> = new Set<ptr>();
 
   export function malloc(size: number): ptr {
     const pointer: ptr = Wrapper._malloc(size);
-    allocatedMemory.add(pointer);
+    allocations.add(pointer);
     return pointer;
   }
 
   export function free(mem: ptr | Set<ptr> | Array<ptr>): void {
     if (mem instanceof Set || Array.isArray(mem)) {
       for (const pointer of mem) {
-        allocatedMemory.delete(pointer);
+        allocations.delete(pointer);
         Wrapper._free(pointer);
       }
     } else {
-      allocatedMemory.delete(mem);
+      allocations.delete(mem);
       Wrapper._free(mem);
     }
   }
 
-  export function setValue(
+  export function clean(): void {
+    free(allocations);
+  }
+
+  export function write(
     pointer: ptr,
     value: any,
-    type: CTypes | CArrType<CTypes>,
+    type: native_t | arr_t<native_t>,
   ) {
     switch (type) {
       case 'char*':
-        const utf8Bytes = [];
+        const utf8_bytes = [];
         if (!/\0/.test(value)) value += '\0';
         for (let i = 0; i < value.length; ++i) {
           const charCode = value.charCodeAt(i);
           if (charCode < 128) {
-            utf8Bytes.push(charCode);
+            utf8_bytes.push(charCode);
           } else if (charCode < 2048) {
-            utf8Bytes.push((charCode >> 6) | 192);
-            utf8Bytes.push((charCode & 63) | 128);
+            utf8_bytes.push((charCode >> 6) | 192);
+            utf8_bytes.push((charCode & 63) | 128);
           } else {
-            utf8Bytes.push((charCode >> 12) | 224);
-            utf8Bytes.push(((charCode >> 6) & 63) | 128);
-            utf8Bytes.push((charCode & 63) | 128);
+            utf8_bytes.push((charCode >> 12) | 224);
+            utf8_bytes.push(((charCode >> 6) & 63) | 128);
+            utf8_bytes.push((charCode & 63) | 128);
           }
         }
 
-        for (let i = 0; i < utf8Bytes.length; ++i) {
-          Wrapper.setValue(pointer + i, utf8Bytes[i], 'i8');
+        for (let i = 0; i < utf8_bytes.length; ++i) {
+          Wrapper.setValue(pointer + i, utf8_bytes[i], 'i8');
         }
         break;
       case 'bool':
@@ -145,22 +148,22 @@ export namespace Memory {
         /*Wrapper.HEAP32[pointer >> 2] = value; // Low 32 bits
         Wrapper.HEAP32[(pointer + 4) >> 2] = Math.floor(value / 4294967296); // High 32 bits
         */
-        let tempDouble, tempI64;
-        (tempI64 = [
+        let tmp_double, tmp_i64;
+        (tmp_i64 = [
           value >>> 0,
-          ((tempDouble = value),
-          +Math.abs(tempDouble) >= +1
-            ? tempDouble > +0
-              ? (Math.min(+Math.floor(tempDouble / +4294967296), +4294967295) |
+          ((tmp_double = value),
+          +Math.abs(tmp_double) >= +1
+            ? tmp_double > +0
+              ? (Math.min(+Math.floor(tmp_double / +4294967296), +4294967295) |
                   0) >>>
                 0
               : ~~+Math.ceil(
-                  (tempDouble - +(~~tempDouble >>> 0)) / +4294967296,
+                  (tmp_double - +(~~tmp_double >>> 0)) / +4294967296,
                 ) >>> 0
             : 0),
         ]),
-          (Wrapper.HEAP32[pointer >> 2] = tempI64[0]),
-          (Wrapper.HEAP32[(pointer + 4) >> 2] = tempI64[1]);
+          (Wrapper.HEAP32[pointer >> 2] = tmp_i64[0]),
+          (Wrapper.HEAP32[(pointer + 4) >> 2] = tmp_i64[1]);
         break;
       case 'float':
         Wrapper.HEAPF32[pointer >> 2] = value;
@@ -176,7 +179,7 @@ export namespace Memory {
     }
   }
 
-  export function getValue(pointer: ptr, type: CTypes): any {
+  export function read(pointer: ptr, type: native_t): any {
     let value;
     switch (type) {
       case 'char':
@@ -228,124 +231,122 @@ export namespace Memory {
     return value;
   }
 
-  export function dereferencePointer(pointer: ptr, types: StructTypes): any {
-    const dereferencedStruct: any = {};
-    const dependancyStack: any = {};
+  export function deref(pointer: ptr, types: struct_t): any {
+    const deref_struct: any = {};
+    const dep_stack: any = {};
     for (const key in types) {
       if (types.hasOwnProperty(key)) {
         const type = types[key];
         if (typeof type === 'function') {
-          let functionTypeInfo = functionTypeCache.get(type);
-          if (!functionTypeInfo) {
-            functionTypeInfo = type(pointer, dereferencedStruct);
-            functionTypeCache.set(type, functionTypeInfo);
+          let fn_type_info = fn_cache.get(type);
+          if (!fn_type_info) {
+            fn_type_info = type(pointer, deref_struct);
+            fn_cache.set(type, fn_type_info);
           }
-          const { offset, entry } = functionTypeInfo;
+          const { offset, entry } = fn_type_info;
           pointer += offset;
-          dereferencedStruct[key] = entry;
+          deref_struct[key] = entry;
         } else if (typeof type === 'object') {
-          dereferencedStruct[key] = dereferencePointer(pointer, type);
-          pointer += getStructSize(type);
+          deref_struct[key] = deref(pointer, type);
+          pointer += get_struct_size(type);
           delete types[
             Object.keys(types).find((key) => key === 'padding') ?? 0
           ];
         } else if (type.includes('padding')) {
           pointer += parseInt(/\[(\d*)\]/.exec(type)?.[1] ?? '0');
         } else if (type.includes('[')) {
-          const [baseType, rest] = type.split('[');
-          const [typedSize] = rest.split(']');
-          const memorySize =
-            getTypeSize(baseType as CTypes) * parseInt(typedSize);
+          const [base_t, rest] = type.split('[');
+          const [typed_size] = rest.split(']');
+          const mem_size =
+            get_type_size(base_t as native_t) * parseInt(typed_size);
           let dependancy;
           if (type.includes('?->')) {
             const [, name] = type.split('->');
-            dependancyStack[name] = {
-              depPointer: pointer,
-              depKey: key,
-              depType: baseType,
+            dep_stack[name] = {
+              dep_ptr: pointer,
+              dep_key: key,
+              dep_t: base_t,
             };
-            dereferencedStruct[key] = null;
-            pointer += memorySize;
+            deref_struct[key] = null;
+            pointer += mem_size;
             continue;
           } else if (type.includes('->')) {
             [, dependancy] = type.split('->');
           }
           if (type.includes('char')) {
-            dereferencedStruct[key] = Memory.getValue(pointer, 'char');
-            pointer += memorySize;
+            deref_struct[key] = Memory.read(pointer, 'char');
+            pointer += mem_size;
           } else {
-            const arraySize = dependancy
-              ? dereferencedStruct[dependancy]
-              : typedSize;
-            if (isNaN(arraySize)) {
-              throw new Error(`Invalid array size: ${arraySize}`);
+            const arr_size = dependancy ? deref_struct[dependancy] : typed_size;
+            if (isNaN(arr_size)) {
+              throw new Error(`Invalid array size: ${arr_size}`);
             }
-            const arrayValues: Array<any> = [];
-            for (let i = 0; i < arraySize; i++) {
-              arrayValues[i] = Memory.getValue(pointer, baseType as CTypes);
-              pointer += getTypeSize(baseType as CTypes);
+            const arr_values: Array<any> = [];
+            for (let i = 0; i < arr_size; i++) {
+              arr_values[i] = Memory.read(pointer, base_t as native_t);
+              pointer += get_type_size(base_t as native_t);
             }
             if (dependancy) {
               pointer +=
-                (parseInt(typedSize) - dereferencedStruct[dependancy]) *
-                getTypeSize(baseType as CTypes);
+                (parseInt(typed_size) - deref_struct[dependancy]) *
+                get_type_size(base_t as native_t);
             }
-            dereferencedStruct[key] = arrayValues;
+            deref_struct[key] = arr_values;
           }
         } else {
-          dereferencedStruct[key] = Memory.getValue(pointer, type as CTypes);
-          pointer += getTypeSize(type as CTypes);
+          deref_struct[key] = Memory.read(pointer, type as native_t);
+          pointer += get_type_size(type as native_t);
         }
 
-        if (dependancyStack.hasOwnProperty(key)) {
-          const depArray = [];
-          let { depType, depPointer, depKey } = dependancyStack[key];
-          for (let i = 0; i < dereferencedStruct[key]; i++) {
-            depArray.push(Memory.getValue(depPointer, depType as CTypes));
-            depPointer += getTypeSize(depType as CTypes);
+        if (dep_stack.hasOwnProperty(key)) {
+          const dep_arr = [];
+          let { dep_t, dep_ptr, dep_key } = dep_stack[key];
+          for (let i = 0; i < deref_struct[key]; i++) {
+            dep_arr.push(Memory.read(dep_ptr, dep_t as native_t));
+            dep_ptr += get_type_size(dep_t as native_t);
           }
-          dereferencedStruct[depKey] = depArray;
+          deref_struct[dep_key] = dep_arr;
         }
       }
     }
 
-    return dereferencedStruct;
+    return deref_struct;
   }
 
-  export function getStructSize(struct: StructTypes): number {
+  export function get_struct_size(struct: struct_t): number {
     let size = 0;
     if (typeof struct === 'function') throw 'unreachable';
     for (const key in struct) {
       if (struct.hasOwnProperty(key)) {
         const type = struct[key];
         if (typeof type === 'function') {
-          let functionTypeInfo = functionTypeCache.get(type);
-          if (!functionTypeInfo) {
-            functionTypeInfo = type(0, {});
-            functionTypeCache.set(type, functionTypeInfo);
+          let fn_type_info = fn_cache.get(type);
+          if (!fn_type_info) {
+            fn_type_info = type(0, {});
+            fn_cache.set(type, fn_type_info);
           }
-          const { offset } = functionTypeInfo;
+          const { offset } = fn_type_info;
           size += offset;
         } else if (typeof type === 'object') {
-          size += getStructSize(type);
+          size += get_struct_size(type);
         } else if ((type as string).includes('padding')) {
           size += parseInt(/\[(\d*)\]/.exec(type as string)?.[1] ?? '0');
         } else if ((type as string).includes('[')) {
-          const [baseType, arraySizeStr] = (type as string).split('[');
-          const arraySize = parseInt(arraySizeStr.slice(0, -1), 10);
-          if (isNaN(arraySize)) {
-            throw new Error(`Invalid array size: ${arraySizeStr}`);
+          const [base_t, arr_size_str] = (type as string).split('[');
+          const arr_size = parseInt(arr_size_str.slice(0, -1), 10);
+          if (isNaN(arr_size)) {
+            throw new Error(`Invalid array size: ${arr_size_str}`);
           }
-          size += getTypeSize(baseType as CTypes) * arraySize;
+          size += get_type_size(base_t as native_t) * arr_size;
         } else {
-          size += getTypeSize(type as CTypes);
+          size += get_type_size(type as native_t);
         }
       }
     }
     return size;
   }
 
-  export function getTypeSize(type: CTypes): number {
+  export function get_type_size(type: native_t): number {
     switch (type) {
       case 'char':
       case 'i8':
@@ -383,12 +384,12 @@ export namespace Memory {
     }
   }
 
-  export function createCallback(
+  export function new_callback(
     func: Function,
-    returnType: WasmSigType,
-    argumentTypes: Array<WasmSigType>,
-  ): JsCallback {
-    const typeMap: Record<WasmSigType, string> = {
+    ret_t: wasm_t,
+    arg_types: Array<wasm_t>,
+  ): js_callback {
+    const type_map: Record<wasm_t, string> = {
       void: 'v',
       int: 'i',
       long: 'j',
@@ -396,17 +397,15 @@ export namespace Memory {
       double: 'd',
     };
 
-    const returnSignature: string = typeMap[returnType];
-    const argSignatures: Array<string> = argumentTypes.map(
-      (type) => typeMap[type],
-    );
+    const return_sig: string = type_map[ret_t];
+    const wasm_args: Array<string> = arg_types.map((type) => type_map[type]);
 
-    const signature: string = returnSignature + argSignatures.join('');
-    const funcPtr: ptr = Wrapper.addFunction(func, signature);
+    const signature: string = return_sig + wasm_args.join('');
+    const function_ptr: ptr = Wrapper.addFunction(func, signature);
 
     return {
-      pointer: funcPtr,
-      free: () => Wrapper.removeFunction(funcPtr),
+      pointer: function_ptr,
+      free: () => Wrapper._free(function_ptr),
     };
   }
 }

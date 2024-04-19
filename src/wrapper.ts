@@ -1,8 +1,7 @@
 import Module from './capstone';
 import { Memory } from './memory';
 
-// @ts-ignore
-const Wrapper = new Module();
+const Wrapper: wasm_module = Module() as wasm_module;
 
 type cs_err = number; // All type of errors encountered by Capstone API. These are values returned by cs_errno()
 type cs_arch = number; // Architecture type
@@ -15,6 +14,47 @@ type cs_ac_type = number; // Common instruction operand access types - to be con
 type cs_regs = Array<number>; // Type of array to keep the list of registers
 type csh = number; // Handle using with all API
 type ptr = number; // Points to a specific memory address
+type wasm_arg = 'number' | 'string' | 'array' | 'boolean' | 'pointer' | null; // types of arguments for the C function.
+type wasm_t = 'i8' | 'i16' | 'i32' | 'i64' | 'float' | 'double' | 'i8*' | '*'; // An LLVM IR type as a string
+
+// Module object with attributes that Emscripten-generated code calls at various points in its execution.
+interface wasm_module {
+  HEAP8: Int8Array; // View for 8-bit signed memory.
+  HEAPU8: Uint8Array; // View for 8-bit unsigned memory.
+  HEAP16: Int16Array; // View for 16-bit signed memory.
+  HEAPU16: Uint16Array; // View for 16-bit unsigned memory.
+  HEAP32: Int32Array; // View for 32-bit signed memory.
+  HEAPU32: Uint32Array; // View for 32-bit unsigned memory.
+  HEAPF32: Float32Array; // View for 32-bit float memory.
+  HEAPF64: Float64Array; // View for 8-bit float memory.
+  _cs_free: (insn: ptr, count: number) => void; // Free memory allocated by _cs_malloc() or disasm()
+  _cs_malloc: (handle: csh) => ptr; // Allocate memory for 1 instruction to be used by disasm_iter()
+  _malloc: (size: number) => ptr; // Allocates a block of memory on the heap, must be paired with free(), or heap memory will leak! (use Memory.malloc()).
+  _free: (pointer: ptr) => void; // Free allocated memory (use Memory.free()).
+  ccall: (
+    ident: string, // name of C function
+    returnType: wasm_arg, // return type
+    argTypes: Array<wasm_arg>, // argument types
+    args: Array<any>, // arguments
+    opts?: {
+      async: boolean; // If true, implies that the ccall will perform an async operation. This assumes you are build with asyncify support.
+    },
+  ) => any; // Call a compiled C function from JavaScript.
+  cwrap: (
+    ident: string, // name of C function
+    returnType: wasm_arg, // return type
+    argTypes: Array<wasm_arg>, // argument types
+  ) => any; // Returns a native JavaScript wrapper for a C function.
+  addFunction: (func: Function, sig: string) => any; // You can use addFunction to return an integer value that represents a function pointer (use Memory.new_callback()).
+  setValue: (ptr: number, value: any, type: wasm_t) => void; // Sets a value at a specific memory address at run-time (use Memory.write()).
+  getValue: (ptr: number, type: wasm_t) => any; // Gets a value at a specific memory address at run-time (use Memory.read()).
+  UTF8ToString: (ptr: number, maxBytesToRead?: number) => string; // Given a pointer ptr to a null-terminated UTF8-encoded string in the Emscripten HEAP, returns a copy of that string as a JavaScript String object.
+  stringToNewUTF8: (str: string, outPtr: ptr, maxBytesToWrite: number) => any; // Copies the given JavaScript String object str to the Emscripten HEAP at address outPtr, null-terminated and encoded in UTF8 form.
+  writeArrayToMemory: (
+    array: Array<number> | Uint8Array | Buffer,
+    buffer: ptr,
+  ) => void; // Writes an array to a specified address in the heap. Note that memory should to be allocated for the array before it is written.
+}
 
 // Detail information of disassembled instruction
 interface cs_insn {
@@ -54,6 +94,21 @@ interface cs_detail {
   riscv?: any; // RISCV architecture
   sh?: any; // SH architecture
   tricore?: any; // TriCore architecture
+}
+
+// User-customized setup for SKIPDATA option
+interface cs_opt_skipdata {
+  mnemonic: string | null; // Capstone considers data to skip as special "instructions", User can specify the string for this instruction's "mnemonic" here (default = ".byte").
+  callback: Function | null; // User-defined callback function to be called when Capstone hits data (default = null).
+  user_data: object; // User-defined data to be passed to callback function.
+}
+
+// Customize mnemonic for instructions with alternative name.
+// To reset existing customized instruction to its default mnemonic,
+// call option(cs.OPT_MNEMONIC) again with the same id and null value
+interface cs_opt_mnem {
+  id: number; // ID of instruction to be customized obtained from the cs_insn object.
+  mnemonic: string | null; // Customized instruction mnemonic(or null).
 }
 
 namespace cs {
@@ -184,6 +239,7 @@ namespace cs {
   export const OPT_SYNTAX_ATT: cs_opt_value = 2; // ATT asm syntax (CS_OPT_SYNTAX, CS_ARCH_X86)
   export const OPT_SYNTAX_NOREGNAME: cs_opt_value = 3; // Asm syntax prints register name with only number - (CS_OPT_SYNTAX, CS_ARCH_PPC, CS_ARCH_ARM)
   export const OPT_SYNTAX_MASM: cs_opt_value = 4; // X86 Intel Masm syntax (CS_OPT_SYNTAX).
+  export const OPT_SYNTAX_MOTOROLA: cs_opt_value = 5; // MOS65XX use $ as hex prefix.
 
   // Common instruction groups - to be consistent across all architectures.
   export const GRP_INVALID: cs_group_type = 0; // uninitialized/invalid group.
@@ -208,8 +264,8 @@ namespace cs {
   export const AC_WRITE: cs_ac_type = 1 << 1; // Operand written to memory or register.
 
   // query id for cs_support()
-  export const SUPPORT_DIET = 0xffff + 1;
-  export const SUPPORT_X86_REDUCE = 0xffff + 2;
+  export const SUPPORT_DIET = ARCH_ALL + 1;
+  export const SUPPORT_X86_REDUCE = ARCH_ALL + 2;
 
   // Manifest Constants
   export const MNEMONIC_SIZE = 32;
@@ -222,18 +278,18 @@ namespace cs {
   export const MAX_NUM_GROUPS = 8;
 
   export function version(): string {
-    const majorPtr: number = Memory.malloc(4);
-    const minorPtr: number = Memory.malloc(4);
+    const major_ptr: number = Memory.malloc(4);
+    const minor_ptr: number = Memory.malloc(4);
     Wrapper.ccall(
       'cs_version',
       'number',
       ['pointer', 'pointer'],
-      [majorPtr, minorPtr],
+      [major_ptr, minor_ptr],
     );
-    const major: number = Wrapper.getValue(majorPtr, 'i32');
-    const minor: number = Wrapper.getValue(minorPtr, 'i32');
-    Memory.free(majorPtr);
-    Memory.free(minorPtr);
+    const major: number = Wrapper.getValue(major_ptr, 'i32');
+    const minor: number = Wrapper.getValue(minor_ptr, 'i32');
+    Memory.free(major_ptr);
+    Memory.free(minor_ptr);
     return `${major}.${minor}`;
   }
 
@@ -258,18 +314,18 @@ namespace cs {
   export class Capstone {
     private arch: cs_arch;
     private mode: cs_mode;
-    private handlePtr: ptr;
+    private handle_ptr: ptr;
 
     constructor(arch: number, mode: number) {
       this.arch = arch;
       this.mode = mode;
-      this.handlePtr = 0;
+      this.handle_ptr = 0;
       this.open();
       this.init(arch);
     }
 
     private init(arch: cs_arch) {
-      const archMappings: { [key: number]: string } = {
+      const arch_map: { [key: number]: string } = {
         [cs.ARCH_ARM]: 'arm',
         [cs.ARCH_ARM64]: 'arm64',
         [cs.ARCH_AARCH64]: 'arm64',
@@ -294,7 +350,7 @@ namespace cs {
       };
 
       const constants: { [key: string]: number } = require(
-        `./constants/${archMappings[arch]}_const`,
+        `./constants/${arch_map[arch]}_const`,
       );
 
       for (const key in constants) {
@@ -302,71 +358,71 @@ namespace cs {
       }
     }
 
-    private dereferenceInsn(insnPtr: ptr): cs_insn {
-      const insnId: number = Memory.getValue(insnPtr, 'i32');
-      const insnAddr: number = Memory.getValue(insnPtr + 8, 'i64');
-      const insnSize: number = Memory.getValue(insnPtr + 16, 'i16');
-      const insnMn: string = Wrapper.UTF8ToString(insnPtr + 42);
-      const insnOp: string = Wrapper.UTF8ToString(insnPtr + 66 + 8);
-      const insnBytes: Array<number> = [];
+    private deref(insn_ptr: ptr): cs_insn {
+      const insn_id: number = Memory.read(insn_ptr, 'i32');
+      const insn_addr: number = Memory.read(insn_ptr + 8, 'i64');
+      const insn_size: number = Memory.read(insn_ptr + 16, 'i16');
+      const insn_mn: string = Wrapper.UTF8ToString(insn_ptr + 42);
+      const insn_op_str: string = Wrapper.UTF8ToString(insn_ptr + 66 + 8);
+      const insn_bytes: Array<number> = [];
 
-      for (let j = 0; j < insnSize; j++) {
-        const byte = Memory.getValue(insnPtr + 18 + j, 'u8');
-        insnBytes.push(byte);
+      for (let j = 0; j < insn_size; j++) {
+        const byte = Memory.read(insn_ptr + 18 + j, 'u8');
+        insn_bytes.push(byte);
       }
 
       const insn: cs_insn = {
-        id: insnId,
-        address: insnAddr,
-        size: insnSize,
-        mnemonic: insnMn,
-        op_str: insnOp,
-        bytes: insnBytes,
+        id: insn_id,
+        address: insn_addr,
+        size: insn_size,
+        mnemonic: insn_mn,
+        op_str: insn_op_str,
+        bytes: insn_bytes,
       };
 
-      const detailPtr: ptr = Memory.getValue(insnPtr + 238, '*');
-      if (detailPtr != 0) insn.detail = this.getDetail(detailPtr);
+      const detail_ptr: ptr = Memory.read(insn_ptr + 238, '*');
+      if (detail_ptr != 0) insn.detail = this.get_detail(detail_ptr);
       return insn;
     }
 
-    private referenceInsn(insn: cs_insn): ptr {
-      const insnPtr: ptr = Memory.malloc(INSN_SIZE);
+    private ref(insn: cs_insn): ptr {
+      const insn_ptr: ptr = Memory.malloc(INSN_SIZE);
 
-      Memory.setValue(insnPtr, insn.id, 'i32');
-      Memory.setValue(insnPtr + 8, insn.address, 'i64');
-      Memory.setValue(insnPtr + 16, insn.size, 'i16');
-      Memory.setValue(insnPtr + 42, insn.mnemonic, 'char');
-      Memory.setValue(insnPtr + 66 + 8, insn.op_str, 'char');
+      Memory.write(insn_ptr, insn.id, 'i32');
+      Memory.write(insn_ptr + 8, insn.address, 'i64');
+      Memory.write(insn_ptr + 16, insn.size, 'i16');
+      Memory.write(insn_ptr + 42, insn.mnemonic, 'char');
+      Memory.write(insn_ptr + 66 + 8, insn.op_str, 'char');
 
       for (let j = 0; j < insn.size; j++) {
-        Memory.setValue(insnPtr + 18 + j, insn.bytes[j], 'u8');
+        Memory.write(insn_ptr + 18 + j, insn.bytes[j], 'u8');
       }
 
       if (insn.detail) {
-        const detail: ptr = insnPtr + 238;
-        const detailPtr = Memory.malloc(1864);
-        Memory.setValue(detail, detailPtr, '*');
+        const detail: ptr = insn_ptr + 238;
+        const detail_ptr = Memory.malloc(1864);
+        Memory.write(detail, detail_ptr, '*');
         for (let i = 0; i < insn.detail.regs_read_count; i++)
-          Memory.setValue(detailPtr + i, insn.detail.regs_read[i], 'i16');
-        Memory.setValue(detailPtr + 40, insn.detail.regs_read_count, 'ubyte');
+          Memory.write(detail_ptr + i, insn.detail.regs_read[i], 'i16');
+        Memory.write(detail_ptr + 40, insn.detail.regs_read_count, 'ubyte');
         for (let i = 0; i < insn.detail.regs_write_count; i++)
-          Memory.setValue(detailPtr + 42 + i, insn.detail.regs_write[i], 'i16');
-        Memory.setValue(detailPtr + 82, insn.detail.regs_write_count, 'ubyte');
+          Memory.write(detail_ptr + 42 + i, insn.detail.regs_write[i], 'i16');
+        Memory.write(detail_ptr + 82, insn.detail.regs_write_count, 'ubyte');
         for (let i = 0; i < insn.detail.groups_count; i++)
-          Memory.setValue(detailPtr + 83 + i, insn.detail.groups[i], 'ubyte');
-        Memory.setValue(detailPtr + 91, insn.detail.groups_count, 'ubyte');
-        Memory.setValue(detailPtr + 92, insn.detail.writeback, 'bool');
+          Memory.write(detail_ptr + 83 + i, insn.detail.groups[i], 'ubyte');
+        Memory.write(detail_ptr + 91, insn.detail.groups_count, 'ubyte');
+        Memory.write(detail_ptr + 92, insn.detail.writeback, 'bool');
       }
 
-      return insnPtr;
+      return insn_ptr;
     }
 
-    private getDetail(pointer: ptr): cs_detail {
+    private get_detail(pointer: ptr): cs_detail {
       const detail: cs_detail = {} as cs_detail;
-      const archInfoPtr: ptr = pointer + 96;
-      const regs_read_count: number = Memory.getValue(pointer + 40, 'ubyte');
-      const regs_write_count: number = Memory.getValue(pointer + 82, 'ubyte');
-      const groups_count: number = Memory.getValue(pointer + 91, 'ubyte');
+      const arch_info_ptr: ptr = pointer + 96;
+      const regs_read_count: number = Memory.read(pointer + 40, 'ubyte');
+      const regs_write_count: number = Memory.read(pointer + 82, 'ubyte');
+      const groups_count: number = Memory.read(pointer + 91, 'ubyte');
 
       detail.regs_write = [];
       detail.groups = [];
@@ -374,23 +430,23 @@ namespace cs {
       detail.regs_read_count = regs_read_count;
       detail.regs_write_count = regs_write_count;
       detail.groups_count = groups_count;
-      detail.writeback = Memory.getValue(pointer + 92, 'bool');
+      detail.writeback = Memory.read(pointer + 92, 'bool');
 
       for (let i = 0; i < regs_read_count; i++) {
-        detail.regs_read[i] = Memory.getValue(pointer + 0 + i, 'ushort');
+        detail.regs_read[i] = Memory.read(pointer + 0 + i, 'ushort');
       }
 
       for (let i = 0; i < regs_write_count; i++) {
-        detail.regs_write[i] = Memory.getValue(pointer + 42 + i, 'ushort');
+        detail.regs_write[i] = Memory.read(pointer + 42 + i, 'ushort');
       }
 
       for (let i = 0; i < groups_count; i++) {
-        detail.groups[i] = Memory.getValue(pointer + 83 + i, 'ubyte');
+        detail.groups[i] = Memory.read(pointer + 83 + i, 'ubyte');
       }
 
       let arch: any;
       let op: any;
-      let opPtr: number;
+      let op_ptr: number;
 
       switch (this.arch) {
         case ARCH_X86:
@@ -398,58 +454,58 @@ namespace cs {
           arch = detail.x86;
           arch.prefix = [];
           arch.opcode = [];
-          const encodingPtr: ptr = pointer + 552;
+          const encoding_ptr: ptr = pointer + 552;
           for (let i = 0; i < 4; i++) {
-            arch.prefix[i] = Memory.getValue(archInfoPtr + i, 'ubyte');
-            arch.opcode[i] = Memory.getValue(archInfoPtr + i + 4, 'ubyte');
+            arch.prefix[i] = Memory.read(arch_info_ptr + i, 'ubyte');
+            arch.opcode[i] = Memory.read(arch_info_ptr + i + 4, 'ubyte');
           }
-          arch.rex = Memory.getValue(archInfoPtr + 8, 'ubyte');
-          arch.addr_size = Memory.getValue(archInfoPtr + 9, 'ubyte');
-          arch.modrm = Memory.getValue(archInfoPtr + 10, 'ubyte');
-          arch.sib = Memory.getValue(archInfoPtr + 12, 'ubyte');
-          arch.disp = Memory.getValue(archInfoPtr + 16, 'long');
-          arch.sib_index = Memory.getValue(archInfoPtr + 24, 'i32');
-          arch.sib_scale = Memory.getValue(archInfoPtr + 28, 'byte');
-          arch.sib_base = Memory.getValue(archInfoPtr + 29, 'i32');
-          arch.xop_cc = Memory.getValue(archInfoPtr + 33, 'i32');
-          arch.sse_cc = Memory.getValue(archInfoPtr + 37, 'i32');
-          arch.avx_cc = Memory.getValue(archInfoPtr + 41, 'i32');
-          arch.avx_sae = Memory.getValue(archInfoPtr + 45, 'bool');
-          arch.avx_rm = Memory.getValue(archInfoPtr + 46, 'i32');
-          arch.eflags = Memory.getValue(archInfoPtr + 50, 'ulong');
-          arch.fpu_flags = Memory.getValue(archInfoPtr + 56, 'ulong');
-          arch.op_count = Memory.getValue(archInfoPtr + 64, 'ubyte');
+          arch.rex = Memory.read(arch_info_ptr + 8, 'ubyte');
+          arch.addr_size = Memory.read(arch_info_ptr + 9, 'ubyte');
+          arch.modrm = Memory.read(arch_info_ptr + 10, 'ubyte');
+          arch.sib = Memory.read(arch_info_ptr + 12, 'ubyte');
+          arch.disp = Memory.read(arch_info_ptr + 16, 'long');
+          arch.sib_index = Memory.read(arch_info_ptr + 24, 'i32');
+          arch.sib_scale = Memory.read(arch_info_ptr + 28, 'byte');
+          arch.sib_base = Memory.read(arch_info_ptr + 29, 'i32');
+          arch.xop_cc = Memory.read(arch_info_ptr + 33, 'i32');
+          arch.sse_cc = Memory.read(arch_info_ptr + 37, 'i32');
+          arch.avx_cc = Memory.read(arch_info_ptr + 41, 'i32');
+          arch.avx_sae = Memory.read(arch_info_ptr + 45, 'bool');
+          arch.avx_rm = Memory.read(arch_info_ptr + 46, 'i32');
+          arch.eflags = Memory.read(arch_info_ptr + 50, 'ulong');
+          arch.fpu_flags = Memory.read(arch_info_ptr + 56, 'ulong');
+          arch.op_count = Memory.read(arch_info_ptr + 64, 'ubyte');
           arch.encoding = {
-            modrm_offset: Memory.getValue(encodingPtr, 'ubyte'),
-            disp_offset: Memory.getValue(encodingPtr + 1, 'ubyte'),
-            disp_size: Memory.getValue(encodingPtr + 2, 'ubyte'),
-            imm_offset: Memory.getValue(encodingPtr + 3, 'ubyte'),
-            imm_size: Memory.getValue(encodingPtr + 4, 'ubyte'),
+            modrm_offset: Memory.read(encoding_ptr, 'ubyte'),
+            disp_offset: Memory.read(encoding_ptr + 1, 'ubyte'),
+            disp_size: Memory.read(encoding_ptr + 2, 'ubyte'),
+            imm_offset: Memory.read(encoding_ptr + 3, 'ubyte'),
+            imm_size: Memory.read(encoding_ptr + 4, 'ubyte'),
           };
           arch.operands = [];
 
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 72 + i * 48;
-            op.size = Memory.getValue(opPtr + 32, 'ubyte');
-            op.access = Memory.getValue(opPtr + 33, 'ubyte');
-            op.avx_bcast = Memory.getValue(opPtr + 36, 'i32');
-            op.avx_zero_opmask = Memory.getValue(opPtr + 40, 'bool');
-            op.type = Memory.getValue(opPtr, 'i32');
+            op_ptr = arch_info_ptr + 72 + i * 48;
+            op.size = Memory.read(op_ptr + 32, 'ubyte');
+            op.access = Memory.read(op_ptr + 33, 'ubyte');
+            op.avx_bcast = Memory.read(op_ptr + 36, 'i32');
+            op.avx_zero_opmask = Memory.read(op_ptr + 40, 'bool');
+            op.type = Memory.read(op_ptr, 'i32');
             switch (op.type) {
               case cs.X86_OP_REG:
-                op.reg = Memory.getValue(opPtr + 8, 'i32');
+                op.reg = Memory.read(op_ptr + 8, 'i32');
                 break;
               case cs.X86_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 8, 'i64');
+                op.imm = Memory.read(op_ptr + 8, 'i64');
                 break;
               case cs.X86_OP_MEM:
                 op.mem = {
-                  segment: Memory.getValue(opPtr + 8, 'i32'),
-                  base: Memory.getValue(opPtr + 12, 'i32'),
-                  index: Memory.getValue(opPtr + 16, 'i32'),
-                  scale: Memory.getValue(opPtr + 20, 'i32'),
-                  disp: Memory.getValue(opPtr + 24, 'i64'),
+                  segment: Memory.read(op_ptr + 8, 'i32'),
+                  base: Memory.read(op_ptr + 12, 'i32'),
+                  index: Memory.read(op_ptr + 16, 'i32'),
+                  scale: Memory.read(op_ptr + 20, 'i32'),
+                  disp: Memory.read(op_ptr + 24, 'i64'),
                 };
                 break;
             }
@@ -460,52 +516,52 @@ namespace cs {
           detail.arm = {};
           arch = detail.arm;
           arch.operands = [];
-          arch.usermode = Memory.getValue(archInfoPtr, 'bool');
-          arch.vector_size = Memory.getValue(archInfoPtr + 4, 'i32');
-          arch.vector_data = Memory.getValue(archInfoPtr + 9, 'i32');
-          arch.cps_mode = Memory.getValue(archInfoPtr + 12, 'i32');
-          arch.cps_flag = Memory.getValue(archInfoPtr + 16, 'i32');
-          arch.cc = Memory.getValue(archInfoPtr + 20, 'i32');
-          arch.update_flags = Memory.getValue(archInfoPtr + 24, 'bool');
-          arch.writeback = Memory.getValue(archInfoPtr + 25, 'bool');
-          arch.post_index = Memory.getValue(archInfoPtr + 26, 'bool');
-          arch.mem_barrier = Memory.getValue(archInfoPtr + 28, 'i32');
-          arch.op_count = Memory.getValue(archInfoPtr + 32, 'ubyte');
+          arch.usermode = Memory.read(arch_info_ptr, 'bool');
+          arch.vector_size = Memory.read(arch_info_ptr + 4, 'i32');
+          arch.vector_data = Memory.read(arch_info_ptr + 9, 'i32');
+          arch.cps_mode = Memory.read(arch_info_ptr + 12, 'i32');
+          arch.cps_flag = Memory.read(arch_info_ptr + 16, 'i32');
+          arch.cc = Memory.read(arch_info_ptr + 20, 'i32');
+          arch.update_flags = Memory.read(arch_info_ptr + 24, 'bool');
+          arch.writeback = Memory.read(arch_info_ptr + 25, 'bool');
+          arch.post_index = Memory.read(arch_info_ptr + 26, 'bool');
+          arch.mem_barrier = Memory.read(arch_info_ptr + 28, 'i32');
+          arch.op_count = Memory.read(arch_info_ptr + 32, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 40 + i * 48;
-            op.vector_index = Memory.getValue(opPtr + 0, 'i32');
+            op_ptr = arch_info_ptr + 40 + i * 48;
+            op.vector_index = Memory.read(op_ptr + 0, 'i32');
             op.shift = {
-              type: Memory.getValue(opPtr + 4, 'i32'),
-              value: Memory.getValue(opPtr + 8, 'u32'),
+              type: Memory.read(op_ptr + 4, 'i32'),
+              value: Memory.read(op_ptr + 8, 'u32'),
             };
-            op.subtracted = Memory.getValue(opPtr + 40, 'bool');
-            op.access = Memory.getValue(opPtr + 41, 'ubyte');
-            op.neon_lane = Memory.getValue(opPtr + 42, 'i8');
-            op.type = Memory.getValue(opPtr + 12, 'i32');
+            op.subtracted = Memory.read(op_ptr + 40, 'bool');
+            op.access = Memory.read(op_ptr + 41, 'ubyte');
+            op.neon_lane = Memory.read(op_ptr + 42, 'i8');
+            op.type = Memory.read(op_ptr + 12, 'i32');
             switch (op.type) {
               case cs.ARM_OP_SYSREG:
               case cs.ARM_OP_REG:
-                op.reg = Memory.getValue(opPtr + 16, 'i32');
+                op.reg = Memory.read(op_ptr + 16, 'i32');
                 break;
               case cs.ARM_OP_IMM:
               case cs.ARM_OP_PIMM:
               case cs.ARM_OP_PIMM:
-                op.imm = Memory.getValue(opPtr + 16, 'i32');
+                op.imm = Memory.read(op_ptr + 16, 'i32');
                 break;
               case cs.ARM_OP_FP:
-                op.fp = Memory.getValue(opPtr + 16, 'double');
+                op.fp = Memory.read(op_ptr + 16, 'double');
                 break;
               case cs.ARM_OP_SETEND:
-                op.setend = Memory.getValue(opPtr + 16, 'i32');
+                op.setend = Memory.read(op_ptr + 16, 'i32');
                 break;
               case cs.ARM_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 16, 'i32'),
-                  index: Memory.getValue(opPtr + 20, 'i32'),
-                  scale: Memory.getValue(opPtr + 24, 'i32'),
-                  disp: Memory.getValue(opPtr + 28, 'i32'),
-                  lshift: Memory.getValue(opPtr + 32, 'i32'),
+                  base: Memory.read(op_ptr + 16, 'i32'),
+                  index: Memory.read(op_ptr + 20, 'i32'),
+                  scale: Memory.read(op_ptr + 24, 'i32'),
+                  disp: Memory.read(op_ptr + 28, 'i32'),
+                  lshift: Memory.read(op_ptr + 32, 'i32'),
                 };
                 break;
             }
@@ -516,63 +572,63 @@ namespace cs {
           detail.arm64 = {};
           arch = detail.arm64;
           arch.operands = [];
-          arch.cc = Memory.getValue(archInfoPtr, 'i32');
-          arch.update_flags = Memory.getValue(archInfoPtr + 4, 'bool');
-          arch.writeback = Memory.getValue(archInfoPtr + 5, 'bool');
-          arch.post_index = Memory.getValue(archInfoPtr + 6, 'bool');
-          arch.op_count = Memory.getValue(archInfoPtr + 7, 'i8');
+          arch.cc = Memory.read(arch_info_ptr, 'i32');
+          arch.update_flags = Memory.read(arch_info_ptr + 4, 'bool');
+          arch.writeback = Memory.read(arch_info_ptr + 5, 'bool');
+          arch.post_index = Memory.read(arch_info_ptr + 6, 'bool');
+          arch.op_count = Memory.read(arch_info_ptr + 7, 'i8');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 8 + i * 56;
-            op.vector_index = Memory.getValue(opPtr + 0, 'i32');
-            op.vas = Memory.getValue(opPtr + 4, 'i32');
+            op_ptr = arch_info_ptr + 8 + i * 56;
+            op.vector_index = Memory.read(op_ptr + 0, 'i32');
+            op.vas = Memory.read(op_ptr + 4, 'i32');
             op.shift = {
-              type: Memory.getValue(opPtr + 8, 'i32'),
-              value: Memory.getValue(opPtr + 12, 'i32'),
+              type: Memory.read(op_ptr + 8, 'i32'),
+              value: Memory.read(op_ptr + 12, 'i32'),
             };
-            op.ext = Memory.getValue(opPtr + 16, 'i32');
-            op.access = Memory.getValue(opPtr + 48, 'i32');
-            op.type = Memory.getValue(opPtr + 20, 'i32');
+            op.ext = Memory.read(op_ptr + 16, 'i32');
+            op.access = Memory.read(op_ptr + 48, 'i32');
+            op.type = Memory.read(op_ptr + 20, 'i32');
             switch (op.type) {
               case cs.ARM64_OP_REG:
               case cs.ARM64_OP_REG_MRS:
               case cs.ARM64_OP_REG_MSR:
-                op.reg = Memory.getValue(opPtr + 32, 'i32');
+                op.reg = Memory.read(op_ptr + 32, 'i32');
                 break;
               case cs.ARM64_OP_IMM:
               case cs.ARM64_OP_CIMM:
-                op.imm = Memory.getValue(opPtr + 32, 'i64');
+                op.imm = Memory.read(op_ptr + 32, 'i64');
                 break;
               case cs.ARM64_OP_FP:
-                op.fp = Memory.getValue(opPtr + 32, 'double');
+                op.fp = Memory.read(op_ptr + 32, 'double');
                 break;
               case cs.ARM64_OP_PSTATE:
-                op.pstate = Memory.getValue(opPtr + 32, 'i32');
+                op.pstate = Memory.read(op_ptr + 32, 'i32');
                 break;
               case cs.ARM64_OP_SYS:
-                op.sys = Memory.getValue(opPtr + 32, 'i32');
+                op.sys = Memory.read(op_ptr + 32, 'i32');
                 break;
               case cs.ARM64_OP_SVCR:
-                op.svcr = Memory.getValue(opPtr + 24, 'i32');
+                op.svcr = Memory.read(op_ptr + 24, 'i32');
                 break;
               case cs.ARM64_OP_BARRIER:
-                op.barrier = Memory.getValue(opPtr + 32, 'i32');
+                op.barrier = Memory.read(op_ptr + 32, 'i32');
                 break;
               case cs.ARM64_OP_PREFETCH:
-                op.prefetch = Memory.getValue(opPtr + 32, 'i32');
+                op.prefetch = Memory.read(op_ptr + 32, 'i32');
                 break;
               case cs.ARM64_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 32, 'i32'),
-                  index: Memory.getValue(opPtr + 36, 'i32'),
-                  disp: Memory.getValue(opPtr + 40, 'i32'),
+                  base: Memory.read(op_ptr + 32, 'i32'),
+                  index: Memory.read(op_ptr + 36, 'i32'),
+                  disp: Memory.read(op_ptr + 40, 'i32'),
                 };
                 break;
               case cs.ARM64_OP_SME_INDEX:
                 op.sme_index = {
-                  reg: Memory.getValue(opPtr + 32, 'i32'),
-                  base: Memory.getValue(opPtr + 36, 'i32'),
-                  disp: Memory.getValue(opPtr + 40, 'i32'),
+                  reg: Memory.read(op_ptr + 32, 'i32'),
+                  base: Memory.read(op_ptr + 36, 'i32'),
+                  disp: Memory.read(op_ptr + 40, 'i32'),
                 };
                 break;
             }
@@ -583,64 +639,64 @@ namespace cs {
           detail.m68k = {};
           arch = detail.m68k;
           arch.operands = [];
-          arch.op_count = Memory.getValue(archInfoPtr + 232, 'ubyte');
+          arch.op_count = Memory.read(arch_info_ptr + 232, 'ubyte');
           arch.op_size = {
-            type: Memory.getValue(archInfoPtr + 224, 'i32'),
+            type: Memory.read(arch_info_ptr + 224, 'i32'),
           };
           switch (arch.op_size.type) {
             case cs.M68K_SIZE_TYPE_CPU:
-              arch.op_size.cpu_size = Memory.getValue(archInfoPtr + 228, 'i32');
+              arch.op_size.cpu_size = Memory.read(arch_info_ptr + 228, 'i32');
               break;
             case cs.M68K_SIZE_TYPE_FPU:
-              arch.op_size.fpu_size = Memory.getValue(archInfoPtr + 228, 'i32');
+              arch.op_size.fpu_size = Memory.read(arch_info_ptr + 228, 'i32');
               break;
           }
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + i * 56;
-            op.address_mode = Memory.getValue(opPtr + 52, 'i32');
-            op.type = Memory.getValue(opPtr + 48, 'i32');
+            op_ptr = arch_info_ptr + i * 56;
+            op.address_mode = Memory.read(op_ptr + 52, 'i32');
+            op.type = Memory.read(op_ptr + 48, 'i32');
             switch (op.type) {
               case cs.M68K_OP_REG:
-                op.reg = Memory.getValue(opPtr + 0, 'i32');
+                op.reg = Memory.read(op_ptr + 0, 'i32');
                 break;
               case cs.M68K_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 0, 'ulong');
+                op.imm = Memory.read(op_ptr + 0, 'ulong');
                 break;
               case cs.M68K_OP_MEM:
                 op.mem = {
-                  base_reg: Memory.getValue(opPtr + 8, 'i32'),
-                  index_reg: Memory.getValue(opPtr + 12, 'i32'),
-                  in_base_reg: Memory.getValue(opPtr + 16, 'i32'),
-                  in_disp: Memory.getValue(opPtr + 20, 'u32'),
-                  out_disp: Memory.getValue(opPtr + 24, 'i32'),
-                  disp: Memory.getValue(opPtr + 28, 'short'),
-                  scale: Memory.getValue(opPtr + 30, 'ubyte'),
-                  bitfield: Memory.getValue(opPtr + 31, 'ubyte'),
-                  width: Memory.getValue(opPtr + 32, 'ubyte'),
-                  offset: Memory.getValue(opPtr + 33, 'ubyte'),
-                  index_size: Memory.getValue(opPtr + 34, 'ubyte'),
+                  base_reg: Memory.read(op_ptr + 8, 'i32'),
+                  index_reg: Memory.read(op_ptr + 12, 'i32'),
+                  in_base_reg: Memory.read(op_ptr + 16, 'i32'),
+                  in_disp: Memory.read(op_ptr + 20, 'u32'),
+                  out_disp: Memory.read(op_ptr + 24, 'i32'),
+                  disp: Memory.read(op_ptr + 28, 'short'),
+                  scale: Memory.read(op_ptr + 30, 'ubyte'),
+                  bitfield: Memory.read(op_ptr + 31, 'ubyte'),
+                  width: Memory.read(op_ptr + 32, 'ubyte'),
+                  offset: Memory.read(op_ptr + 33, 'ubyte'),
+                  index_size: Memory.read(op_ptr + 34, 'ubyte'),
                 };
                 break;
               case cs.M68K_OP_FP_DOUBLE:
-                op.dimm = Memory.getValue(opPtr + 0, 'double');
+                op.dimm = Memory.read(op_ptr + 0, 'double');
                 break;
               case cs.M68K_OP_FP_SINGLE:
-                op.simm = Memory.getValue(opPtr + 0, 'float');
+                op.simm = Memory.read(op_ptr + 0, 'float');
                 break;
               case cs.M68K_OP_REG_BITS:
-                op.register_bits = Memory.getValue(opPtr + 44, 'i32');
+                op.register_bits = Memory.read(op_ptr + 44, 'i32');
                 break;
               case cs.M68K_OP_REG_PAIR:
                 op.reg_pair = {
-                  reg_0: Memory.getValue(opPtr + 0, 'i32'),
-                  reg_1: Memory.getValue(opPtr + 4, 'i32'),
+                  reg_0: Memory.read(op_ptr + 0, 'i32'),
+                  reg_1: Memory.read(op_ptr + 4, 'i32'),
                 };
                 break;
               case cs.M68K_OP_BR_DISP:
                 op.br_disp = {
-                  disp: Memory.getValue(opPtr + 36, 'i32'),
-                  disp_size: Memory.getValue(opPtr + 40, 'ubyte'),
+                  disp: Memory.read(op_ptr + 36, 'i32'),
+                  disp_size: Memory.read(op_ptr + 40, 'ubyte'),
                 };
                 break;
             }
@@ -651,22 +707,22 @@ namespace cs {
           detail.mips = {};
           arch = detail.mips;
           arch.operands = [];
-          arch.op_count = Memory.getValue(archInfoPtr, 'ubyte');
+          arch.op_count = Memory.read(arch_info_ptr, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 8 + i * 24;
-            op.type = Memory.getValue(opPtr + 0, 'i32');
+            op_ptr = arch_info_ptr + 8 + i * 24;
+            op.type = Memory.read(op_ptr + 0, 'i32');
             switch (op.type) {
               case cs.MIPS_OP_REG:
-                op.reg = Memory.getValue(opPtr + 8, 'i32');
+                op.reg = Memory.read(op_ptr + 8, 'i32');
                 break;
               case cs.MIPS_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 8, 'long');
+                op.imm = Memory.read(op_ptr + 8, 'long');
                 break;
               case cs.MIPS_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 8, 'i32'),
-                  disp: Memory.getValue(opPtr + 12, 'long'),
+                  base: Memory.read(op_ptr + 8, 'i32'),
+                  disp: Memory.read(op_ptr + 12, 'long'),
                 };
                 break;
             }
@@ -677,32 +733,32 @@ namespace cs {
           detail.ppc = {};
           arch = detail.ppc;
           arch.operands = [];
-          arch.bc = Memory.getValue(archInfoPtr + 0, 'i32');
-          arch.bh = Memory.getValue(archInfoPtr + 4, 'i32');
-          arch.update_cr0 = Memory.getValue(archInfoPtr + 8, 'bool');
-          arch.op_count = Memory.getValue(archInfoPtr + 9, 'ubyte');
+          arch.bc = Memory.read(arch_info_ptr + 0, 'i32');
+          arch.bh = Memory.read(arch_info_ptr + 4, 'i32');
+          arch.update_cr0 = Memory.read(arch_info_ptr + 8, 'bool');
+          arch.op_count = Memory.read(arch_info_ptr + 9, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 16 + i * 24;
-            op.type = Memory.getValue(opPtr, 'i32');
+            op_ptr = arch_info_ptr + 16 + i * 24;
+            op.type = Memory.read(op_ptr, 'i32');
             switch (op.type) {
               case cs.PPC_OP_REG:
-                op.reg = Memory.getValue(opPtr + 8, 'i32');
+                op.reg = Memory.read(op_ptr + 8, 'i32');
                 break;
               case cs.PPC_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 8, 'long');
+                op.imm = Memory.read(op_ptr + 8, 'long');
                 break;
               case cs.PPC_OP_CRX:
                 op.crx = {
-                  scale: Memory.getValue(opPtr + 8, 'u32'),
-                  reg: Memory.getValue(opPtr + 12, 'i32'),
-                  cond: Memory.getValue(opPtr + 16, 'i32'),
+                  scale: Memory.read(op_ptr + 8, 'u32'),
+                  reg: Memory.read(op_ptr + 12, 'i32'),
+                  cond: Memory.read(op_ptr + 16, 'i32'),
                 };
                 break;
               case cs.PPC_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 8, 'i32'),
-                  disp: Memory.getValue(opPtr + 12, 'i32'),
+                  base: Memory.read(op_ptr + 8, 'i32'),
+                  disp: Memory.read(op_ptr + 12, 'i32'),
                 };
                 break;
             }
@@ -713,25 +769,25 @@ namespace cs {
           detail.sparc = {};
           arch = detail.sparc;
           arch.operands = [];
-          arch.cc = Memory.getValue(archInfoPtr + 0, 'i32');
-          arch.hint = Memory.getValue(archInfoPtr + 4, 'i32');
-          arch.op_count = Memory.getValue(archInfoPtr + 8, 'ubyte');
+          arch.cc = Memory.read(arch_info_ptr + 0, 'i32');
+          arch.hint = Memory.read(arch_info_ptr + 4, 'i32');
+          arch.op_count = Memory.read(arch_info_ptr + 8, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 16 + i * 16;
-            op.type = Memory.getValue(opPtr + 0, 'i32');
+            op_ptr = arch_info_ptr + 16 + i * 16;
+            op.type = Memory.read(op_ptr + 0, 'i32');
             switch (op.type) {
               case cs.SPARC_OP_REG:
-                op.reg = Memory.getValue(opPtr + 8, 'i32');
+                op.reg = Memory.read(op_ptr + 8, 'i32');
                 break;
               case cs.SPARC_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 8, 'long');
+                op.imm = Memory.read(op_ptr + 8, 'long');
                 break;
               case cs.SPARC_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 8, 'ubyte'),
-                  index: Memory.getValue(opPtr + 9, 'ubyte'),
-                  disp: Memory.getValue(opPtr + 12, 'i32'),
+                  base: Memory.read(op_ptr + 8, 'ubyte'),
+                  index: Memory.read(op_ptr + 9, 'ubyte'),
+                  disp: Memory.read(op_ptr + 12, 'i32'),
                 };
                 break;
             }
@@ -742,25 +798,25 @@ namespace cs {
           detail.sysz = {};
           arch = detail.sysz;
           arch.operands = [];
-          arch.cc = Memory.getValue(archInfoPtr + 0, 'i32');
-          arch.op_count = Memory.getValue(archInfoPtr + 4, 'ubyte');
+          arch.cc = Memory.read(arch_info_ptr + 0, 'i32');
+          arch.op_count = Memory.read(arch_info_ptr + 4, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 8 + i * 32;
-            op.type = Memory.getValue(opPtr + 0, 'i32');
+            op_ptr = arch_info_ptr + 8 + i * 32;
+            op.type = Memory.read(op_ptr + 0, 'i32');
             switch (op.type) {
               case cs.SYSZ_OP_REG:
-                op.reg = Memory.getValue(opPtr + 8, 'i32');
+                op.reg = Memory.read(op_ptr + 8, 'i32');
                 break;
               case cs.SYSZ_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 8, 'i64');
+                op.imm = Memory.read(op_ptr + 8, 'i64');
                 break;
               case cs.SYSZ_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 8, 'ubyte'),
-                  index: Memory.getValue(opPtr + 9, 'ubyte'),
-                  length: Memory.getValue(opPtr + 16, 'ulong'),
-                  disp: Memory.getValue(opPtr + 24, 'long'),
+                  base: Memory.read(op_ptr + 8, 'ubyte'),
+                  index: Memory.read(op_ptr + 9, 'ubyte'),
+                  length: Memory.read(op_ptr + 16, 'ulong'),
+                  disp: Memory.read(op_ptr + 24, 'long'),
                 };
                 break;
             }
@@ -771,24 +827,24 @@ namespace cs {
           detail.xcore = {};
           arch = detail.xcore;
           arch.operands = [];
-          arch.op_count = Memory.getValue(archInfoPtr + 0, 'ubyte');
+          arch.op_count = Memory.read(arch_info_ptr + 0, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 4 + i * 16;
-            op.type = Memory.getValue(opPtr + 0, 'i32');
+            op_ptr = arch_info_ptr + 4 + i * 16;
+            op.type = Memory.read(op_ptr + 0, 'i32');
             switch (op.type) {
               case cs.XCORE_OP_REG:
-                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                op.reg = Memory.read(op_ptr + 4, 'i32');
                 break;
               case cs.XCORE_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 4, 'i32');
+                op.imm = Memory.read(op_ptr + 4, 'i32');
                 break;
               case cs.XCORE_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 4, 'ubyte'),
-                  index: Memory.getValue(opPtr + 5, 'ubyte'),
-                  disp: Memory.getValue(opPtr + 8, 'i32'),
-                  direct: Memory.getValue(opPtr + 12, 'i32'),
+                  base: Memory.read(op_ptr + 4, 'ubyte'),
+                  index: Memory.read(op_ptr + 5, 'ubyte'),
+                  disp: Memory.read(op_ptr + 8, 'i32'),
+                  direct: Memory.read(op_ptr + 12, 'i32'),
                 };
                 break;
             }
@@ -799,41 +855,41 @@ namespace cs {
           detail.tms320c64x = {};
           arch = detail.tms320c64x;
           arch.operands = [];
-          arch.op_count = Memory.getValue(archInfoPtr + 0, 'ubyte');
+          arch.op_count = Memory.read(arch_info_ptr + 0, 'ubyte');
           arch.condition = {
-            reg: Memory.getValue(archInfoPtr + 260, 'i32'),
-            zero: Memory.getValue(archInfoPtr + 264, 'i32'),
+            reg: Memory.read(arch_info_ptr + 260, 'i32'),
+            zero: Memory.read(arch_info_ptr + 264, 'i32'),
           };
           arch.funit = {
-            unit: Memory.getValue(archInfoPtr + 268, 'u32'),
-            side: Memory.getValue(archInfoPtr + 272, 'u32'),
-            crosspath: Memory.getValue(archInfoPtr + 276, 'u32'),
+            unit: Memory.read(arch_info_ptr + 268, 'u32'),
+            side: Memory.read(arch_info_ptr + 272, 'u32'),
+            crosspath: Memory.read(arch_info_ptr + 276, 'u32'),
           };
-          arch.parallel = Memory.getValue(archInfoPtr + 280, 'u32');
+          arch.parallel = Memory.read(arch_info_ptr + 280, 'u32');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 4 + i * 32;
-            op.type = Memory.getValue(opPtr, 'i32');
+            op_ptr = arch_info_ptr + 4 + i * 32;
+            op.type = Memory.read(op_ptr, 'i32');
             switch (op.type) {
               case cs.TMS320C64X_OP_REG:
-                op.reg = Memory.getValue(opPtr + 4, 'u32');
+                op.reg = Memory.read(op_ptr + 4, 'u32');
                 break;
               case cs.TMS320C64X_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 4, 'i32');
+                op.imm = Memory.read(op_ptr + 4, 'i32');
                 break;
               case cs.TMS320C64X_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 4, 'u32'),
-                  disp: Memory.getValue(opPtr + 8, 'i32'),
-                  unit: Memory.getValue(opPtr + 12, 'i32'),
-                  scaled: Memory.getValue(opPtr + 16, 'i32'),
-                  disptype: Memory.getValue(opPtr + 20, 'i32'),
-                  direction: Memory.getValue(opPtr + 24, 'i32'),
-                  modify: Memory.getValue(opPtr + 28, 'i32'),
+                  base: Memory.read(op_ptr + 4, 'u32'),
+                  disp: Memory.read(op_ptr + 8, 'i32'),
+                  unit: Memory.read(op_ptr + 12, 'i32'),
+                  scaled: Memory.read(op_ptr + 16, 'i32'),
+                  disptype: Memory.read(op_ptr + 20, 'i32'),
+                  direction: Memory.read(op_ptr + 24, 'i32'),
+                  modify: Memory.read(op_ptr + 28, 'i32'),
                 };
                 break;
               case cs.TMS320C64X_OP_REGPAIR:
-                op.reg = Memory.getValue(opPtr + 4, 'u32');
+                op.reg = Memory.read(op_ptr + 4, 'u32');
                 break;
             }
             arch.operands[i] = op;
@@ -843,49 +899,49 @@ namespace cs {
           detail.m680x = {};
           arch = detail.m680x;
           arch.operands = [];
-          arch.flags = Memory.getValue(archInfoPtr + 0, 'ubyte');
-          arch.op_count = Memory.getValue(archInfoPtr + 1, 'ubyte');
+          arch.flags = Memory.read(arch_info_ptr + 0, 'ubyte');
+          arch.op_count = Memory.read(arch_info_ptr + 1, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 4 + i * 24;
-            op.type = Memory.getValue(opPtr, 'i32');
-            op.size = Memory.getValue(opPtr + 20, 'ubyte');
-            op.access = Memory.getValue(opPtr + 21, 'ubyte');
+            op_ptr = arch_info_ptr + 4 + i * 24;
+            op.type = Memory.read(op_ptr, 'i32');
+            op.size = Memory.read(op_ptr + 20, 'ubyte');
+            op.access = Memory.read(op_ptr + 21, 'ubyte');
             switch (op.type) {
               case cs.M680X_OP_IMMEDIATE:
-                op.imm = Memory.getValue(opPtr + 4, 'i32');
+                op.imm = Memory.read(op_ptr + 4, 'i32');
                 break;
               case cs.M680X_OP_REGISTER:
-                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                op.reg = Memory.read(op_ptr + 4, 'i32');
                 break;
               case cs.M680X_OP_INDEXED:
                 op.idx = {
-                  base_reg: Memory.getValue(opPtr + 4, 'i32'),
-                  offset_reg: Memory.getValue(opPtr + 8, 'i32'),
-                  offset: Memory.getValue(opPtr + 12, 'short'),
-                  offset_addr: Memory.getValue(opPtr + 14, 'ushort'),
-                  offset_bits: Memory.getValue(opPtr + 16, 'ubyte'),
-                  inc_dec: Memory.getValue(opPtr + 17, 'byte'),
-                  flags: Memory.getValue(opPtr + 18, 'ubyte'),
+                  base_reg: Memory.read(op_ptr + 4, 'i32'),
+                  offset_reg: Memory.read(op_ptr + 8, 'i32'),
+                  offset: Memory.read(op_ptr + 12, 'short'),
+                  offset_addr: Memory.read(op_ptr + 14, 'ushort'),
+                  offset_bits: Memory.read(op_ptr + 16, 'ubyte'),
+                  inc_dec: Memory.read(op_ptr + 17, 'byte'),
+                  flags: Memory.read(op_ptr + 18, 'ubyte'),
                 };
                 break;
               case cs.M680X_OP_RELATIVE:
                 op.rel = {
-                  address: Memory.getValue(opPtr + 4, 'ushort'),
-                  offset: Memory.getValue(opPtr + 6, 'short'),
+                  address: Memory.read(op_ptr + 4, 'ushort'),
+                  offset: Memory.read(op_ptr + 6, 'short'),
                 };
                 break;
               case cs.M680X_OP_EXTENDED:
                 op.ext = {
-                  address: Memory.getValue(opPtr + 4, 'ushort'),
-                  indirect: Memory.getValue(opPtr + 6, 'bool'),
+                  address: Memory.read(op_ptr + 4, 'ushort'),
+                  indirect: Memory.read(op_ptr + 6, 'bool'),
                 };
                 break;
               case cs.M680X_OP_DIRECT:
-                op.direct_addr = Memory.getValue(opPtr + 4, 'ubyte');
+                op.direct_addr = Memory.read(op_ptr + 4, 'ubyte');
                 break;
               case cs.M680X_OP_CONSTANT:
-                op.const_val = Memory.getValue(opPtr + 4, 'ubyte');
+                op.const_val = Memory.read(op_ptr + 4, 'ubyte');
                 break;
             }
             arch.operands[i] = op;
@@ -894,30 +950,30 @@ namespace cs {
         case ARCH_EVM:
           detail.evm = {};
           arch = detail.evm;
-          arch.pop = Memory.getValue(archInfoPtr + 0, 'ubyte');
-          arch.push = Memory.getValue(archInfoPtr + 1, 'ubyte');
-          arch.fee = Memory.getValue(archInfoPtr + 4, 'ubyte');
+          arch.pop = Memory.read(arch_info_ptr + 0, 'ubyte');
+          arch.push = Memory.read(arch_info_ptr + 1, 'ubyte');
+          arch.fee = Memory.read(arch_info_ptr + 4, 'ubyte');
           break;
         case ARCH_MOS65XX:
           detail.mos65xx = {};
           arch = detail.mos65xx;
           arch.operands = [];
-          arch.am = Memory.getValue(archInfoPtr + 0, 'i32');
-          arch.modifies_flags = Memory.getValue(archInfoPtr + 4, 'bool');
-          arch.op_count = Memory.getValue(archInfoPtr + 5, 'ubyte');
+          arch.am = Memory.read(arch_info_ptr + 0, 'i32');
+          arch.modifies_flags = Memory.read(arch_info_ptr + 4, 'bool');
+          arch.op_count = Memory.read(arch_info_ptr + 5, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 8 + i * 8;
-            op.type = Memory.getValue(opPtr, 'i32');
+            op_ptr = arch_info_ptr + 8 + i * 8;
+            op.type = Memory.read(op_ptr, 'i32');
             switch (op.type) {
               case cs.MOS65XX_OP_REG:
-                op.reg = Memory.getValue(opPtr + 4, 'i32');
+                op.reg = Memory.read(op_ptr + 4, 'i32');
                 break;
               case cs.MOS65XX_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 4, 'i32');
+                op.imm = Memory.read(op_ptr + 4, 'i32');
                 break;
               case cs.MOS65XX_OP_MEM:
-                op.mem = Memory.getValue(opPtr + 4, 'i32');
+                op.mem = Memory.read(op_ptr + 4, 'i32');
                 break;
             }
             arch.operands[i] = op;
@@ -927,38 +983,38 @@ namespace cs {
           detail.wasm = {};
           arch = detail.wasm;
           arch.operands = [];
-          arch.op_count = Memory.getValue(archInfoPtr + 0, 'ubyte');
+          arch.op_count = Memory.read(arch_info_ptr + 0, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 8 + i * 32;
-            op.type = Memory.getValue(opPtr, 'i32');
-            op.size = Memory.getValue(opPtr + 4, 'i32');
+            op_ptr = arch_info_ptr + 8 + i * 32;
+            op.type = Memory.read(op_ptr, 'i32');
+            op.size = Memory.read(op_ptr + 4, 'i32');
             switch (op.type) {
               case cs.WASM_OP_INT7:
-                op.int7 = Memory.getValue(opPtr + 8, 'ubyte');
+                op.int7 = Memory.read(op_ptr + 8, 'ubyte');
                 break;
               case cs.WASM_OP_VARUINT32:
-                op.varuint32 = Memory.getValue(opPtr + 8, 'u32');
+                op.varuint32 = Memory.read(op_ptr + 8, 'u32');
                 break;
               case cs.WASM_OP_VARUINT64:
-                op.varuint64 = Memory.getValue(opPtr + 8, 'u64');
+                op.varuint64 = Memory.read(op_ptr + 8, 'u64');
                 break;
               case cs.WASM_OP_UINT32:
-                op.uint32 = Memory.getValue(opPtr + 8, 'u32');
+                op.uint32 = Memory.read(op_ptr + 8, 'u32');
                 break;
               case cs.WASM_OP_UINT64:
-                op.uint64 = Memory.getValue(opPtr + 8, 'u64');
+                op.uint64 = Memory.read(op_ptr + 8, 'u64');
                 break;
               case cs.WASM_OP_IMM:
                 op.imm = [];
                 for (let i = 0; i < 2; i++)
-                  op.imm[i] = Memory.getValue(opPtr + 8 + i, 'u32');
+                  op.imm[i] = Memory.read(op_ptr + 8 + i, 'u32');
                 break;
               case cs.WASM_OP_BRTABLE:
                 op.brtable = {
-                  length: Memory.getValue(opPtr + 8, 'u32'),
-                  address: Memory.getValue(opPtr + 12, 'u64'),
-                  default_target: Memory.getValue(opPtr + 20, 'u32'),
+                  length: Memory.read(op_ptr + 8, 'u32'),
+                  address: Memory.read(op_ptr + 12, 'u64'),
+                  default_target: Memory.read(op_ptr + 20, 'u32'),
                 };
                 break;
             }
@@ -969,36 +1025,36 @@ namespace cs {
           detail.bpf = {};
           arch = detail.bpf;
           arch.operands = [];
-          arch.op_count = Memory.getValue(archInfoPtr + 0, 'ubyte');
+          arch.op_count = Memory.read(arch_info_ptr + 0, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 8 + i * 24;
-            op.type = Memory.getValue(opPtr + 0, 'i32');
-            op.access = Memory.getValue(opPtr + 16, 'u32');
+            op_ptr = arch_info_ptr + 8 + i * 24;
+            op.type = Memory.read(op_ptr + 0, 'i32');
+            op.access = Memory.read(op_ptr + 16, 'u32');
             switch (op.type) {
               case cs.BPF_OP_REG:
-                op.reg = Memory.getValue(opPtr + 8, 'ubyte');
+                op.reg = Memory.read(op_ptr + 8, 'ubyte');
                 break;
               case cs.BPF_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 8, 'i64');
+                op.imm = Memory.read(op_ptr + 8, 'i64');
                 break;
               case cs.BPF_OP_OFF:
-                op.off = Memory.getValue(opPtr + 8, 'u32');
+                op.off = Memory.read(op_ptr + 8, 'u32');
                 break;
               case cs.BPF_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 8, 'i32'),
-                  disp: Memory.getValue(opPtr + 12, 'u32'),
+                  base: Memory.read(op_ptr + 8, 'i32'),
+                  disp: Memory.read(op_ptr + 12, 'u32'),
                 };
                 break;
               case cs.BPF_OP_MMEM:
-                op.mmem = Memory.getValue(opPtr + 8, 'u32');
+                op.mmem = Memory.read(op_ptr + 8, 'u32');
                 break;
               case cs.BPF_OP_MSH:
-                op.msh = Memory.getValue(opPtr + 8, 'u32');
+                op.msh = Memory.read(op_ptr + 8, 'u32');
                 break;
               case cs.BPF_OP_EXT:
-                op.ext = Memory.getValue(opPtr + 8, 'u32');
+                op.ext = Memory.read(op_ptr + 8, 'u32');
                 break;
             }
             arch.operands[i] = op;
@@ -1008,23 +1064,23 @@ namespace cs {
           detail.riscv = {};
           arch = detail.riscv;
           arch.operands = [];
-          arch.need_effective_addr = Memory.getValue(archInfoPtr + 0, 'bool');
-          arch.op_count = Memory.getValue(archInfoPtr + 1, 'ubyte');
+          arch.need_effective_addr = Memory.read(arch_info_ptr + 0, 'bool');
+          arch.op_count = Memory.read(arch_info_ptr + 1, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 8 + i * 24;
-            op.type = Memory.getValue(opPtr + 0, 'i32');
+            op_ptr = arch_info_ptr + 8 + i * 24;
+            op.type = Memory.read(op_ptr + 0, 'i32');
             switch (op.type) {
               case cs.RISCV_OP_REG:
-                op.reg = Memory.getValue(opPtr + 8, 'u32');
+                op.reg = Memory.read(op_ptr + 8, 'u32');
                 break;
               case cs.RISCV_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 8, 'i32');
+                op.imm = Memory.read(op_ptr + 8, 'i32');
                 break;
               case cs.RISCV_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 8, 'u32'),
-                  disp: Memory.getValue(opPtr + 16, 'i64'),
+                  base: Memory.read(op_ptr + 8, 'u32'),
+                  disp: Memory.read(op_ptr + 16, 'i64'),
                 };
                 break;
             }
@@ -1035,25 +1091,25 @@ namespace cs {
           detail.sh = {};
           arch = detail.sh;
           arch.operands = [];
-          arch.insn = Memory.getValue(archInfoPtr + 0, 'u32');
-          arch.size = Memory.getValue(archInfoPtr + 4, 'ubyte');
-          arch.op_count = Memory.getValue(archInfoPtr + 5, 'ubyte');
+          arch.insn = Memory.read(arch_info_ptr + 0, 'u32');
+          arch.size = Memory.read(arch_info_ptr + 4, 'ubyte');
+          arch.op_count = Memory.read(arch_info_ptr + 5, 'ubyte');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 8 + i * 58;
-            op.type = Memory.getValue(opPtr + 0, 'i32');
+            op_ptr = arch_info_ptr + 8 + i * 58;
+            op.type = Memory.read(op_ptr + 0, 'i32');
             switch (op.type) {
               case cs.SH_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 8, 'i64');
+                op.imm = Memory.read(op_ptr + 8, 'i64');
                 break;
               case cs.SH_OP_REG:
-                op.reg = Memory.getValue(opPtr + 8, 'i32');
+                op.reg = Memory.read(op_ptr + 8, 'i32');
                 break;
               case cs.SH_OP_MEM:
                 op.mem = {
-                  address: Memory.getValue(opPtr + 8, 'i32'),
-                  reg: Memory.getValue(opPtr + 12, 'i32'),
-                  disp: Memory.getValue(opPtr + 16, 'i32'),
+                  address: Memory.read(op_ptr + 8, 'i32'),
+                  reg: Memory.read(op_ptr + 12, 'i32'),
+                  disp: Memory.read(op_ptr + 16, 'i32'),
                 };
                 break;
             }
@@ -1064,23 +1120,23 @@ namespace cs {
           detail.tricore = {};
           arch = detail.tricore;
           arch.operands = [];
-          arch.op_count = Memory.getValue(archInfoPtr + 0, 'ubyte');
-          arch.update_flags = Memory.getValue(archInfoPtr + 132, 'bool');
+          arch.op_count = Memory.read(arch_info_ptr + 0, 'ubyte');
+          arch.update_flags = Memory.read(arch_info_ptr + 132, 'bool');
           for (let i = 0; i < arch.op_count; i++) {
             op = {};
-            opPtr = archInfoPtr + 4 + i * 16;
-            op.type = Memory.getValue(opPtr + 0, 'i32');
+            op_ptr = arch_info_ptr + 4 + i * 16;
+            op.type = Memory.read(op_ptr + 0, 'i32');
             switch (op.type) {
               case cs.TRICORE_OP_REG:
-                op.reg = Memory.getValue(opPtr + 4, 'u32');
+                op.reg = Memory.read(op_ptr + 4, 'u32');
                 break;
               case cs.TRICORE_OP_IMM:
-                op.imm = Memory.getValue(opPtr + 4, 'i32');
+                op.imm = Memory.read(op_ptr + 4, 'i32');
                 break;
               case cs.TRICORE_OP_MEM:
                 op.mem = {
-                  base: Memory.getValue(opPtr + 4, 'ubyte'),
-                  disp: Memory.getValue(opPtr + 8, 'i32'),
+                  base: Memory.read(op_ptr + 4, 'ubyte'),
+                  disp: Memory.read(op_ptr + 8, 'i32'),
                 };
                 break;
             }
@@ -1093,75 +1149,91 @@ namespace cs {
 
     public option(
       option: cs_opt_type,
-      value: cs_opt_value | boolean | { id: number; name: string },
+      value: cs_opt_value | boolean | cs_opt_mnem | cs_opt_skipdata,
     ): void {
-      const handle: csh = Memory.getValue(this.handlePtr, '*');
+      const handle: csh = Memory.read(this.handle_ptr, '*');
 
       if (!handle) {
         return;
       }
 
-      let opVal: any = 0;
+      let opt_val: any = 0;
 
       if (option === OPT_MNEMONIC) {
         if (
           typeof value !== 'object' ||
+          value === undefined ||
           value === null ||
-          typeof value.id !== 'number' ||
-          typeof value.name !== 'string'
+          ((value as cs_opt_mnem).id === undefined &&
+            (value as cs_opt_mnem).mnemonic === undefined) ||
+          ((value as cs_opt_mnem).id !== undefined &&
+            typeof (value as cs_opt_mnem).id !== 'number') ||
+          ((value as cs_opt_mnem).mnemonic !== undefined &&
+            typeof (value as cs_opt_mnem).mnemonic !== 'string')
         ) {
           throw new Error(
-            'When using cs.OPT_MNEMONIC, the value parameter needs to be an object with the following properties,: { id: number, name: string }',
+            'When using cs.OPT_MNEMONIC, the value parameter needs to be an object with the following properties,: { id: number, mnemonic: string | null }',
           );
         }
 
-        const strPtr: ptr = Memory.malloc(value.name.length + 1);
-        for (let i = 0; i < value.name.length; i++) {
-          Memory.setValue(strPtr + i, value.name.charCodeAt(i), 'i8');
+        let str_ptr;
+        const mnemonic_len = (value as cs_opt_mnem).mnemonic.length;
+        if ((value as cs_opt_mnem).mnemonic) {
+          str_ptr = Memory.malloc(mnemonic_len + 1);
+          for (let i = 0; i < (value as cs_opt_mnem).mnemonic.length; i++) {
+            Memory.write(
+              str_ptr + i,
+              (value as cs_opt_mnem).mnemonic.charCodeAt(i),
+              'i8',
+            );
+          }
+          Memory.write(str_ptr + mnemonic_len, 0, 'i8');
+        } else {
+          str_ptr = Memory.malloc(1);
+          Memory.write(str_ptr, 0, 'i8');
         }
-        Memory.setValue(strPtr + value.name.length, 0, 'i8');
+        const obj_ptr = Memory.malloc(8);
+        Memory.write(obj_ptr, (value as cs_opt_mnem).id, 'i32');
+        Memory.write(obj_ptr + 4, str_ptr, 'i32');
 
-        const objPtr = Memory.malloc(8);
-        Memory.setValue(objPtr, value.id, 'i32');
-        Memory.setValue(objPtr + 4, strPtr, 'i32');
-
-        opVal = objPtr;
+        opt_val = obj_ptr;
+      } else if (option === OPT_SKIPDATA_SETUP) {
+        // TODO
       } else {
-        opVal = typeof value === 'boolean' ? (value ? OPT_ON : OPT_OFF) : value;
+        opt_val =
+          typeof value === 'boolean' ? (value ? OPT_ON : OPT_OFF) : value;
       }
 
       const ret: cs_err = Wrapper.ccall(
         'cs_option',
         'number',
         ['pointer', 'number', 'number'],
-        [handle, option, opVal],
+        [handle, option, opt_val],
       );
 
       if (ret !== ERR_OK) {
         const error = new Error(
-          `capstone: Function cs_option failed with code ${ret}:\n${strerror(
-            ret,
-          )}`,
+          `capstone: Function cs_option failed with code ${ret}:\n${strerror(ret)}`,
         );
         throw error;
       }
 
-      if (option === OPT_MNEMONIC && opVal !== 0) {
-        Memory.free(Memory.getValue(opVal, '*'));
-        Memory.free(opVal);
+      if (option === OPT_MNEMONIC && opt_val !== 0) {
+        Memory.free(Memory.read(opt_val, '*'));
+        Memory.free(opt_val);
       }
     }
 
     private open(): void {
-      this.handlePtr = Memory.malloc(4);
+      this.handle_ptr = Memory.malloc(4);
       const ret: cs_err = Wrapper.ccall(
         'cs_open',
         'number',
         ['number', 'number', 'number'],
-        [this.arch, this.mode, this.handlePtr],
+        [this.arch, this.mode, this.handle_ptr],
       );
       if (ret != ERR_OK) {
-        Memory.setValue(this.handlePtr, 0, '*');
+        Memory.write(this.handle_ptr, 0, '*');
         const error =
           'capstone: Function cs_open failed with code ' +
           ret +
@@ -1176,7 +1248,7 @@ namespace cs {
         'cs_close',
         'number',
         ['pointer'],
-        [this.handlePtr],
+        [this.handle_ptr],
       );
       if (ret != ERR_OK) {
         const error =
@@ -1187,44 +1259,43 @@ namespace cs {
         throw error;
       }
 
-      Memory.allocatedMemory.delete(this.handlePtr);
+      Memory.allocations.delete(this.handle_ptr);
 
-      if (Memory.allocatedMemory.size !== 0)
-        Memory.free(Memory.allocatedMemory);
+      if (Memory.allocations.size !== 0) Memory.free(Memory.allocations);
     }
 
     public disasm(
       buffer: Buffer | Array<number> | Uint8Array,
       addr: number,
-      maxLen?: number,
+      max_len?: number,
     ): cs_insn[] {
-      const handle: csh = Memory.getValue(this.handlePtr, 'i32');
-      const bufferLen: number = buffer.length;
-      const bufferPtr: ptr = Memory.malloc(bufferLen);
-      const insnPtr: ptr = Memory.malloc(4);
+      const handle: csh = Memory.read(this.handle_ptr, 'i32');
+      const buffer_len: number = buffer.length;
+      const buffer_ptr: ptr = Memory.malloc(buffer_len);
+      const insn_ptr: ptr = Memory.malloc(4);
 
-      Wrapper.writeArrayToMemory(buffer, bufferPtr);
+      Wrapper.writeArrayToMemory(buffer, buffer_ptr);
 
-      const insnCount: number = Wrapper.ccall(
+      const insn_count: number = Wrapper.ccall(
         'cs_disasm',
         'number',
         ['number', 'number', 'number', 'number', 'number', 'number'],
-        [handle, bufferPtr, bufferLen, addr, 0, maxLen || 0, insnPtr],
+        [handle, buffer_ptr, buffer_len, addr, 0, max_len || 0, insn_ptr],
       );
 
-      if (insnCount > 0) {
-        const insnArrayPtr: ptr = Memory.getValue(insnPtr, 'i32');
+      if (insn_count > 0) {
+        const insn_arr_ptr: ptr = Memory.read(insn_ptr, 'i32');
         const instructions: cs_insn[] = [];
 
-        for (let i = 0; i < insnCount; i++) {
-          const insnOffset: ptr = insnArrayPtr + i * INSN_SIZE;
-          const insn: cs_insn = this.dereferenceInsn(insnOffset);
+        for (let i = 0; i < insn_count; i++) {
+          const insnOffset: ptr = insn_arr_ptr + i * INSN_SIZE;
+          const insn: cs_insn = this.deref(insnOffset);
           instructions.push(insn);
         }
-        Memory.free([insnPtr, bufferPtr]);
+        Memory.free([insn_ptr, buffer_ptr]);
         return instructions;
       } else {
-        Memory.free([insnPtr, bufferPtr]);
+        Memory.free([insn_ptr, buffer_ptr]);
 
         const code: cs_err = cs.errno(handle);
         const error =
@@ -1242,48 +1313,45 @@ namespace cs {
       insn: {} | cs_insn | null;
     }): boolean {
       const { buffer, addr } = data;
-      const handle: csh = Wrapper.getValue(this.handlePtr, 'i32');
-      const bufferLen: number = buffer.length;
-      const codeMem: ptr = Memory.malloc(buffer.length);
-      const castPtr: ptr = Memory.malloc(42);
-      const codePtr: ptr = castPtr;
-      const sizePtr: ptr = castPtr + 8;
-      const addrPtr: ptr = castPtr + 16;
-      const insnPtr: ptr = Wrapper._cs_malloc(4);
+      const handle: csh = Wrapper.getValue(this.handle_ptr, 'i32');
+      const buffer_len: number = buffer.length;
+      const code_mem: ptr = Memory.malloc(buffer.length);
+      const cast_ptr: ptr = Memory.malloc(24);
+      const code_ptr: ptr = cast_ptr;
+      const size_ptr: ptr = cast_ptr + 8;
+      const addr_ptr: ptr = cast_ptr + 16;
+      const insn_ptr: ptr = Wrapper._cs_malloc(handle);
 
-      Memory.setValue(addrPtr, addr, 'i64');
-      Memory.setValue(sizePtr, bufferLen, 'i32');
-      Wrapper.writeArrayToMemory(buffer, codeMem);
-      Memory.setValue(codePtr, codeMem, 'i32');
+      Memory.write(addr_ptr, addr, 'i64');
+      Memory.write(size_ptr, buffer_len, 'i32');
+      Wrapper.writeArrayToMemory(buffer, code_mem);
+      Memory.write(code_ptr, code_mem, 'i32');
 
       const ret: boolean = Wrapper.ccall(
         'cs_disasm_iter',
         'boolean',
         ['number', 'number', 'number', 'number', 'pointer'],
-        [handle, codePtr, sizePtr, addrPtr, insnPtr],
+        [handle, code_ptr, size_ptr, addr_ptr, insn_ptr],
       );
 
       if (ret) {
-        const newAddr: number = Memory.getValue(addrPtr, 'i64');
-        const newSize: number = Memory.getValue(sizePtr, 'i16');
-        const newBytes = [];
-        for (let j = 0; j < newSize; j++) {
-          const byte = Memory.getValue(
-            Memory.getValue(codePtr, 'i32') + j,
-            'u8',
-          );
-          newBytes.push(byte);
+        const new_addr: number = Memory.read(addr_ptr, 'i64');
+        const new_size: number = Memory.read(size_ptr, 'i16');
+        const new_bytes = [];
+        for (let j = 0; j < new_size; j++) {
+          const byte = Memory.read(Memory.read(code_ptr, 'i32') + j, 'u8');
+          new_bytes.push(byte);
         }
 
-        const insn: cs_insn = this.dereferenceInsn(insnPtr);
+        const insn: cs_insn = this.deref(insn_ptr);
 
-        data.buffer = Buffer.from(newBytes);
-        data.addr = newAddr;
+        data.buffer = Buffer.from(new_bytes);
+        data.addr = new_addr;
         data.insn = insn;
       }
-      Memory.free(codeMem);
-      Memory.free(castPtr);
-      Memory.free(insnPtr);
+      Memory.free(code_mem);
+      Memory.free(cast_ptr);
+      Wrapper._cs_free(insn_ptr, 1);
 
       return ret;
     }
@@ -1319,7 +1387,7 @@ namespace cs {
     }
 
     public group_name(group_id: number): string {
-      const handle: csh = Memory.getValue(this.handlePtr, '*');
+      const handle: csh = Memory.read(this.handle_ptr, '*');
       const ret: string = Wrapper.ccall(
         'cs_group_name',
         'string',
@@ -1330,7 +1398,7 @@ namespace cs {
     }
 
     public reg_name(reg_id: number): string {
-      const handle: csh = Memory.getValue(this.handlePtr, '*');
+      const handle: csh = Memory.read(this.handle_ptr, '*');
       const ret: string = Wrapper.ccall(
         'cs_reg_name',
         'string',
@@ -1341,7 +1409,7 @@ namespace cs {
     }
 
     public insn_name(insn_id: number): string {
-      const handle: csh = Memory.getValue(this.handlePtr, '*');
+      const handle: csh = Memory.read(this.handle_ptr, '*');
       const ret: string = Wrapper.ccall(
         'cs_insn_name',
         'string',
@@ -1396,9 +1464,11 @@ declare namespace cs {
   const XCORE_OP_MEM: number;
   const ARM_OP_REG: number;
   const ARM_OP_IMM: number;
+  const ARM_OP_PIMM: number;
   const ARM_OP_FP: number;
   const ARM_OP_SETEND: number;
   const ARM_OP_MEM: number;
+  const ARM_OP_SYSREG: number;
   const M68K_SIZE_TYPE_CPU: number;
   const M68K_SIZE_TYPE_FPU: number;
   const TMS320C64X_OP_REG: number;
@@ -1441,4 +1511,19 @@ declare namespace cs {
 }
 
 export default cs;
-export { Wrapper };
+export {
+  Wrapper,
+  cs_opt_skipdata,
+  cs_opt_mnem,
+  cs_insn,
+  cs_detail,
+  cs_arch,
+  cs_mode,
+  cs_err,
+  cs_opt_type,
+  cs_opt_value,
+  cs_group_type,
+  cs_op_type,
+  cs_ac_type,
+  cs_regs,
+};

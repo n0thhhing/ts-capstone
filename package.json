@@ -5,8 +5,6 @@
     "@types/emscripten": "^1.39.10",
     "@types/node": "latest",
     "bun-types": "^1.0.36",
-    "i": "^0.3.7",
-    "npm": "^10.5.0",
     "typescript": "^5.0.0"
   },
   "type": "module",

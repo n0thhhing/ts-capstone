@@ -78,13 +78,9 @@ combine_files() {
 	fi
 	file_paths=("${!1}")
 	output_file=$2
-	# Create a temporary file to store the combined content
 	temp_file=$(mktemp)
-	# Add the initial content to the temporary file
 	echo '' >"$temp_file"
-	# Append the content of all input files to the temporary file
 	cat "${file_paths[@]}" >>"$temp_file"
-	# Move the temporary file to the output file
 	mv "$temp_file" "$output_file"
 	echo "Files combined successfully into $output_file"
 }

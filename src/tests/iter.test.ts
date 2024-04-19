@@ -2,7 +2,7 @@ import cs from '../wrapper';
 import { expect, test } from 'bun:test';
 
 test('disasm_iter ARM', () => {
-  const armDisassembler = new cs.Capstone(cs.ARCH_ARM, cs.MODE_THUMB);
+  const arm = new cs.Capstone(cs.ARCH_ARM, cs.MODE_THUMB);
   // prettier-ignore
   const armBuffer = [
     0x4f, 0xf0, 0x00, 0x01, // 0x1000 mov.w r1, #0
@@ -17,7 +17,7 @@ test('disasm_iter ARM', () => {
     0xd0, 0xff, 0xa2, 0x01, // 0x1020 vaddw.u16 q8, q8, d18
   ];
 
-  const armData = {
+  const arm_ret = {
     buffer: armBuffer,
     addr: 0x1000,
     insn: {},
@@ -77,19 +77,19 @@ test('disasm_iter ARM', () => {
   ];
 
   let index = 0;
-  while (armDisassembler.disasm_iter(armData)) {
+  while (arm.disasm_iter(arm_ret)) {
     const expected = expectedInstructions[index++];
-    expect(armData.insn.address).toBe(expected.address);
-    expect(armData.insn.mnemonic).toBe(expected.mnemonic);
-    expect(armData.insn.op_str).toBe(expected.op_str);
-    expect(armData.insn.bytes).toEqual(expected.bytes);
+    expect(arm_ret.insn.address).toBe(expected.address);
+    expect(arm_ret.insn.mnemonic).toBe(expected.mnemonic);
+    expect(arm_ret.insn.op_str).toBe(expected.op_str);
+    expect(arm_ret.insn.bytes).toEqual(expected.bytes);
   }
 
-  armDisassembler.close();
+  arm.close();
 });
 
 test('disasm_iter ARM64', () => {
-  const arm64Disassembler = new cs.Capstone(1, 0);
+  const arm64 = new cs.Capstone(1, 0);
   // prettier-ignore
   const arm64Buffer = [  
     0xf5, 0x53, 0xbe, 0xa9, // 0x4db43dc stp x21, x20, [sp, #-0x20]!
@@ -110,7 +110,7 @@ test('disasm_iter ARM64', () => {
     0xe0, 0x03, 0x14, 0xaa, // 0x4db4418 mov x0, x20
   ];
 
-  const arm64Data = {
+  const arm64_ret = {
     buffer: arm64Buffer,
     addr: 0x4db43dc,
     insn: {},
@@ -216,13 +216,13 @@ test('disasm_iter ARM64', () => {
   ];
 
   let index = 0;
-  while (arm64Disassembler.disasm_iter(arm64Data)) {
+  while (arm64.disasm_iter(arm64_ret)) {
     const expected = expectedInstructions[index++];
-    expect(arm64Data.insn.address).toBe(expected.address);
-    expect(arm64Data.insn.mnemonic).toBe(expected.mnemonic);
-    expect(arm64Data.insn.op_str).toBe(expected.op_str);
-    expect(arm64Data.insn.bytes).toEqual(expected.bytes);
+    expect(arm64_ret.insn.address).toBe(expected.address);
+    expect(arm64_ret.insn.mnemonic).toBe(expected.mnemonic);
+    expect(arm64_ret.insn.op_str).toBe(expected.op_str);
+    expect(arm64_ret.insn.bytes).toEqual(expected.bytes);
   }
 
-  arm64Disassembler.close();
+  arm64.close();
 });

@@ -1,4 +1,4 @@
-type CTypes =
+type native_t =
   | 'i8'
   | 'int8_t'
   | 'i16'
@@ -35,21 +35,21 @@ type CTypes =
   | 'char'
   | 'char*'
   | 'boolean';
-type CArrType<T extends CTypes> = `${T}[${number}]`;
-type DependantType = `${CArrType<CTypes>}->${string}`;
+type arr_t<T extends native_t> = `${T}[${number}]`;
+type depend_t = `${arr_t<native_t>}->${string}`;
 type ptr = number;
-type WasmSigType = 'void' | 'int' | 'long' | 'float' | 'double';
-interface JsCallback {
+type wasm_t = 'void' | 'int' | 'long' | 'float' | 'double';
+interface js_callback {
   pointer: ptr;
   free: () => void;
 }
-interface StructTypes {
+interface struct_t {
   [key: string]:
     | `padding[${number}]`
-    | CTypes
-    | CArrType<CTypes>
-    | DependantType
-    | StructTypes
+    | native_t
+    | arr_t<native_t>
+    | depend_t
+    | struct_t
     | ((
         pointer: number,
         struct: any,
@@ -59,22 +59,22 @@ interface StructTypes {
       });
 }
 export declare namespace Memory {
-  const allocatedMemory: Set<ptr>;
+  const allocations: Set<ptr>;
   function malloc(size: number): ptr;
   function free(mem: ptr | Set<ptr> | Array<ptr>): void;
-  function setValue(
+  function write(
     pointer: ptr,
     value: any,
-    type: CTypes | CArrType<CTypes>,
+    type: native_t | arr_t<native_t>,
   ): void;
-  function getValue(pointer: ptr, type: CTypes): any;
-  function dereferencePointer(pointer: ptr, types: StructTypes): any;
-  function getStructSize(struct: StructTypes): number;
-  function getTypeSize(type: CTypes): number;
-  function createCallback(
+  function read(pointer: ptr, type: native_t): any;
+  function deref(pointer: ptr, types: struct_t): any;
+  function get_struct_size(struct: struct_t): number;
+  function get_type_size(type: native_t): number;
+  function new_callback(
     func: Function,
-    returnType: WasmSigType,
-    argumentTypes: Array<WasmSigType>,
-  ): JsCallback;
+    ret_t: wasm_t,
+    arg_types: Array<wasm_t>,
+  ): js_callback;
 }
 export {};
