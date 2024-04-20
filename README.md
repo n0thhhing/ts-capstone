@@ -300,12 +300,6 @@ const Capstone = new Module();
 // ...
 ```
 
-### Extra info
-
-For more information on the build system and the API,
-see [BUILD.md](./build/BUILD.md), this provides info on the functions I have made
-to make developing easier.
-
 ## Contributing
 
 Contributions to the Capstone module are welcome. If you would like to contribute, please follow these guidelines:
