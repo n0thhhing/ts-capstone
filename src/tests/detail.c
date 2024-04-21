@@ -107,96 +107,97 @@ void print_insn(cs_insn *instructions, size_t count) {
   }
 }
 
-int main(void) { /*
-   csh x86handle;
-   cs_insn *x86insn;
-   size_t x86count;
+int main(void) {
+  csh x86handle;
+  cs_insn *x86insn;
+  size_t x86count;
 
-   if (cs_open(CS_ARCH_X86, CS_MODE_16, &x86handle) != CS_ERR_OK)
-     return -1;
-   cs_option(x86handle, CS_OPT_DETAIL, CS_OPT_ON);
-   x86count = cs_disasm(x86handle, (uint8_t *)X86, sizeof(X86) - 1, 0x1000, 0,
-                        &x86insn);
+  if (cs_open(CS_ARCH_X86, CS_MODE_16, &x86handle) != CS_ERR_OK)
+    return -1;
+  cs_option(x86handle, CS_OPT_DETAIL, CS_OPT_ON);
+  x86count = cs_disasm(x86handle, (uint8_t *)X86, sizeof(X86) - 1, 0x1000, 0,
+                       &x86insn);
 
-   if (x86count > 0) {
-     size_t j;
+  if (x86count > 0) {
+    size_t j;
 
-     printf("\x1b[31mx86\x1b[0m\n");
-     for (j = 0; j < x86count; j++) {
-       cs_detail *detail = x86insn[j].detail;
-       printf("bytes: ");
-       for (int i = 0; i < x86insn[j].size; i++) {
-         printf("0x%02x, ", x86insn[j].bytes[i]);
-       }
-       printf("\n");
-       printf("op distance: %d\n",
-              ((char *)&detail->x86.operands - (char *)&detail->x86));
-       printf("op size: %d\n", sizeof(cs_x86_op));
-       printf("size: %d\n", x86insn[j].size);
-       printf("regs_read_count: %d\n", detail->regs_read_count);
-       printf("regs_read: %d\n", detail->regs_read[0]);
-       printf("regs_write_count: %d\n", detail->regs_write_count);
-       printf("regs_write: %d\n", detail->regs_write[0]);
-       printf("groups_count: %d\n", detail->groups_count);
-       printf("groups: %d\n\n", detail->groups[0]);
+    printf("\x1b[31mx86\x1b[0m\n");
+    print_insn(x86insn, x86count);
+    for (j = 0; j < x86count; j++) {
+      cs_detail *detail = x86insn[j].detail;
+      printf("bytes: ");
+      for (int i = 0; i < x86insn[j].size; i++) {
+        printf("0x%02x, ", x86insn[j].bytes[i]);
+      }
+      printf("\n");
+      printf("op distance: %d\n",
+             ((char *)&detail->x86.operands - (char *)&detail->x86));
+      printf("op size: %d\n", sizeof(cs_x86_op));
+      printf("size: %d\n", x86insn[j].size);
+      printf("regs_read_count: %d\n", detail->regs_read_count);
+      printf("regs_read: %d\n", detail->regs_read[0]);
+      printf("regs_write_count: %d\n", detail->regs_write_count);
+      printf("regs_write: %d\n", detail->regs_write[0]);
+      printf("groups_count: %d\n", detail->groups_count);
+      printf("groups: %d\n\n", detail->groups[0]);
 
-       cs_x86 *x86 = &(detail->x86);
-       printf("prefix: %d\n", x86->prefix[0]);
-       printf("opcode: %d\n", x86->opcode[0]);
-       printf("rex: %d\n", x86->rex);
-       printf("addr_size: %d\n", x86->addr_size);
-       printf("modrm: %d\n", x86->modrm);
-       printf("sib: %d\n", x86->sib);
-       printf("disp: %ld\n", x86->disp);
-       printf("sib_index: %d\n", x86->sib_index);
-       printf("sib_scale: %d\n", x86->sib_scale);
-       printf("sib_base: %d\n", x86->sib_base);
-       printf("xop_cc: %d\n", x86->xop_cc);
-       printf("sse_cc: %d\n", x86->sse_cc);
-       printf("avx_cc: %d\n", x86->avx_cc);
-       printf("avx_sae: %s\n", x86->avx_sae ? "true" : "false");
-       printf("avx_rm: %d\n", x86->avx_rm);
-       printf("eflags: %ld\n\n", x86->eflags);
-       printf("fpu_flags: %ld\n\n", x86->fpu_flags);
+      cs_x86 *x86 = &(detail->x86);
+      printf("prefix: %d\n", x86->prefix[0]);
+      printf("opcode: %d\n", x86->opcode[0]);
+      printf("rex: %d\n", x86->rex);
+      printf("addr_size: %d\n", x86->addr_size);
+      printf("modrm: %d\n", x86->modrm);
+      printf("sib: %d\n", x86->sib);
+      printf("disp: %ld\n", x86->disp);
+      printf("sib_index: %d\n", x86->sib_index);
+      printf("sib_scale: %d\n", x86->sib_scale);
+      printf("sib_base: %d\n", x86->sib_base);
+      printf("xop_cc: %d\n", x86->xop_cc);
+      printf("sse_cc: %d\n", x86->sse_cc);
+      printf("avx_cc: %d\n", x86->avx_cc);
+      printf("avx_sae: %s\n", x86->avx_sae ? "true" : "false");
+      printf("avx_rm: %d\n", x86->avx_rm);
+      printf("eflags: %ld\n\n", x86->eflags);
+      printf("fpu_flags: %ld\n\n", x86->fpu_flags);
 
-       cs_x86_encoding encoding = x86->encoding;
-       printf("cs_x86_encoding:\n");
-       printf("modrm_offset: %d\n", encoding.modrm_offset);
-       printf("disp_offset: %d\n", encoding.disp_offset);
-       printf("disp_size: %d\n", encoding.disp_size);
-       printf("imm_offset: %d\n", encoding.imm_offset);
-       printf("imm_size: %d\n", encoding.imm_size);
-       printf("\n\n");
-       for (int i = 0; i < x86->op_count; i++) {
-         cs_x86_op *op = &(x86->operands[i]);
-         printf("size: %d\n", op->size);
-         printf("access: %d\n", op->access);
-         printf("avx_bcast: %d\n", op->avx_bcast);
-         printf("avx_zero_opmask: %d\n", op->avx_zero_opmask);
-         switch ((int)op->type) {
-         case X86_OP_REG:
-           printf("reg: %d\n", op->reg);
-           break;
-         case X86_OP_IMM:
-           printf("imm: %d\n", op->imm);
-           break;
-         case X86_OP_MEM:
-           printf("mem\n", i);
-           printf("mem.segment: %d\n", op->mem.segment);
-           printf("mem.base: %d\n", op->mem.base);
-           printf("mem.index: %d\n", op->mem.index);
-           printf("mem.scale: %d\n", op->mem.scale);
-           printf("mem.disp: %ld\n", op->mem.disp);
-           break;
-         default:
-           break;
-         }
-       }
-     }
-     cs_free(x86insn, x86count);
-   } else {
-     printf("ERROR: Failed to disassemble given code!\n");
-   }
+      cs_x86_encoding encoding = x86->encoding;
+      printf("cs_x86_encoding:\n");
+      printf("modrm_offset: %d\n", encoding.modrm_offset);
+      printf("disp_offset: %d\n", encoding.disp_offset);
+      printf("disp_size: %d\n", encoding.disp_size);
+      printf("imm_offset: %d\n", encoding.imm_offset);
+      printf("imm_size: %d\n", encoding.imm_size);
+      printf("\n\n");
+      for (int i = 0; i < x86->op_count; i++) {
+        cs_x86_op *op = &(x86->operands[i]);
+        printf("size: %d\n", op->size);
+        printf("access: %d\n", op->access);
+        printf("avx_bcast: %d\n", op->avx_bcast);
+        printf("avx_zero_opmask: %d\n", op->avx_zero_opmask);
+        switch ((int)op->type) {
+        case X86_OP_REG:
+          printf("reg: %d\n", op->reg);
+          break;
+        case X86_OP_IMM:
+          printf("imm: %d\n", op->imm);
+          break;
+        case X86_OP_MEM:
+          printf("mem\n", i);
+          printf("mem.segment: %d\n", op->mem.segment);
+          printf("mem.base: %d\n", op->mem.base);
+          printf("mem.index: %d\n", op->mem.index);
+          printf("mem.scale: %d\n", op->mem.scale);
+          printf("mem.disp: %ld\n", op->mem.disp);
+          break;
+        default:
+          break;
+        }
+      }
+    }
+    cs_free(x86insn, x86count);
+  } else {
+    printf("ERROR: Failed to disassemble given code!\n");
+  } /*
 
    csh armhandle;
    cs_insn *arminsn;
@@ -211,6 +212,7 @@ int main(void) { /*
      size_t j;
 
      printf("\x1b[31marm\x1b[0m\n");
+     print_insn(arminsn, armcount);
      for (j = 0; j < armcount; j++) {
        cs_detail *detail = arminsn[j].detail;
        printf("regs_read_count: %d\n", detail->regs_read_count);
@@ -311,6 +313,7 @@ int main(void) { /*
      size_t j;
 
      printf("\x1b[31marm64\x1b[0m\n");
+     print_insn(arm64insn, arm64count);
      for (j = 0; j < arm64count; j++) {
        cs_detail *detail = arm64insn[j].detail;
        printf("regs_read_count: %d\n", detail->regs_read_count);
@@ -370,7 +373,8 @@ int main(void) { /*
            break;
          case ARM64_OP_IMM:
            printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%d)\n", i,
- op->imm, op->imm); break; case ARM64_OP_FP: #if defined(_KERNEL_MODE)
+ op->imm, op->imm); break; case ARM64_OP_FP:
+ #if defined(_KERNEL_MODE)
            // Issue #681: Windows kernel does not support formatting float
            point printf(
                "\t\toperands[%u].type: FP = <float_point_unsupported>\n", i);
@@ -428,717 +432,118 @@ int main(void) { /*
      }
    }
 
-   const char *s_addressing_modes[] = {
-       "<invalid mode>",
+  const char *s_addressing_modes[] = {
+      "<invalid mode>",
 
-       "Register Direct - Data",
-       "Register Direct - Address",
+      "Register Direct - Data",
+      "Register Direct - Address",
 
-       "Register Indirect - Address",
-       "Register Indirect - Address with Postincrement",
-       "Register Indirect - Address with Predecrement",
-       "Register Indirect - Address with Displacement",
+      "Register Indirect - Address",
+      "Register Indirect - Address with Postincrement",
+      "Register Indirect - Address with Predecrement",
+      "Register Indirect - Address with Displacement",
 
-       "Address Register Indirect With Index - 8-bit displacement",
-       "Address Register Indirect With Index - Base displacement",
+      "Address Register Indirect With Index - 8-bit displacement",
+      "Address Register Indirect With Index - Base displacement",
 
-       "Memory indirect - Postindex",
-       "Memory indirect - Preindex",
+      "Memory indirect - Postindex",
+      "Memory indirect - Preindex",
 
-       "Program Counter Indirect - with Displacement",
+      "Program Counter Indirect - with Displacement",
 
-       "Program Counter Indirect with Index - with 8-Bit Displacement",
-       "Program Counter Indirect with Index - with Base Displacement",
+      "Program Counter Indirect with Index - with 8-Bit Displacement",
+      "Program Counter Indirect with Index - with Base Displacement",
 
-       "Program Counter Memory Indirect - Postindexed",
-       "Program Counter Memory Indirect - Preindexed",
+      "Program Counter Memory Indirect - Postindexed",
+      "Program Counter Memory Indirect - Preindexed",
 
-       "Absolute Data Addressing  - Short",
-       "Absolute Data Addressing  - Long",
-       "Immediate value",
-   };
-   csh m68khandle;
-   cs_insn *m68kinsn;
-   size_t m68kcount;
+      "Absolute Data Addressing  - Short",
+      "Absolute Data Addressing  - Long",
+      "Immediate value",
+  };
+  csh m68khandle;
+  cs_insn *m68kinsn;
+  size_t m68kcount;
 
-   if (cs_open(CS_ARCH_M68K, CS_MODE_M68K_020, &m68khandle) != CS_ERR_OK)
-     return -1;
-   cs_option(m68khandle, CS_OPT_DETAIL, CS_OPT_ON);
-   m68kcount = cs_disasm(m68khandle, (uint8_t *)M68K, sizeof(M68K) - 1, 0x1000,
-                         0, &m68kinsn);
-   if (m68kcount > 0) {
-     size_t j;
-
-     printf("\x1b[31mm68k\x1b[0m\n");
-     for (j = 0; j < m68kcount; j++) {
-       cs_detail *detail = m68kinsn[j].detail;
-       printf("distance: %ld %d\n",
-              ((char *)&detail->m68k.op_size - (char *)&detail->m68k) / 4,
-              CS_MODE_M68K_020);
-       printf("regs_read_count: %d\n", detail->regs_read_count);
-       printf("op_type: %d\n", detail->m68k.operands[0].type);
-       printf("op_count: %d\n", detail->m68k.op_count);
-       printf("op_size type: %d\n", detail->m68k.op_size.type);
-       printf("cpu_size: %d\n", detail->m68k.op_size.cpu_size);
-       for (int i = 0; i < detail->m68k.op_count; i++) {
-         cs_m68k_op *op = &(detail->m68k.operands[i]);
-         printf("disp: %d\n", op->br_disp.disp);
-         printf("disp_size: %d\n", op->br_disp.disp_size);
-         printf("register bits: %d\n", op->register_bits);
-         switch ((int)op->type) {
-         default:
-           break;
-         case M68K_OP_REG:
-           printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
-                  cs_reg_name(m68khandle, op->reg), op->reg);
-           break;
-         case M68K_OP_IMM:
-           printf("\t\toperands[%u].type: IMM = 0x%x(%d)\n", i, (int)op->imm,
-                  op->imm);
-           break;
-         case M68K_OP_MEM:
-           printf("\t\toperands[%u].type: MEM\n", i);
-           if (op->mem.base_reg != M68K_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.base: REG = %s(%d)\n", i,
-                    cs_reg_name(m68khandle, op->mem.base_reg),
- op->mem.base_reg); if (op->mem.index_reg != M68K_REG_INVALID) {
-             printf("\t\t\toperands[%u].mem.index: REG = %s(%d)\n", i,
-                    cs_reg_name(m68khandle, op->mem.index_reg),
-                    op->mem.index_reg);
-             printf("\t\t\toperands[%u].mem.index: size = %c(%d)\n", i,
-                    op->mem.index_size ? 'l' : 'w', op->mem.index_size);
-           }
-           printf("\t\t\toperands[%u].mem.disp: 0x%x(%d)\n", i, op->mem.disp,
-                  op->mem.disp);
-           printf("\t\t\toperands[%u].mem.scale: %d(%d)\n", i, op->mem.scale,
-                  op->mem.scale);
-           printf("\t\tin_disp: %d\n", op->mem.in_disp);
-           printf("\t\tout_disp: %d\n", op->mem.out_disp);
-           printf("\t\tbitfield: %d\n", op->mem.bitfield);
-           printf("\t\twidth: %d\n", op->mem.width);
-           printf("\t\toffset: %d\n", op->mem.offset);
-           printf("\t\taddress mode: %s(%d)%d\n",
-                  s_addressing_modes[op->address_mode], op->address_mode,
-                  (char *)&detail->m68k.operands[i].register_bits -
-                      (char *)&detail->m68k.operands[i]);
-           break;
-         case M68K_OP_FP_SINGLE:
-           printf("\t\toperands[%u].type: FP_SINGLE\n", i);
-           printf("\t\t\toperands[%u].simm: %f(%d)\n", i, op->simm, op->simm);
-           break;
-         case M68K_OP_FP_DOUBLE:
-           printf("\t\toperands[%u].type: FP_DOUBLE\n", i);
-           printf("\t\t\toperands[%u].dimm: %lf(%d)\n", i, op->dimm, op->dimm);
-           break;
-         case M68K_OP_REG_BITS:
-           printf("\t\toperands[%u].type: REG_BITS = $%x(%d)\n", i,
-                  op->register_bits, op->register_bits);
-           break;
-         case M68K_OP_REG_PAIR:
-           printf("\t\toperands[%u].type: REG_PAIR = (%s, %s)(%d %d)\n", i,
-                  cs_reg_name(m68khandle, op->reg_pair.reg_0),
-                  cs_reg_name(m68khandle, op->reg_pair.reg_1),
-                  op->reg_pair.reg_0, op->reg_pair.reg_1);
-           break;
-         }
-       }
-       printf("\n\n");
-     }
-   }
-
-   csh mipshandle;
-   cs_insn *mipsinsn;
-   size_t mipscount;
-
-   if (cs_open(CS_ARCH_MIPS, CS_MODE_MIPS32 | CS_MODE_BIG_ENDIAN, &mipshandle)
- != CS_ERR_OK) return -1; cs_option(mipshandle, CS_OPT_DETAIL, CS_OPT_ON);
-   mipscount = cs_disasm(mipshandle, (uint8_t *)MIPS, sizeof(MIPS) - 1, 0x1000,
-                         0, &mipsinsn);
-   if (mipscount > 0) {
-     size_t j;
-
-     printf("\x1b[31mmips\x1b[0m\n");
-     for (j = 0; j < mipscount; j++) {
-       cs_detail *detail = mipsinsn[j].detail;
-       printf("regs_read_count: %d\n", detail->regs_read_count);
-       printf("op distance: %d\n",
-              ((char *)&detail->mips.operands - (char *)&detail->mips));
-       printf("op size: %d\n", sizeof(cs_mips_op));
-       cs_mips *mips = &(detail->mips);
-
-       for (int i = 0; i < mips->op_count; i++) {
-         cs_mips_op *op = &(mips->operands[i]);
-         switch ((int)op->type) {
-         default:
-           break;
-         case MIPS_OP_REG:
-           printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
-                  cs_reg_name(mipshandle, op->reg), op->reg);
-           break;
-         case MIPS_OP_IMM:
-           printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%d)\n", i,
- op->imm, op->imm); break; case MIPS_OP_MEM: printf("base: %d\n", op->mem.base);
-           printf("disp: %d\n", op->mem.disp);
-           printf("\t\toperands[%u].type: MEM\n", i);
-           if (op->mem.base != MIPS_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
-                    cs_reg_name(mipshandle, op->mem.base));
-           if (op->mem.disp != 0)
-             printf("\t\t\toperands[%u].mem.disp: 0x%" PRIx64 "\n", i,
-                    op->mem.disp);
-
-           break;
-         }
-       }
-       printf("\n\n");
-     }
-   }
-
-   const char *get_bc_name(int bc) {
-     switch (bc) {
-     default:
-     case PPC_BC_INVALID:
-       return ("invalid");
-     case PPC_BC_LT:
-       return ("lt");
-     case PPC_BC_LE:
-       return ("le");
-     case PPC_BC_EQ:
-       return ("eq");
-     case PPC_BC_GE:
-       return ("ge");
-     case PPC_BC_GT:
-       return ("gt");
-     case PPC_BC_NE:
-       return ("ne");
-     case PPC_BC_UN:
-       return ("un");
-     case PPC_BC_NU:
-       return ("nu");
-     case PPC_BC_SO:
-       return ("so");
-     case PPC_BC_NS:
-       return ("ns");
-     }
-   }
-
-   csh ppchandle;
-   cs_insn *ppcinsn;
-   size_t ppccount;
-
-   if (cs_open(CS_ARCH_PPC, CS_MODE_BIG_ENDIAN + CS_MODE_PS, &ppchandle) !=
-       CS_ERR_OK)
-     return -1;
-   cs_option(ppchandle, CS_OPT_DETAIL, CS_OPT_ON);
-   ppccount = cs_disasm(ppchandle, (uint8_t *)PPC, sizeof(PPC) - 1, 0x1000, 0,
-                        &ppcinsn);
-   if (ppccount > 0) {
-     size_t j;
-
-     printf("\x1b[31mppc\x1b[0m\n");
-     for (j = 0; j < ppccount; j++) {
-       cs_detail *detail = ppcinsn[j].detail;
-       printf("regs_read_count: %d\n", detail->regs_read_count);
-       cs_ppc *ppc = &(detail->ppc);
-       printf("bc: %d\n", ppc->bc);
-       printf("bh: %d\n", ppc->bh);
-       printf("update_cr0: %d\n", ppc->update_cr0);
-
-       printf("op distance: %d\n",
-              ((char *)&detail->ppc.operands - (char *)&detail->ppc));
-       printf("op size: %d\n", sizeof(cs_ppc_op));
-       printf(
-           "PPC_OP_REG: %d\nPPC_OP_IMM: %d\nPPC_OP_MEM: %d\nPPC_OP_CRX: %d\n",
- PPC_OP_REG, PPC_OP_IMM, PPC_OP_MEM, PPC_OP_CRX); for (int i = 0; i <
-               ppc->op_count;
-           i++) {
-         cs_ppc_op *op = &(ppc->operands[i]);
-         printf("type:%d\n", op->type);
-
-         switch ((int)op->type) {
-         default:
-           break;
-         case PPC_OP_REG:
-           printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
-                  cs_reg_name(ppchandle, op->reg), op->reg);
-           break;
-         case PPC_OP_IMM:
-           printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%d)\n", i,
- op->imm, op->imm); break; case PPC_OP_MEM: printf("base: %d\n", op->mem.base);
-           printf("disp: %d\n", op->mem.disp);
-           printf("\t\toperands[%u].type: MEM\n", i);
-           if (op->mem.base != PPC_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
-                    cs_reg_name(ppchandle, op->mem.base));
-           if (op->mem.disp != 0)
-             printf("\t\t\toperands[%u].mem.disp: 0x%x\n", i, op->mem.disp);
-
-           break;
-         case PPC_OP_CRX:
-           printf("\t\toperands[%u].type: CRX\n", i);
-           printf("\t\t\toperands[%u].crx.scale: %d\n", i, op->crx.scale);
-           printf("\t\t\toperands[%u].crx.reg: %s(%d)\n", i,
-                  cs_reg_name(ppchandle, op->crx.reg), op->crx.reg);
-           printf("\t\t\toperands[%u].crx.cond: %s(%d)\n", i,
-                  get_bc_name(op->crx.cond), op->crx.cond);
-           break;
-         }
-       }
-       printf("\n\n");
-     }
-   }
-
-   csh sparchandle;
-   cs_insn *sparcinsn;
-   size_t sparccount;
-
-   if (cs_open(CS_ARCH_SPARC, CS_MODE_BIG_ENDIAN + CS_MODE_V9, &sparchandle) !=
-       CS_ERR_OK)
-     return -1;
-   cs_option(sparchandle, CS_OPT_DETAIL, CS_OPT_ON);
-   sparccount = cs_disasm(sparchandle, (uint8_t *)SPARC, sizeof(SPARC) - 1,
-                          0x1000, 0, &sparcinsn);
-   if (sparccount > 0) {
-     size_t j;
-
-     printf("\x1b[31msparc\x1b[0m\n");
-     for (j = 0; j < sparccount; j++) {
-       cs_detail *detail = sparcinsn[j].detail;
-       printf("regs_read_count: %d\n", detail->regs_read_count);
-       printf("op distance: %d\n",
-              ((char *)&detail->sparc.operands - (char *)&detail->sparc));
-       printf("op size: %d\n", sizeof(cs_sparc_op));
-       printf("cc: %d\n", detail->sparc.cc);
-       printf("hint: %d\n", detail->sparc.hint);
-       cs_sparc *sparc = &(detail->sparc);
-       for (int i = 0; i < sparc->op_count; i++) {
-         cs_sparc_op *op = &(sparc->operands[i]);
-         switch ((int)op->type) {
-         default:
-           break;
-         case SPARC_OP_REG:
-           printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
-                  cs_reg_name(sparchandle, op->reg), op->reg);
-           break;
-         case SPARC_OP_IMM:
-           printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%d)\n", i,
- op->imm, op->imm); break; case SPARC_OP_MEM: printf("base: %d\n",
- op->mem.base); printf("index: %d\n", op->mem.index); printf("disp: %d\n",
- op->mem.disp); printf("\t\toperands[%u].type: MEM\n", i); if (op->mem.base !=
- X86_REG_INVALID) printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
-                    cs_reg_name(sparchandle, op->mem.base));
-           if (op->mem.index != X86_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.index: REG = %s\n", i,
-                    cs_reg_name(sparchandle, op->mem.index));
-           if (op->mem.disp != 0)
-             printf("\t\t\toperands[%u].mem.disp: 0x%x\n", i, op->mem.disp);
-
-           break;
-         }
-       }
-       printf("\n\n");
-     }
-   }
-
-   csh syszhandle;
-   cs_insn *syszinsn;
-   size_t syszcount;
-
-   if (cs_open(CS_ARCH_SYSZ, CS_MODE_BIG_ENDIAN, &syszhandle) != CS_ERR_OK)
-     return -1;
-   cs_option(syszhandle, CS_OPT_DETAIL, CS_OPT_ON);
-   syszcount = cs_disasm(syszhandle, (uint8_t *)SYSZ, sizeof(SYSZ) - 1, 0x1000,
-                         0, &syszinsn);
-   if (syszcount > 0) {
-     size_t j;
-
-     printf("\x1b[31msysz\x1b[0m\n");
-     for (j = 0; j < syszcount; j++) {
-       cs_detail *detail = syszinsn[j].detail;
-       printf("regs_read_count: %d\n", detail->regs_read_count);
-       printf("op distance: %d\n",
-              ((char *)&detail->sysz.operands - (char *)&detail->sysz));
-       printf("op size: %d\n", sizeof(cs_sysz_op));
-       printf("cc: %d\n", detail->sysz.cc);
-       cs_sysz *sysz = &(detail->sysz);
-       for (int i = 0; i < sysz->op_count; i++) {
-         cs_sysz_op *op = &(sysz->operands[i]);
-         switch ((int)op->type) {
-         default:
-           break;
-         case SYSZ_OP_REG:
-           printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
-                  cs_reg_name(syszhandle, op->reg), op->reg);
-           break;
-         case SYSZ_OP_ACREG:
-           printf("\t\toperands[%u].type: ACREG = %u(%d)\n", i, op->reg,
-                  op->reg);
-           break;
-         case SYSZ_OP_IMM:
-           printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%lld)\n", i,
-                  op->imm, op->imm);
-           break;
-         case SYSZ_OP_MEM:
-           printf("base: %d\n", op->mem.base);
-           printf("index: %d\n", op->mem.index);
-           printf("length: %d\n", op->mem.length);
-           printf("disp: %d\n", op->mem.disp);
-           printf("\t\toperands[%u].type: MEM\n", i);
-           if (op->mem.base != SYSZ_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
-                    cs_reg_name(syszhandle, op->mem.base));
-           if (op->mem.index != SYSZ_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.index: REG = %s\n", i,
-                    cs_reg_name(syszhandle, op->mem.index));
-           if (op->mem.length != 0)
-             printf("\t\t\toperands[%u].mem.length: 0x%" PRIx64 "\n", i,
-                    op->mem.length);
-           if (op->mem.disp != 0)
-             printf("\t\t\toperands[%u].mem.disp: 0x%" PRIx64 "\n", i,
-                    op->mem.disp);
-
-           break;
-         }
-       }
-       printf("\n\n");
-     }
-   }
-
-   csh xcorehandle;
-   cs_insn *xcoreinsn;
-   size_t xcorecount;
-
-   if (cs_open(CS_ARCH_XCORE, CS_MODE_BIG_ENDIAN, &xcorehandle) != CS_ERR_OK)
-     return -1;
-   cs_option(xcorehandle, CS_OPT_DETAIL, CS_OPT_ON);
-   xcorecount = cs_disasm(xcorehandle, (uint8_t *)XCORE, sizeof(XCORE) - 1,
-                          0x1000, 0, &xcoreinsn);
-   if (xcorecount > 0) {
-     size_t j;
-
-     printf("\x1b[31mxcore\x1b[0m\n");
-     for (j = 0; j < xcorecount; j++) {
-       cs_detail *detail = xcoreinsn[j].detail;
-       printf("regs_read_count: %d\n", detail->regs_read_count);
-       cs_xcore *xcore = &(detail->xcore);
-       for (int i = 0; i < xcore->op_count; i++) {
-         cs_xcore_op *op = &(xcore->operands[i]);
-         switch ((int)op->type) {
-         default:
-           break;
-         case XCORE_OP_REG:
-           printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
-                  cs_reg_name(xcorehandle, op->reg), op->reg);
-           break;
-         case XCORE_OP_IMM:
-           printf("\t\toperands[%u].type: IMM = 0x%x(%d)\n", i, op->imm,
-                  op->imm);
-           break;
-         case XCORE_OP_MEM:
-           printf("base: %d\n", op->mem.base);
-           printf("index: %d\n", op->mem.index);
-           printf("disp: %d\n", op->mem.disp);
-           printf("direct: %d\n", op->mem.direct);
-           printf("\t\toperands[%u].type: MEM\n", i);
-           if (op->mem.base != XCORE_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.base: REG = %s(%d)\n", i,
-                    cs_reg_name(xcorehandle, op->mem.base), op->mem.base);
-           if (op->mem.index != XCORE_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.index: REG = %s(%d)\n", i,
-                    cs_reg_name(xcorehandle, op->mem.index), op->mem.index);
-           if (op->mem.disp != 0)
-             printf("\t\t\toperands[%u].mem.disp: 0x%x(%d)\n", i, op->mem.disp,
-                    op->mem.disp);
-           if (op->mem.direct != 1)
-             printf("\t\t\toperands[%u].mem.direct: -1(%d)\n", i,
-                    op->mem.direct);
-
-           break;
-         }
-       }
-       printf("\n\n");
-     }
-   }
-
-   csh tms320c64xhandle;
-   cs_insn *tms320c64xinsn;
-   size_t tms320c64xcount;
-
-   if (cs_open(CS_ARCH_TMS320C64X, CS_MODE_BIG_ENDIAN, &tms320c64xhandle) !=
-       CS_ERR_OK)
-     return -1;
-   cs_option(tms320c64xhandle, CS_OPT_DETAIL, CS_OPT_ON);
-   tms320c64xcount =
-       cs_disasm(tms320c64xhandle, (uint8_t *)TMS320C64X, sizeof(TMS320C64X) -
- 1, 0x1000, 0, &tms320c64xinsn); if (tms320c64xcount > 0) { size_t j;
-
-     printf("\x1b[31mtms320c64x\x1b[0m\n");
-     for (j = 0; j < tms320c64xcount; j++) {
-       cs_detail *detail = tms320c64xinsn[j].detail;
-       printf("op_str: %s\n", tms320c64xinsn[j].op_str);
-       printf("regs_read_count: %d\n", detail->regs_read_count);
-       printf("unit: %d\n", detail->tms320c64x.funit.unit);
-       printf("side: %d\n", detail->tms320c64x.funit.side);
-       printf("crosspath: %d\n", detail->tms320c64x.funit.crosspath);
-       printf("parallel: %d\n", detail->tms320c64x.parallel);
-       printf("reg: %d\n", detail->tms320c64x.condition.reg);
-       printf("zero: %d\n", detail->tms320c64x.condition.zero);
-       cs_tms320c64x *tms320c64x = &(detail->tms320c64x);
-       for (int i = 0; i < tms320c64x->op_count; i++) {
-         cs_tms320c64x_op *op = &(tms320c64x->operands[i]);
-         printf("op_type: %d\n", op->type);
-         switch ((int)op->type) {
-         default:
-           break;
-         case TMS320C64X_OP_REG:
-           printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
-                  cs_reg_name(tms320c64xhandle, op->reg), op->reg);
-           break;
-         case TMS320C64X_OP_IMM:
-           printf("\t\toperands[%u].type: IMM = 0x%x(%d)\n", i, op->imm,
-                  op->imm);
-           break;
-         case TMS320C64X_OP_MEM:
-           printf("\t\toperands[%u].type: MEM\n", i);
-           if (op->mem.base != TMS320C64X_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.base: REG = %s(%d)\n", i,
-                    cs_reg_name(tms320c64xhandle, op->mem.base), op->mem.base);
-           printf("\t\t\toperands[%u].mem.disptype(%d): ", i, op->mem.disptype);
-           if (op->mem.disptype == TMS320C64X_MEM_DISP_INVALID) {
-             printf("Invalid\n");
-             printf("\t\t\toperands[%u].mem.disp: %u(%d)\n", i, op->mem.disp,
-                    op->mem.disp);
-           }
-           if (op->mem.disptype == TMS320C64X_MEM_DISP_CONSTANT) {
-             printf("Constant\n");
-             printf("\t\t\toperands[%u].mem.disp: %u(%d)\n", i, op->mem.disp,
-                    op->mem.disp);
-           }
-           if (op->mem.disptype == TMS320C64X_MEM_DISP_REGISTER) {
-             printf("Register\n");
-             printf("\t\t\toperands[%u].mem.disp: %s(%d)\n", i,
-                    cs_reg_name(tms320c64xhandle, op->mem.disp), op->mem.disp);
-           }
-           printf("\t\t\toperands[%u].mem.unit: %u(%d)\n", i, op->mem.unit,
-                  op->mem.unit);
-           printf("\t\t\toperands[%u].mem.direction(%d): ", i,
-                  op->mem.direction);
-           if (op->mem.direction == TMS320C64X_MEM_DIR_INVALID)
-             printf("Invalid\n");
-           if (op->mem.direction == TMS320C64X_MEM_DIR_FW)
-             printf("Forward\n");
-           if (op->mem.direction == TMS320C64X_MEM_DIR_BW)
-             printf("Backward\n");
-           printf("\t\t\toperands[%u].mem.modify(%d): ", i, op->mem.modify);
-           if (op->mem.modify == TMS320C64X_MEM_MOD_INVALID)
-             printf("Invalid\n");
-           if (op->mem.modify == TMS320C64X_MEM_MOD_NO)
-             printf("No\n");
-           if (op->mem.modify == TMS320C64X_MEM_MOD_PRE)
-             printf("Pre\n");
-           if (op->mem.modify == TMS320C64X_MEM_MOD_POST)
-             printf("Post\n");
-           printf("\t\t\toperands[%u].mem.scaled: %u\n", i, op->mem.scaled);
-
-           break;
-         case TMS320C64X_OP_REGPAIR:
-           printf("\t\toperands[%u].type: REGPAIR = %s:%s(%d)\n", i,
-                  cs_reg_name(tms320c64xhandle, op->reg + 1),
-                  cs_reg_name(tms320c64xhandle, op->reg), op->reg);
-           break;
-         }
-       }
-       printf("\n\n");
-     }
-   }
-
-   static const char *s_access[] = {
-       "UNCHANGED",
-       "READ",
-       "WRITE",
-       "READ | WRITE",
-   };
-   csh m680xhandle;
-   cs_insn *m680xinsn;
-   size_t m680xcount;
-
-   if (cs_open(CS_ARCH_M680X, CS_MODE_M680X_CPU12, &m680xhandle) != CS_ERR_OK)
-     return -1;
-   cs_option(m680xhandle, CS_OPT_DETAIL, CS_OPT_ON);
-   m680xcount = cs_disasm(m680xhandle, (uint8_t *)CPU12, sizeof(CPU12) - 1,
-                          0x1000, 0, &m680xinsn);
-   if (m680xcount > 0) {
-     size_t j;
-
-     printf("\x1b[31mm680x\x1b[0m\n");
-     for (j = 0; j < m680xcount; j++) {
-       cs_detail *detail = m680xinsn[j].detail;
-       printf("regs_read_count: %d\n", detail->regs_read_count);
-       printf("count: %d\n", m680xcount);
-       printf("flags: %d\n", detail->m680x.flags);
-       cs_m680x *m680x = &(detail->m680x);
-       for (int i = 0; i < m680x->op_count; i++) {
-         cs_m680x_op *op = &(m680x->operands[i]);
-         const char *comment;
-
-         switch ((int)op->type) {
-         default:
-           break;
-
-         case M680X_OP_REGISTER:
-           comment = "";
-
-           if ((i == 0 && (m680x->flags & M680X_FIRST_OP_IN_MNEM)) ||
-               ((i == 1 && (m680x->flags & M680X_SECOND_OP_IN_MNEM))))
-             comment = " (in mnemonic)";
-
-           printf("\t\toperands[%u].type: REGISTER = %s%s(%d)\n", i,
-                  cs_reg_name(m680xhandle, op->reg), comment, op->reg);
-           break;
-
-         case M680X_OP_CONSTANT:
-           printf("\t\toperands[%u].type: CONSTANT = %u(%d)\n", i,
- op->const_val, op->const_val); break;
-
-         case M680X_OP_IMMEDIATE:
-           printf("\t\toperands[%u].type: IMMEDIATE = #%d(%d)\n", i, op->imm,
-                  op->imm);
-           break;
-
-         case M680X_OP_DIRECT:
-           printf("\t\toperands[%u].type: DIRECT = 0x%02x(%d)\n", i,
-                  op->direct_addr, op->direct_addr);
-           break;
-
-         case M680X_OP_EXTENDED:
-           printf("\t\toperands[%u].type: EXTENDED %s = 0x%04x(%d)\n", i,
-                  op->ext.indirect ? "true" : "false", op->ext.address,
-                  op->ext.address);
-           break;
-
-         case M680X_OP_RELATIVE:
-           printf("\t\toperands[%u].type: RELATIVE addr = 0x%04x(%d)\n", i,
-                  op->rel.address, op->rel.address);
-           printf("\t\toperands[%u].type: RELATIVE offset = %d\n", i,
-                  op->rel.offset);
-           break;
-
-         case M680X_OP_INDEXED:
-           printf("base_reg: %d\n", op->idx.base_reg);
-           printf("offset_reg: %d\n", op->idx.offset_reg);
-           printf("offset: %d\n", op->idx.offset);
-           printf("offset_addr: %d\n", op->idx.offset_addr);
-           printf("offset_bits: %d\n", op->idx.offset_bits);
-           printf("inc_dec: %d\n", op->idx.inc_dec);
-           printf("flags: %d\n", op->idx.flags);
-           printf("\t\toperands[%u].type: INDEXED%s\n", i,
-                  (op->idx.flags & M680X_IDX_INDIRECT) ? " INDIRECT" : "");
-
-           if (op->idx.base_reg != M680X_REG_INVALID)
-             printf("\t\t\tbase register: %s\n",
-                    cs_reg_name(m680xhandle, op->idx.base_reg));
-
-           if (op->idx.offset_reg != M680X_REG_INVALID)
-             printf("\t\t\toffset register: %s\n",
-                    cs_reg_name(m680xhandle, op->idx.offset_reg));
-
-           if ((op->idx.offset_bits != 0) &&
-               (op->idx.offset_reg == M680X_REG_INVALID) && !op->idx.inc_dec) {
-             printf("\t\t\toffset: %d\n", op->idx.offset);
-
-             if (op->idx.base_reg == M680X_REG_PC)
-               printf("\t\t\toffset address: 0x%x\n", op->idx.offset_addr);
-
-             printf("\t\t\toffset bits: %u\n", op->idx.offset_bits);
-           }
-
-           if (op->idx.inc_dec) {
-             const char *post_pre =
-                 op->idx.flags & M680X_IDX_POST_INC_DEC ? "post" : "pre";
-             const char *inc_dec =
-                 (op->idx.inc_dec > 0) ? "increment" : "decrement";
-
-             printf("\t\t\t%s %s: %d\n", post_pre, inc_dec,
-                    abs(op->idx.inc_dec));
-           }
-
-           break;
-         }
-
-         if (op->size != 0)
-           printf("\t\t\tsize: %u\n", op->size);
-
-         if (op->access != CS_AC_INVALID)
-           printf("\t\t\taccess: %s(%d)\n", s_access[op->access], op->access);
-       }
-       printf("\n\n");
-     }
-   }
-
-   csh evmhandle;
-   cs_insn *evminsn;
-   size_t evmcount;
-
-   if (cs_open(CS_ARCH_EVM, 0, &evmhandle) != CS_ERR_OK)
-     return -1;
-   cs_option(evmhandle, CS_OPT_DETAIL, CS_OPT_ON);
-   evmcount = cs_disasm(evmhandle, (uint8_t *)EVM, sizeof(EVM) - 1, 0x1000, 0,
-                        &evminsn);
-   if (evmcount > 0) {
-     size_t j;
-
-     printf("\x1b[31mevm\x1b[0m\n");
-     for (j = 0; j < evmcount; j++) {
-       cs_detail *detail = evminsn[j].detail;
-       printf("regs_read_count: %d\n", detail->regs_read_count);
-       cs_evm *evm = &(detail->evm);
-       printf("\tPop:     %u\n", evm->pop);
-       printf("\tPush:    %u\n", evm->push);
-       printf("\tGas fee: %u\n", evm->fee);
-       printf("\n\n");
-     }
-   }*/
-
-  csh mos65xxhandle;
-  cs_insn *mos65xxinsn;
-  size_t mos65xxcount;
-
-  if (cs_open(CS_ARCH_MOS65XX, CS_MODE_MOS65XX_W65C02, &mos65xxhandle) !=
-      CS_ERR_OK)
+  if (cs_open(CS_ARCH_M68K, CS_MODE_M68K_020, &m68khandle) != CS_ERR_OK)
     return -1;
-  cs_option(mos65xxhandle, CS_OPT_DETAIL, CS_OPT_ON);
-  mos65xxcount = cs_disasm(mos65xxhandle, (uint8_t *)MW65C02,
-                           sizeof(MW65C02) - 1, 0x1000, 0, &mos65xxinsn);
-  if (mos65xxcount > 0) {
+  cs_option(m68khandle, CS_OPT_DETAIL, CS_OPT_ON);
+  m68kcount = cs_disasm(m68khandle, (uint8_t *)M68K, sizeof(M68K) - 1, 0x1000,
+                        0, &m68kinsn);
+  if (m68kcount > 0) {
     size_t j;
 
-    printf("\x1b[31mmos65xx\x1b[0m\n");
-    print_insn(mos65xxinsn, mos65xxcount);
-    for (j = 0; j < mos65xxcount; j++) {
-      cs_detail *detail = mos65xxinsn[j].detail;
-      printf("op distance: %d\n",
-             ((char *)&detail->mos65xx.operands - (char *)&detail->mos65xx));
-      printf("op size: %d\n", sizeof(cs_mos65xx_op));
-      printf("modifies_flags: %s\n",
-             (detail->mos65xx.modifies_flags == 1) ? "true" : "false");
-      printf("am: %d\n", detail->mos65xx.am);
-      for (int i = 0; i < detail->mos65xx.op_count; i++) {
-        cs_mos65xx_op *op = &(detail->mos65xx.operands[i]);
-        printf("op_type: %d\n", op->type);
+    printf("\x1b[31mm68k\x1b[0m\n");
+    print_insn(m68kinsn, m68kcount);
+    for (j = 0; j < m68kcount; j++) {
+      cs_detail *detail = m68kinsn[j].detail;
+      printf("distance: %ld %d\n",
+             ((char *)&detail->m68k.op_size - (char *)&detail->m68k) / 4,
+             CS_MODE_M68K_020);
+      printf("regs_read_count: %d\n", detail->regs_read_count);
+      printf("op_type: %d\n", detail->m68k.operands[0].type);
+      printf("op_count: %d\n", detail->m68k.op_count);
+      printf("op_size type: %d\n", detail->m68k.op_size.type);
+      printf("cpu_size: %d\n", detail->m68k.op_size.cpu_size);
+      for (int i = 0; i < detail->m68k.op_count; i++) {
+        cs_m68k_op *op = &(detail->m68k.operands[i]);
+        printf("disp: %d\n", op->br_disp.disp);
+        printf("disp_size: %d\n", op->br_disp.disp_size);
+        printf("register bits: %d\n", op->register_bits);
         switch ((int)op->type) {
         default:
           break;
-        case MOS65XX_OP_REG:
+        case M68K_OP_REG:
           printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
-                 cs_reg_name(mos65xxhandle, op->reg), op->reg);
+                 cs_reg_name(m68khandle, op->reg), op->reg);
           break;
-        case MOS65XX_OP_IMM:
-          printf("\t\toperands[%u].type: IMM = 0x%x(%d)\n", i, op->imm,
+        case M68K_OP_IMM:
+          printf("\t\toperands[%u].type: IMM = 0x%x(%d)\n", i, (int)op->imm,
                  op->imm);
           break;
-        case MOS65XX_OP_MEM:
-          printf("\t\toperands[%u].type: MEM = 0x%x(%d)\n", i, op->mem,
-                 op->mem);
+        case M68K_OP_MEM:
+          printf("\t\toperands[%u].type: MEM\n", i);
+          if (op->mem.base_reg != M68K_REG_INVALID)
+            printf("\t\t\toperands[%u].mem.base: REG = %s(%d)\n", i,
+                   cs_reg_name(m68khandle, op->mem.base_reg), op->mem.base_reg);
+          if (op->mem.index_reg != M68K_REG_INVALID) {
+            printf("\t\t\toperands[%u].mem.index: REG = %s(%d)\n", i,
+                   cs_reg_name(m68khandle, op->mem.index_reg),
+                   op->mem.index_reg);
+            printf("\t\t\toperands[%u].mem.index: size = %c(%d)\n", i,
+                   op->mem.index_size ? 'l' : 'w', op->mem.index_size);
+          }
+          printf("\t\t\toperands[%u].mem.disp: 0x%x(%d)\n", i, op->mem.disp,
+                 op->mem.disp);
+          printf("\t\t\toperands[%u].mem.scale: %d(%d)\n", i, op->mem.scale,
+                 op->mem.scale);
+          printf("\t\tin_disp: %d\n", op->mem.in_disp);
+          printf("\t\tout_disp: %d\n", op->mem.out_disp);
+          printf("\t\tbitfield: %d\n", op->mem.bitfield);
+          printf("\t\twidth: %d\n", op->mem.width);
+          printf("\t\toffset: %d\n", op->mem.offset);
+          printf("\t\taddress mode: %s(%d)%d\n",
+                 s_addressing_modes[op->address_mode], op->address_mode,
+                 (char *)&detail->m68k.operands[i].register_bits -
+                     (char *)&detail->m68k.operands[i]);
+          break;
+        case M68K_OP_FP_SINGLE:
+          printf("\t\toperands[%u].type: FP_SINGLE\n", i);
+          printf("\t\t\toperands[%u].simm: %f(%d)\n", i, op->simm, op->simm);
+          break;
+        case M68K_OP_FP_DOUBLE:
+          printf("\t\toperands[%u].type: FP_DOUBLE\n", i);
+          printf("\t\t\toperands[%u].dimm: %lf(%d)\n", i, op->dimm, op->dimm);
+          break;
+        case M68K_OP_REG_BITS:
+          printf("\t\toperands[%u].type: REG_BITS = $%x(%d)\n", i,
+                 op->register_bits, op->register_bits);
+          break;
+        case M68K_OP_REG_PAIR:
+          printf("\t\toperands[%u].type: REG_PAIR = (%s, %s)(%d %d)\n", i,
+                 cs_reg_name(m68khandle, op->reg_pair.reg_0),
+                 cs_reg_name(m68khandle, op->reg_pair.reg_1),
+                 op->reg_pair.reg_0, op->reg_pair.reg_1);
           break;
         }
       }
@@ -1146,7 +551,614 @@ int main(void) { /*
     }
   }
 
-  /*  csh wasmhandle;
+     csh mipshandle;
+     cs_insn *mipsinsn;
+     size_t mipscount;
+
+     if (cs_open(CS_ARCH_MIPS, CS_MODE_MIPS32 | CS_MODE_BIG_ENDIAN, &mipshandle)
+   != CS_ERR_OK) return -1; cs_option(mipshandle, CS_OPT_DETAIL, CS_OPT_ON);
+     mipscount = cs_disasm(mipshandle, (uint8_t *)MIPS, sizeof(MIPS) - 1,
+   0x1000, 0, &mipsinsn); if (mipscount > 0) { size_t j;
+
+       printf("\x1b[31mmips\x1b[0m\n");
+       print_insn(mipsinsn, mipscount);
+       for (j = 0; j < mipscount; j++) {
+         cs_detail *detail = mipsinsn[j].detail;
+         printf("regs_read_count: %d\n", detail->regs_read_count);
+         printf("op distance: %d\n",
+                ((char *)&detail->mips.operands - (char *)&detail->mips));
+         printf("op size: %d\n", sizeof(cs_mips_op));
+         cs_mips *mips = &(detail->mips);
+
+         for (int i = 0; i < mips->op_count; i++) {
+           cs_mips_op *op = &(mips->operands[i]);
+           switch ((int)op->type) {
+           default:
+             break;
+           case MIPS_OP_REG:
+             printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
+                    cs_reg_name(mipshandle, op->reg), op->reg);
+             break;
+           case MIPS_OP_IMM:
+             printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%d)\n", i,
+   op->imm, op->imm); break; case MIPS_OP_MEM: printf("base: %d\n",
+   op->mem.base); printf("disp: %d\n", op->mem.disp);
+             printf("\t\toperands[%u].type: MEM\n", i);
+             if (op->mem.base != MIPS_REG_INVALID)
+               printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
+                      cs_reg_name(mipshandle, op->mem.base));
+             if (op->mem.disp != 0)
+               printf("\t\t\toperands[%u].mem.disp: 0x%" PRIx64 "\n", i,
+                      op->mem.disp);
+
+             break;
+           }
+         }
+         printf("\n\n");
+       }
+     }
+
+     const char *get_bc_name(int bc) {
+       switch (bc) {
+       default:
+       case PPC_BC_INVALID:
+         return ("invalid");
+       case PPC_BC_LT:
+         return ("lt");
+       case PPC_BC_LE:
+         return ("le");
+       case PPC_BC_EQ:
+         return ("eq");
+       case PPC_BC_GE:
+         return ("ge");
+       case PPC_BC_GT:
+         return ("gt");
+       case PPC_BC_NE:
+         return ("ne");
+       case PPC_BC_UN:
+         return ("un");
+       case PPC_BC_NU:
+         return ("nu");
+       case PPC_BC_SO:
+         return ("so");
+       case PPC_BC_NS:
+         return ("ns");
+       }
+     }
+
+     csh ppchandle;
+     cs_insn *ppcinsn;
+     size_t ppccount;
+
+     if (cs_open(CS_ARCH_PPC, CS_MODE_BIG_ENDIAN + CS_MODE_PS, &ppchandle) !=
+         CS_ERR_OK)
+       return -1;
+     cs_option(ppchandle, CS_OPT_DETAIL, CS_OPT_ON);
+     ppccount = cs_disasm(ppchandle, (uint8_t *)PPC, sizeof(PPC) - 1, 0x1000, 0,
+                          &ppcinsn);
+     if (ppccount > 0) {
+       size_t j;
+
+       printf("\x1b[31mppc\x1b[0m\n");
+       print_insn(ppcinsn, ppccount);
+       for (j = 0; j < ppccount; j++) {
+         cs_detail *detail = ppcinsn[j].detail;
+         printf("regs_read_count: %d\n", detail->regs_read_count);
+         cs_ppc *ppc = &(detail->ppc);
+         printf("bc: %d\n", ppc->bc);
+         printf("bh: %d\n", ppc->bh);
+         printf("update_cr0: %d\n", ppc->update_cr0);
+
+         printf("op distance: %d\n",
+                ((char *)&detail->ppc.operands - (char *)&detail->ppc));
+         printf("op size: %d\n", sizeof(cs_ppc_op));
+         printf(
+             "PPC_OP_REG: %d\nPPC_OP_IMM: %d\nPPC_OP_MEM: %d\nPPC_OP_CRX: %d\n",
+   PPC_OP_REG, PPC_OP_IMM, PPC_OP_MEM, PPC_OP_CRX); for (int i = 0; i <
+                 ppc->op_count;
+             i++) {
+           cs_ppc_op *op = &(ppc->operands[i]);
+           printf("type:%d\n", op->type);
+
+           switch ((int)op->type) {
+           default:
+             break;
+           case PPC_OP_REG:
+             printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
+                    cs_reg_name(ppchandle, op->reg), op->reg);
+             break;
+           case PPC_OP_IMM:
+             printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%d)\n", i,
+   op->imm, op->imm); break; case PPC_OP_MEM: printf("base: %d\n",
+   op->mem.base); printf("disp: %d\n", op->mem.disp);
+             printf("\t\toperands[%u].type: MEM\n", i);
+             if (op->mem.base != PPC_REG_INVALID)
+               printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
+                      cs_reg_name(ppchandle, op->mem.base));
+             if (op->mem.disp != 0)
+               printf("\t\t\toperands[%u].mem.disp: 0x%x\n", i, op->mem.disp);
+
+             break;
+           case PPC_OP_CRX:
+             printf("\t\toperands[%u].type: CRX\n", i);
+             printf("\t\t\toperands[%u].crx.scale: %d\n", i, op->crx.scale);
+             printf("\t\t\toperands[%u].crx.reg: %s(%d)\n", i,
+                    cs_reg_name(ppchandle, op->crx.reg), op->crx.reg);
+             printf("\t\t\toperands[%u].crx.cond: %s(%d)\n", i,
+                    get_bc_name(op->crx.cond), op->crx.cond);
+             break;
+           }
+         }
+         printf("\n\n");
+       }
+     }
+
+    csh sparchandle;
+    cs_insn *sparcinsn;
+    size_t sparccount;
+
+    if (cs_open(CS_ARCH_SPARC, CS_MODE_BIG_ENDIAN + CS_MODE_V9, &sparchandle) !=
+        CS_ERR_OK)
+      return -1;
+    cs_option(sparchandle, CS_OPT_DETAIL, CS_OPT_ON);
+    sparccount = cs_disasm(sparchandle, (uint8_t *)SPARC, sizeof(SPARC) - 1,
+                           0x1000, 0, &sparcinsn);
+    if (sparccount > 0) {
+      size_t j;
+
+      printf("\x1b[31msparc\x1b[0m\n");
+      print_insn(sparcinsn, sparccount);
+      for (j = 0; j < sparccount; j++) {
+        cs_detail *detail = sparcinsn[j].detail;
+        printf("regs_read_count: %d\n", detail->regs_read_count);
+        printf("op distance: %d\n",
+               ((char *)&detail->sparc.operands - (char *)&detail->sparc));
+        printf("op size: %d\n", sizeof(cs_sparc_op));
+        printf("cc: %d\n", detail->sparc.cc);
+        printf("hint: %d\n", detail->sparc.hint);
+        cs_sparc *sparc = &(detail->sparc);
+        for (int i = 0; i < sparc->op_count; i++) {
+          cs_sparc_op *op = &(sparc->operands[i]);
+          switch ((int)op->type) {
+          default:
+            break;
+          case SPARC_OP_REG:
+            printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
+                   cs_reg_name(sparchandle, op->reg), op->reg);
+            break;
+          case SPARC_OP_IMM:
+            printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%d)\n", i,
+   op->imm, op->imm); break; case SPARC_OP_MEM: printf("base: %d\n",
+   op->mem.base); printf("index: %d\n", op->mem.index); printf("disp: %d\n",
+   op->mem.disp); printf("\t\toperands[%u].type: MEM\n", i); if (op->mem.base !=
+   X86_REG_INVALID) printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
+                     cs_reg_name(sparchandle, op->mem.base));
+            if (op->mem.index != X86_REG_INVALID)
+              printf("\t\t\toperands[%u].mem.index: REG = %s\n", i,
+                     cs_reg_name(sparchandle, op->mem.index));
+            if (op->mem.disp != 0)
+              printf("\t\t\toperands[%u].mem.disp: 0x%x\n", i, op->mem.disp);
+
+            break;
+          }
+        }
+        printf("\n\n");
+      }
+    }
+
+    csh syszhandle;
+    cs_insn *syszinsn;
+    size_t syszcount;
+
+    if (cs_open(CS_ARCH_SYSZ, CS_MODE_BIG_ENDIAN, &syszhandle) != CS_ERR_OK)
+      return -1;
+    cs_option(syszhandle, CS_OPT_DETAIL, CS_OPT_ON);
+    syszcount = cs_disasm(syszhandle, (uint8_t *)SYSZ, sizeof(SYSZ) - 1, 0x1000,
+                          0, &syszinsn);
+    if (syszcount > 0) {
+      size_t j;
+
+      printf("\x1b[31msysz\x1b[0m\n");
+      print_insn(syszinsn, syszcount);
+      for (j = 0; j < syszcount; j++) {
+        cs_detail *detail = syszinsn[j].detail;
+        printf("regs_read_count: %d\n", detail->regs_read_count);
+        printf("op distance: %d\n",
+               ((char *)&detail->sysz.operands - (char *)&detail->sysz));
+        printf("op size: %d\n", sizeof(cs_sysz_op));
+        printf("cc: %d\n", detail->sysz.cc);
+        cs_sysz *sysz = &(detail->sysz);
+        for (int i = 0; i < sysz->op_count; i++) {
+          cs_sysz_op *op = &(sysz->operands[i]);
+          switch ((int)op->type) {
+          default:
+            break;
+          case SYSZ_OP_REG:
+            printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
+                   cs_reg_name(syszhandle, op->reg), op->reg);
+            break;
+          case SYSZ_OP_ACREG:
+            printf("\t\toperands[%u].type: ACREG = %u(%d)\n", i, op->reg,
+                   op->reg);
+            break;
+          case SYSZ_OP_IMM:
+            printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%lld)\n", i,
+                   op->imm, op->imm);
+            break;
+          case SYSZ_OP_MEM:
+            printf("base: %d\n", op->mem.base);
+            printf("index: %d\n", op->mem.index);
+            printf("length: %d\n", op->mem.length);
+            printf("disp: %d\n", op->mem.disp);
+            printf("\t\toperands[%u].type: MEM\n", i);
+            if (op->mem.base != SYSZ_REG_INVALID)
+              printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
+                     cs_reg_name(syszhandle, op->mem.base));
+            if (op->mem.index != SYSZ_REG_INVALID)
+              printf("\t\t\toperands[%u].mem.index: REG = %s\n", i,
+                     cs_reg_name(syszhandle, op->mem.index));
+            if (op->mem.length != 0)
+              printf("\t\t\toperands[%u].mem.length: 0x%" PRIx64 "\n", i,
+                     op->mem.length);
+            if (op->mem.disp != 0)
+              printf("\t\t\toperands[%u].mem.disp: 0x%" PRIx64 "\n", i,
+                     op->mem.disp);
+
+            break;
+          }
+        }
+        printf("\n\n");
+      }
+    }
+
+    csh xcorehandle;
+    cs_insn *xcoreinsn;
+    size_t xcorecount;
+
+    if (cs_open(CS_ARCH_XCORE, CS_MODE_BIG_ENDIAN, &xcorehandle) != CS_ERR_OK)
+      return -1;
+    cs_option(xcorehandle, CS_OPT_DETAIL, CS_OPT_ON);
+    xcorecount = cs_disasm(xcorehandle, (uint8_t *)XCORE, sizeof(XCORE) - 1,
+                           0x1000, 0, &xcoreinsn);
+    if (xcorecount > 0) {
+      size_t j;
+
+      printf("\x1b[31mxcore\x1b[0m\n");
+      print_insn(xcoreinsn, xcorecount);
+      for (j = 0; j < xcorecount; j++) {
+        cs_detail *detail = xcoreinsn[j].detail;
+        printf("regs_read_count: %d\n", detail->regs_read_count);
+        cs_xcore *xcore = &(detail->xcore);
+        for (int i = 0; i < xcore->op_count; i++) {
+          cs_xcore_op *op = &(xcore->operands[i]);
+          switch ((int)op->type) {
+          default:
+            break;
+          case XCORE_OP_REG:
+            printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
+                   cs_reg_name(xcorehandle, op->reg), op->reg);
+            break;
+          case XCORE_OP_IMM:
+            printf("\t\toperands[%u].type: IMM = 0x%x(%d)\n", i, op->imm,
+                   op->imm);
+            break;
+          case XCORE_OP_MEM:
+            printf("base: %d\n", op->mem.base);
+            printf("index: %d\n", op->mem.index);
+            printf("disp: %d\n", op->mem.disp);
+            printf("direct: %d\n", op->mem.direct);
+            printf("\t\toperands[%u].type: MEM\n", i);
+            if (op->mem.base != XCORE_REG_INVALID)
+              printf("\t\t\toperands[%u].mem.base: REG = %s(%d)\n", i,
+                     cs_reg_name(xcorehandle, op->mem.base), op->mem.base);
+            if (op->mem.index != XCORE_REG_INVALID)
+              printf("\t\t\toperands[%u].mem.index: REG = %s(%d)\n", i,
+                     cs_reg_name(xcorehandle, op->mem.index), op->mem.index);
+            if (op->mem.disp != 0)
+              printf("\t\t\toperands[%u].mem.disp: 0x%x(%d)\n", i, op->mem.disp,
+                     op->mem.disp);
+            if (op->mem.direct != 1)
+              printf("\t\t\toperands[%u].mem.direct: -1(%d)\n", i,
+                     op->mem.direct);
+
+            break;
+          }
+        }
+        printf("\n\n");
+      }
+    }
+
+    csh tms320c64xhandle;
+    cs_insn *tms320c64xinsn;
+    size_t tms320c64xcount;
+
+    if (cs_open(CS_ARCH_TMS320C64X, CS_MODE_BIG_ENDIAN, &tms320c64xhandle) !=
+        CS_ERR_OK)
+      return -1;
+    cs_option(tms320c64xhandle, CS_OPT_DETAIL, CS_OPT_ON);
+    tms320c64xcount =
+        cs_disasm(tms320c64xhandle, (uint8_t *)TMS320C64X, sizeof(TMS320C64X) -
+   1, 0x1000, 0, &tms320c64xinsn); if (tms320c64xcount > 0) { size_t j;
+
+      printf("\x1b[31mtms320c64x\x1b[0m\n");
+      printf("%lld", CS_MODE_BIG_ENDIAN);
+      print_insn(tms320c64xinsn, tms320c64xcount);
+      for (j = 0; j < tms320c64xcount; j++) {
+        cs_detail *detail = tms320c64xinsn[j].detail;
+        printf("op_str: %s\n", tms320c64xinsn[j].op_str);
+        printf("regs_read_count: %d\n", detail->regs_read_count);
+        printf("unit: %d\n", detail->tms320c64x.funit.unit);
+        printf("side: %d\n", detail->tms320c64x.funit.side);
+        printf("crosspath: %d\n", detail->tms320c64x.funit.crosspath);
+        printf("parallel: %d\n", detail->tms320c64x.parallel);
+        printf("reg: %d\n", detail->tms320c64x.condition.reg);
+        printf("zero: %d\n", detail->tms320c64x.condition.zero);
+        cs_tms320c64x *tms320c64x = &(detail->tms320c64x);
+        for (int i = 0; i < tms320c64x->op_count; i++) {
+          cs_tms320c64x_op *op = &(tms320c64x->operands[i]);
+          printf("op_type: %d\n", op->type);
+          switch ((int)op->type) {
+          default:
+            break;
+          case TMS320C64X_OP_REG:
+            printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
+                   cs_reg_name(tms320c64xhandle, op->reg), op->reg);
+            break;
+          case TMS320C64X_OP_IMM:
+            printf("\t\toperands[%u].type: IMM = 0x%x(%d)\n", i, op->imm,
+                   op->imm);
+            break;
+          case TMS320C64X_OP_MEM:
+            printf("\t\toperands[%u].type: MEM\n", i);
+            if (op->mem.base != TMS320C64X_REG_INVALID)
+              printf("\t\t\toperands[%u].mem.base: REG = %s(%d)\n", i,
+                     cs_reg_name(tms320c64xhandle, op->mem.base), op->mem.base);
+            printf("\t\t\toperands[%u].mem.disptype(%d): ", i,
+   op->mem.disptype); if (op->mem.disptype == TMS320C64X_MEM_DISP_INVALID) {
+              printf("Invalid\n");
+              printf("\t\t\toperands[%u].mem.disp: %u(%d)\n", i, op->mem.disp,
+                     op->mem.disp);
+            }
+            if (op->mem.disptype == TMS320C64X_MEM_DISP_CONSTANT) {
+              printf("Constant\n");
+              printf("\t\t\toperands[%u].mem.disp: %u(%d)\n", i, op->mem.disp,
+                     op->mem.disp);
+            }
+            if (op->mem.disptype == TMS320C64X_MEM_DISP_REGISTER) {
+              printf("Register\n");
+              printf("\t\t\toperands[%u].mem.disp: %s(%d)\n", i,
+                     cs_reg_name(tms320c64xhandle, op->mem.disp), op->mem.disp);
+            }
+            printf("\t\t\toperands[%u].mem.unit: %u(%d)\n", i, op->mem.unit,
+                   op->mem.unit);
+            printf("\t\t\toperands[%u].mem.direction(%d): ", i,
+                   op->mem.direction);
+            if (op->mem.direction == TMS320C64X_MEM_DIR_INVALID)
+              printf("Invalid\n");
+            if (op->mem.direction == TMS320C64X_MEM_DIR_FW)
+              printf("Forward\n");
+            if (op->mem.direction == TMS320C64X_MEM_DIR_BW)
+              printf("Backward\n");
+            printf("\t\t\toperands[%u].mem.modify(%d): ", i, op->mem.modify);
+            if (op->mem.modify == TMS320C64X_MEM_MOD_INVALID)
+              printf("Invalid\n");
+            if (op->mem.modify == TMS320C64X_MEM_MOD_NO)
+              printf("No\n");
+            if (op->mem.modify == TMS320C64X_MEM_MOD_PRE)
+              printf("Pre\n");
+            if (op->mem.modify == TMS320C64X_MEM_MOD_POST)
+              printf("Post\n");
+            printf("\t\t\toperands[%u].mem.scaled: %u\n", i, op->mem.scaled);
+
+            break;
+          case TMS320C64X_OP_REGPAIR:
+            printf("\t\toperands[%u].type: REGPAIR = %s:%s(%d)\n", i,
+                   cs_reg_name(tms320c64xhandle, op->reg + 1),
+                   cs_reg_name(tms320c64xhandle, op->reg), op->reg);
+            break;
+          }
+        }
+        printf("\n\n");
+      }
+    }
+
+   static const char *s_access[] = {
+        "UNCHANGED",
+        "READ",
+        "WRITE",
+        "READ | WRITE",
+    };
+    csh m680xhandle;
+    cs_insn *m680xinsn;
+    size_t m680xcount;
+
+    if (cs_open(CS_ARCH_M680X, CS_MODE_M680X_CPU12, &m680xhandle) != CS_ERR_OK)
+      return -1;
+    cs_option(m680xhandle, CS_OPT_DETAIL, CS_OPT_ON);
+    m680xcount = cs_disasm(m680xhandle, (uint8_t *)CPU12, sizeof(CPU12) - 1,
+                           0x1000, 0, &m680xinsn);
+    if (m680xcount > 0) {
+      size_t j;
+
+      printf("\x1b[31mm680x\x1b[0m\n");
+      print_insn(m680xinsn, m680xcount);
+      for (j = 0; j < m680xcount; j++) {
+        cs_detail *detail = m680xinsn[j].detail;
+        printf("regs_read_count: %d\n", detail->regs_read_count);
+        printf("count: %d\n", m680xcount);
+        printf("flags: %d\n", detail->m680x.flags);
+        cs_m680x *m680x = &(detail->m680x);
+        for (int i = 0; i < m680x->op_count; i++) {
+          cs_m680x_op *op = &(m680x->operands[i]);
+          const char *comment;
+
+          switch ((int)op->type) {
+          default:
+            break;
+
+          case M680X_OP_REGISTER:
+            comment = "";
+
+            if ((i == 0 && (m680x->flags & M680X_FIRST_OP_IN_MNEM)) ||
+                ((i == 1 && (m680x->flags & M680X_SECOND_OP_IN_MNEM))))
+              comment = " (in mnemonic)";
+
+            printf("\t\toperands[%u].type: REGISTER = %s%s(%d)\n", i,
+                   cs_reg_name(m680xhandle, op->reg), comment, op->reg);
+            break;
+
+          case M680X_OP_CONSTANT:
+            printf("\t\toperands[%u].type: CONSTANT = %u(%d)\n", i,
+   op->const_val, op->const_val); break;
+
+          case M680X_OP_IMMEDIATE:
+            printf("\t\toperands[%u].type: IMMEDIATE = #%d(%d)\n", i, op->imm,
+                   op->imm);
+            break;
+
+          case M680X_OP_DIRECT:
+            printf("\t\toperands[%u].type: DIRECT = 0x%02x(%d)\n", i,
+                   op->direct_addr, op->direct_addr);
+            break;
+
+          case M680X_OP_EXTENDED:
+            printf("\t\toperands[%u].type: EXTENDED %s = 0x%04x(%d)\n", i,
+                   op->ext.indirect ? "true" : "false", op->ext.address,
+                   op->ext.address);
+            break;
+
+          case M680X_OP_RELATIVE:
+            printf("\t\toperands[%u].type: RELATIVE addr = 0x%04x(%d)\n", i,
+                   op->rel.address, op->rel.address);
+            printf("\t\toperands[%u].type: RELATIVE offset = %d\n", i,
+                   op->rel.offset);
+            break;
+
+          case M680X_OP_INDEXED:
+            printf("base_reg: %d\n", op->idx.base_reg);
+            printf("offset_reg: %d\n", op->idx.offset_reg);
+            printf("offset: %d\n", op->idx.offset);
+            printf("offset_addr: %d\n", op->idx.offset_addr);
+            printf("offset_bits: %d\n", op->idx.offset_bits);
+            printf("inc_dec: %d\n", op->idx.inc_dec);
+            printf("flags: %d\n", op->idx.flags);
+            printf("\t\toperands[%u].type: INDEXED%s\n", i,
+                   (op->idx.flags & M680X_IDX_INDIRECT) ? " INDIRECT" : "");
+
+            if (op->idx.base_reg != M680X_REG_INVALID)
+              printf("\t\t\tbase register: %s\n",
+                     cs_reg_name(m680xhandle, op->idx.base_reg));
+
+            if (op->idx.offset_reg != M680X_REG_INVALID)
+              printf("\t\t\toffset register: %s\n",
+                     cs_reg_name(m680xhandle, op->idx.offset_reg));
+
+            if ((op->idx.offset_bits != 0) &&
+                (op->idx.offset_reg == M680X_REG_INVALID) && !op->idx.inc_dec) {
+              printf("\t\t\toffset: %d\n", op->idx.offset);
+
+              if (op->idx.base_reg == M680X_REG_PC)
+                printf("\t\t\toffset address: 0x%x\n", op->idx.offset_addr);
+
+              printf("\t\t\toffset bits: %u\n", op->idx.offset_bits);
+            }
+
+            if (op->idx.inc_dec) {
+              const char *post_pre =
+                  op->idx.flags & M680X_IDX_POST_INC_DEC ? "post" : "pre";
+              const char *inc_dec =
+                  (op->idx.inc_dec > 0) ? "increment" : "decrement";
+
+              printf("\t\t\t%s %s: %d\n", post_pre, inc_dec,
+                     abs(op->idx.inc_dec));
+            }
+
+            break;
+          }
+
+          if (op->size != 0)
+            printf("\t\t\tsize: %u\n", op->size);
+
+          if (op->access != CS_AC_INVALID)
+            printf("\t\t\taccess: %s(%d)\n", s_access[op->access], op->access);
+        }
+        printf("\n\n");
+      }
+    }
+
+    csh evmhandle;
+    cs_insn *evminsn;
+    size_t evmcount;
+
+    if (cs_open(CS_ARCH_EVM, 0, &evmhandle) != CS_ERR_OK)
+      return -1;
+    cs_option(evmhandle, CS_OPT_DETAIL, CS_OPT_ON);
+    evmcount = cs_disasm(evmhandle, (uint8_t *)EVM, sizeof(EVM) - 1, 0x1000, 0,
+                         &evminsn);
+    if (evmcount > 0) {
+      size_t j;
+
+      printf("\x1b[31mevm\x1b[0m\n");
+      print_insn(evminsn, evmcount);
+      for (j = 0; j < evmcount; j++) {
+        cs_detail *detail = evminsn[j].detail;
+        printf("regs_read_count: %d\n", detail->regs_read_count);
+        cs_evm *evm = &(detail->evm);
+        printf("\tPop:     %u\n", evm->pop);
+        printf("\tPush:    %u\n", evm->push);
+        printf("\tGas fee: %u\n", evm->fee);
+        printf("\n\n");
+      }
+    }
+
+    csh mos65xxhandle;
+    cs_insn *mos65xxinsn;
+    size_t mos65xxcount;
+
+    if (cs_open(CS_ARCH_MOS65XX, CS_MODE_MOS65XX_W65C02, &mos65xxhandle) !=
+        CS_ERR_OK)
+      return -1;
+    cs_option(mos65xxhandle, CS_OPT_DETAIL, CS_OPT_ON);
+    mos65xxcount = cs_disasm(mos65xxhandle, (uint8_t *)MW65C02,
+                             sizeof(MW65C02) - 1, 0x1000, 0, &mos65xxinsn);
+    if (mos65xxcount > 0) {
+      size_t j;
+
+      printf("\x1b[31mmos65xx\x1b[0m\n");
+      print_insn(mos65xxinsn, mos65xxcount);
+      for (j = 0; j < mos65xxcount; j++) {
+        cs_detail *detail = mos65xxinsn[j].detail;
+        printf("op distance: %d\n",
+               ((char *)&detail->mos65xx.operands - (char *)&detail->mos65xx));
+        printf("op size: %d\n", sizeof(cs_mos65xx_op));
+        printf("modifies_flags: %s\n",
+               (detail->mos65xx.modifies_flags == 1) ? "true" : "false");
+        printf("am: %d\n", detail->mos65xx.am);
+        for (int i = 0; i < detail->mos65xx.op_count; i++) {
+          cs_mos65xx_op *op = &(detail->mos65xx.operands[i]);
+          printf("op_type: %d\n", op->type);
+          switch ((int)op->type) {
+          default:
+            break;
+          case MOS65XX_OP_REG:
+            printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
+                   cs_reg_name(mos65xxhandle, op->reg), op->reg);
+            break;
+          case MOS65XX_OP_IMM:
+            printf("\t\toperands[%u].type: IMM = 0x%x(%d)\n", i, op->imm,
+                   op->imm);
+            break;
+          case MOS65XX_OP_MEM:
+            printf("\t\toperands[%u].type: MEM = 0x%x(%d)\n", i, op->mem,
+                   op->mem);
+            break;
+          }
+        }
+        printf("\n\n");
+      }
+    }
+
+     csh wasmhandle;
     cs_insn *wasminsn;
     size_t wasmcount;
 
@@ -1186,7 +1198,7 @@ int main(void) { /*
       return -1;
     cs_option(bpfhandle, CS_OPT_DETAIL, CS_OPT_ON);
     bpfcount = cs_disasm(bpfhandle, (uint8_t *)EBPF, sizeof(EBPF) - 1, 0x1000,
-    0, &bpfinsn); if (bpfcount > 0) { size_t j; printf("\x1b[31mbpf\x1b[0m\n");
+   0, &bpfinsn); if (bpfcount > 0) { size_t j; printf("\x1b[31mbpf\x1b[0m\n");
       print_insn(bpfinsn, bpfcount);
       for (j = 0; j < bpfcount; j++) {
         cs_detail *detail = bpfinsn[j].detail;
@@ -1267,13 +1279,12 @@ int main(void) { /*
             break;
           case RISCV_OP_IMM:
             printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%d)\n", i,
-    op->imm, op->imm); break; case RISCV_OP_MEM: printf("\t\toperands[%u].type:
-    MEM\n", i); if (op->mem.base != RISCV_REG_INVALID)
-                printf("\t\t\toperands[%u].mem.base: REG = %s(%d)\n", i,
-                       cs_reg_name(riscvhandle, op->mem.base), op->mem.base);
-              if (op->mem.disp != 0)
-                printf("\t\t\toperands[%u].mem.disp: 0x%" PRIx64 "(%d)\n", i,
-                       op->mem.disp, op->mem.disp);
+   op->imm, op->imm); break; case RISCV_OP_MEM: printf("\t\toperands[%u].type:
+   MEM\n", i); if (op->mem.base != RISCV_REG_INVALID)
+   printf("\t\t\toperands[%u].mem.base: REG = %s(%d)\n", i,
+   cs_reg_name(riscvhandle, op->mem.base), op->mem.base); if (op->mem.disp != 0)
+   printf("\t\t\toperands[%u].mem.disp: 0x%" PRIx64 "(%d)\n", i, op->mem.disp,
+   op->mem.disp);
 
               break;
           }
@@ -1373,7 +1384,7 @@ int main(void) { /*
         }
         printf("update_flags offset: %d\n",
                (char *)&detail->tricore.update_flags - (char
-    *)&detail->tricore); printf("\n\n");
+   *)&detail->tricore); printf("\n\n");
       }
     }
 
