@@ -7,7 +7,7 @@ function gen(constants: Record<string, any>, namespace: string, filePath: string
     
     const new_constants = Object.entries(constants)
         .filter(([key, _]) => !existing_keys.includes(key))
-        .map(([key, value]) => `    const ${key}: ${typeof value};`);
+        .map(([key, value]) => `    const ${key}: ${value};`);
         
     const declare_content = `${new_constants.join('\n')}\n`;
     

@@ -13,10 +13,19 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
   ]);
 
   const disassembler = new cs.Capstone(cs.ARCH_ARM64, cs.MODE_ARM);
+  disassembler.option(cs.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  let index = 0;
-  expect(insns).toEqual([
+  expect(
+    insns.map(({ id, address, size, mnemonic, op_str, bytes }) => ({
+      id,
+      address,
+      size,
+      mnemonic,
+      op_str,
+      bytes,
+    })),
+  ).toEqual([
     {
       id: 662,
       address: 4096,

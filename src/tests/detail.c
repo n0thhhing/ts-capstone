@@ -88,6 +88,14 @@
   "\x00\x00\xe0\x83\x22\xe5\xf1\x02\x03\x0e\x00\x00\xa0\xe3\x02\x30\xc1\xe7"   \
   "\x00\x00\x53\xe3\x00\x02\x01\xf1\x05\x40\xd0\xe8\xf4\x80\x00\x00"
 
+struct arch {
+  cs_arch arch;
+  cs_mode mode;
+  unsigned char *buffer;
+  size_t size;
+  const char *name;
+};
+
 void print_insn(cs_insn *instructions, size_t count) {
   printf("[\n");
   for (size_t i = 0; i < count; i++) {
@@ -107,330 +115,335 @@ void print_insn(cs_insn *instructions, size_t count) {
   }
 }
 
-int main(void) {
-  csh x86handle;
-  cs_insn *x86insn;
-  size_t x86count;
+int main(
+    void) { /*
+csh x86handle;
+cs_insn *x86insn;
+size_t x86count;
 
-  if (cs_open(CS_ARCH_X86, CS_MODE_16, &x86handle) != CS_ERR_OK)
+if (cs_open(CS_ARCH_X86, CS_MODE_16, &x86handle) != CS_ERR_OK)
+return -1;
+cs_option(x86handle, CS_OPT_DETAIL, CS_OPT_ON);
+x86count = cs_disasm(x86handle, (uint8_t *)X86, sizeof(X86) - 1, 0x1000, 0,
+                   &x86insn);
+
+if (x86count > 0) {
+size_t j;
+
+printf("\x1b[31mx86\x1b[0m\n");
+print_insn(x86insn, x86count);
+for (j = 0; j < x86count; j++) {
+  cs_detail *detail = x86insn[j].detail;
+  printf("bytes: ");
+  for (int i = 0; i < x86insn[j].size; i++) {
+    printf("0x%02x, ", x86insn[j].bytes[i]);
+  }
+  printf("\n");
+  printf("op distance: %d\n",
+         ((char *)&detail->x86.operands - (char *)&detail->x86));
+  printf("op size: %d\n", sizeof(cs_x86_op));
+  printf("size: %d\n", x86insn[j].size);
+  printf("regs_read_count: %d\n", detail->regs_read_count);
+  printf("regs_read: %d\n", detail->regs_read[0]);
+  printf("regs_write_count: %d\n", detail->regs_write_count);
+  printf("regs_write: %d\n", detail->regs_write[0]);
+  printf("groups_count: %d\n", detail->groups_count);
+  printf("groups: %d\n\n", detail->groups[0]);
+
+  cs_x86 *x86 = &(detail->x86);
+  printf("prefix: %d\n", x86->prefix[0]);
+  printf("opcode: %d\n", x86->opcode[0]);
+  printf("rex: %d\n", x86->rex);
+  printf("addr_size: %d\n", x86->addr_size);
+  printf("modrm: %d\n", x86->modrm);
+  printf("sib: %d\n", x86->sib);
+  printf("disp: %ld\n", x86->disp);
+  printf("sib_index: %d\n", x86->sib_index);
+  printf("sib_scale: %d\n", x86->sib_scale);
+  printf("sib_base: %d\n", x86->sib_base);
+  printf("xop_cc: %d\n", x86->xop_cc);
+  printf("sse_cc: %d\n", x86->sse_cc);
+  printf("avx_cc: %d\n", x86->avx_cc);
+  printf("avx_sae: %s\n", x86->avx_sae ? "true" : "false");
+  printf("avx_rm: %d\n", x86->avx_rm);
+  printf("eflags: %ld\n\n", x86->eflags);
+  printf("fpu_flags: %ld\n\n", x86->fpu_flags);
+
+  cs_x86_encoding encoding = x86->encoding;
+  printf("cs_x86_encoding:\n");
+  printf("modrm_offset: %d\n", encoding.modrm_offset);
+  printf("disp_offset: %d\n", encoding.disp_offset);
+  printf("disp_size: %d\n", encoding.disp_size);
+  printf("imm_offset: %d\n", encoding.imm_offset);
+  printf("imm_size: %d\n", encoding.imm_size);
+  printf("\n\n");
+  for (int i = 0; i < x86->op_count; i++) {
+    cs_x86_op *op = &(x86->operands[i]);
+    printf("size: %d\n", op->size);
+    printf("access: %d\n", op->access);
+    printf("avx_bcast: %d\n", op->avx_bcast);
+    printf("avx_zero_opmask: %d\n", op->avx_zero_opmask);
+    switch ((int)op->type) {
+    case X86_OP_REG:
+      printf("reg: %d\n", op->reg);
+      break;
+    case X86_OP_IMM:
+      printf("imm: %d\n", op->imm);
+      break;
+    case X86_OP_MEM:
+      printf("mem\n", i);
+      printf("mem.segment: %d\n", op->mem.segment);
+      printf("mem.base: %d\n", op->mem.base);
+      printf("mem.index: %d\n", op->mem.index);
+      printf("mem.scale: %d\n", op->mem.scale);
+      printf("mem.disp: %ld\n", op->mem.disp);
+      break;
+    default:
+      break;
+    }
+  }
+}
+cs_free(x86insn, x86count);
+} else {
+printf("ERROR: Failed to disassemble given code!\n");
+}
+
+csh armhandle;
+cs_insn *arminsn;
+size_t armcount;
+
+if (cs_open(CS_ARCH_ARM, 0, &armhandle) != CS_ERR_OK)
+ return -1;
+cs_option(armhandle, CS_OPT_DETAIL, CS_OPT_ON);
+armcount = cs_disasm(armhandle, (uint8_t *)ARM, sizeof(ARM) - 1, 0x1000, 0,
+                    &arminsn);
+if (armcount > 0) {
+ size_t j;
+
+ printf("\x1b[31marm\x1b[0m\n");
+ print_insn(arminsn, armcount);
+ for (j = 0; j < armcount; j++) {
+   cs_detail *detail = arminsn[j].detail;
+   printf("regs_read_count: %d\n", detail->regs_read_count);
+   cs_arm *arm = &(detail->arm);
+   printf("op distance: %d\n",
+          ((char *)&detail->arm.operands - (char *)&detail->arm));
+   printf("op size: %d\n", sizeof(cs_arm_op));
+   printf("usermode: %d\n", arm->usermode);
+   printf("vector_size: %d\n", arm->vector_size);
+   printf("vector_data: %d\n", arm->vector_data);
+   printf("cps_mode: %d\n", arm->cps_mode);
+   printf("cps_flag: %d\n", arm->cps_flag);
+   printf("cc: %d\n", arm->cc);
+   printf("update_flags: %d\n", arm->update_flags);
+   printf("writeback: %d\n", arm->writeback);
+   printf("post_index: %d\n", arm->post_index);
+   printf("mem_barrier: %d\n", arm->mem_barrier);
+   for (int i = 0; i < arm->op_count; i++) {
+     cs_arm_op *op = &(arm->operands[i]);
+     printf("vector_index: %d\n", op->vector_index);
+     printf("shift.type: %d\n", op->shift.type);
+     printf("shift.value: %d\n", op->shift.value);
+     printf("subtracted: %d\n", op->subtracted);
+     printf("access: %d\n", sizeof(op->access));
+     printf("neon_lane: %d\n", op->neon_lane);
+     printf(
+         "subtracted distance: %d\n",
+         ((char *)&arm->operands[i].subtracted - (char
+*)&arm->operands[i])); switch ((int)op->type) { default: break; case
+ARM_OP_REG: printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
+              cs_reg_name(armhandle, op->reg), op->reg);
+       break;
+     case ARM_OP_IMM:
+       printf("\t\toperands[%u].type: IMM = 0x%x(%d)\n", i, op->imm,
+              op->imm);
+       break;
+     case ARM_OP_FP:
+#if defined(_KERNEL_MODE)
+       // Issue #681: Windows kernel does not support formatting float
+       point printf(
+           "\t\toperands[%u].type: FP = <float_point_unsupported>\n", i);
+#else
+       printf("\t\toperands[%u].type: FP = %f(%d)\n", i, op->fp, op->fp);
+#endif
+       break;
+     case ARM_OP_MEM:
+       printf("\t\toperands[%u].type: MEM\n", i);
+       printf("base: %d\n", op->mem.base);
+       printf("index: %d\n", op->mem.index);
+       printf("scale: %d\n", op->mem.scale);
+       printf("disp: %d\n", op->mem.disp);
+       printf("lshift: %d\n", op->mem.lshift);
+       if (op->mem.base != ARM_REG_INVALID)
+         printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
+                cs_reg_name(armhandle, op->mem.base));
+       if (op->mem.index != ARM_REG_INVALID)
+         printf("\t\t\toperands[%u].mem.index: REG = %s\n", i,
+                cs_reg_name(armhandle, op->mem.index));
+       if (op->mem.scale != 1)
+         printf("\t\t\toperands[%u].mem.scale: %u\n", i, op->mem.scale);
+       if (op->mem.disp != 0)
+         printf("\t\t\toperands[%u].mem.disp: 0x%x\n", i, op->mem.disp);
+       if (op->mem.lshift != 0)
+         printf("\t\t\toperands[%u].mem.lshift: 0x%x\n", i, op->mem.lshift);
+
+       break;
+     case ARM_OP_PIMM:
+       printf("\t\toperands[%u].type: P-IMM = %u(%d)\n", i, op->imm,
+              op->imm);
+       break;
+     case ARM_OP_CIMM:
+       printf("\t\toperands[%u].type: C-IMM = %u(%d)\n", i, op->imm,
+              op->imm);
+       break;
+     case ARM_OP_SETEND:
+       printf("\t\toperands[%u].type: SETEND = %s(%d)\n", i,
+              op->setend == ARM_SETEND_BE ? "be" : "le", op->setend);
+       break;
+     case ARM_OP_SYSREG:
+       printf("\t\toperands[%u].type: SYSREG = %u(%d)\n", i, op->reg,
+              op->reg);
+       break;
+     }
+   }
+   printf("\n\n");
+ }
+}*/
+
+  csh arm64handle;
+  cs_insn *arm64insn;
+  size_t arm64count;
+  if (cs_open(1, 0, &arm64handle) != CS_ERR_OK)
     return -1;
-  cs_option(x86handle, CS_OPT_DETAIL, CS_OPT_ON);
-  x86count = cs_disasm(x86handle, (uint8_t *)X86, sizeof(X86) - 1, 0x1000, 0,
-                       &x86insn);
-
-  if (x86count > 0) {
+  cs_option(arm64handle, CS_OPT_DETAIL, CS_OPT_ON);
+  arm64count = cs_disasm(arm64handle, (uint8_t *)ARM64, sizeof(ARM64) - 1,
+                         0x1000, 0, &arm64insn);
+  if (arm64count > 0) {
     size_t j;
 
-    printf("\x1b[31mx86\x1b[0m\n");
-    print_insn(x86insn, x86count);
-    for (j = 0; j < x86count; j++) {
-      cs_detail *detail = x86insn[j].detail;
-      printf("bytes: ");
-      for (int i = 0; i < x86insn[j].size; i++) {
-        printf("0x%02x, ", x86insn[j].bytes[i]);
-      }
-      printf("\n");
-      printf("op distance: %d\n",
-             ((char *)&detail->x86.operands - (char *)&detail->x86));
-      printf("op size: %d\n", sizeof(cs_x86_op));
-      printf("size: %d\n", x86insn[j].size);
+    printf("\x1b[31marm64\x1b[0m\n");
+    print_insn(arm64insn, arm64count);
+    for (j = 0; j < arm64count; j++) {
+      printf("op_index: %d\n",
+             cs_op_index(arm64handle, &arm64insn[j], ARM64_OP_REG, 1));
+      cs_detail *detail = arm64insn[j].detail;
       printf("regs_read_count: %d\n", detail->regs_read_count);
-      printf("regs_read: %d\n", detail->regs_read[0]);
-      printf("regs_write_count: %d\n", detail->regs_write_count);
-      printf("regs_write: %d\n", detail->regs_write[0]);
-      printf("groups_count: %d\n", detail->groups_count);
-      printf("groups: %d\n\n", detail->groups[0]);
-
-      cs_x86 *x86 = &(detail->x86);
-      printf("prefix: %d\n", x86->prefix[0]);
-      printf("opcode: %d\n", x86->opcode[0]);
-      printf("rex: %d\n", x86->rex);
-      printf("addr_size: %d\n", x86->addr_size);
-      printf("modrm: %d\n", x86->modrm);
-      printf("sib: %d\n", x86->sib);
-      printf("disp: %ld\n", x86->disp);
-      printf("sib_index: %d\n", x86->sib_index);
-      printf("sib_scale: %d\n", x86->sib_scale);
-      printf("sib_base: %d\n", x86->sib_base);
-      printf("xop_cc: %d\n", x86->xop_cc);
-      printf("sse_cc: %d\n", x86->sse_cc);
-      printf("avx_cc: %d\n", x86->avx_cc);
-      printf("avx_sae: %s\n", x86->avx_sae ? "true" : "false");
-      printf("avx_rm: %d\n", x86->avx_rm);
-      printf("eflags: %ld\n\n", x86->eflags);
-      printf("fpu_flags: %ld\n\n", x86->fpu_flags);
-
-      cs_x86_encoding encoding = x86->encoding;
-      printf("cs_x86_encoding:\n");
-      printf("modrm_offset: %d\n", encoding.modrm_offset);
-      printf("disp_offset: %d\n", encoding.disp_offset);
-      printf("disp_size: %d\n", encoding.disp_size);
-      printf("imm_offset: %d\n", encoding.imm_offset);
-      printf("imm_size: %d\n", encoding.imm_size);
-      printf("\n\n");
-      for (int i = 0; i < x86->op_count; i++) {
-        cs_x86_op *op = &(x86->operands[i]);
-        printf("size: %d\n", op->size);
+      cs_arm64 *arm64 = &(detail->arm64);
+      printf("cc: %d\n", arm64->cc);
+      printf("update_flags: %d\n", arm64->update_flags);
+      printf("writeback: %d\n", arm64->writeback);
+      printf("post_index: %d\n", arm64->post_index);
+      printf("op distance: %d\n",
+             ((char *)&detail->arm64.operands - (char *)&detail->arm64));
+      printf("op size: %d\n", sizeof(cs_arm64_op));
+      printf("post_index distance: %d\n",
+             (char *)&arm64->post_index - (char *)&arm64->cc);
+      printf("op_count distance: %d\n",
+             (char *)&arm64->op_count - (char *)&arm64->cc);
+      for (int i = 0; i < arm64->op_count; i++) {
+        cs_arm64_op *op = &(arm64->operands[i]);
+        printf("vector_index: %d\n", op->vector_index);
+        printf("vas: %d\n", op->vas);
+        printf("type: %d\n", op->shift.type);
+        printf("value: %d\n", op->shift.value);
+        printf("ext: %d\n", op->ext);
         printf("access: %d\n", op->access);
-        printf("avx_bcast: %d\n", op->avx_bcast);
-        printf("avx_zero_opmask: %d\n", op->avx_zero_opmask);
-        switch ((int)op->type) {
-        case X86_OP_REG:
-          printf("reg: %d\n", op->reg);
-          break;
-        case X86_OP_IMM:
-          printf("imm: %d\n", op->imm);
-          break;
-        case X86_OP_MEM:
-          printf("mem\n", i);
-          printf("mem.segment: %d\n", op->mem.segment);
-          printf("mem.base: %d\n", op->mem.base);
-          printf("mem.index: %d\n", op->mem.index);
-          printf("mem.scale: %d\n", op->mem.scale);
-          printf("mem.disp: %ld\n", op->mem.disp);
-          break;
+        printf("svcr distance: %d\n",
+               (char *)&op->svcr - (char *)&op->vector_index);
+        printf("op_type distance: %d\n",
+               (char *)&op->type - (char *)&op->vector_index);
+        printf("ext distance: %d\n",
+               (char *)&op->ext - (char *)&op->vector_index);
+        printf("shift distance: %d\n",
+               (char *)&op->shift - (char *)&op->vector_index);
+        printf("shift.type distance: %d\n",
+               (char *)&op->shift.type - (char *)&op->vector_index);
+        printf("shift.value distance: %d\n",
+               (char *)&op->shift.value - (char *)&op->vector_index);
+        printf("vector_index distance: %d\n",
+               (char *)&op->vector_index - (char *)&op->vector_index);
+        printf("vas distance: %d\n",
+               (char *)&op->vas - (char *)&op->vector_index);
+        printf("reg distance: %d\n",
+               (char *)&op->reg - (char *)&op->vector_index);
+        printf("mem.index distance: %d\n",
+               (char *)&op->mem.index - (char *)&op->vector_index);
+        printf("mem.disp distance: %d\n",
+               (char *)&op->mem.disp - (char *)&op->vector_index);
+        printf("sme_index distance: %d\n",
+               (char *)&op->sme_index - (char *)&op->vector_index);
+        printf("access distance: %d\n",
+               (char *)&op->access - (char *)&op->vector_index);
+
+        switch (op->type) {
         default:
+          break;
+        case ARM64_OP_REG:
+          printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
+                 cs_reg_name(arm64handle, op->reg), op->reg);
+          break;
+        case ARM64_OP_IMM:
+          printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%d)\n", i, op->imm,
+                 op->imm);
+          break;
+        case ARM64_OP_FP:
+#if defined(_KERNEL_MODE)
+          // Issue #681: Windows kernel does not support formatting float
+          point printf(
+              "\t\toperands[%u].type: FP = <float_point_unsupported>\n", i);
+#else
+          printf("\t\toperands[%u].type: FP = %f(%d)\n", i, op->fp, op->fp);
+#endif
+          break;
+        case ARM64_OP_MEM:
+          printf("base: %d\n", op->mem.base);
+          printf("index: %d\n", op->mem.index);
+          printf("disp: %d\n", op->mem.disp);
+          printf("\t\toperands[%u].type: MEM\n", i);
+          if (op->mem.base != ARM64_REG_INVALID)
+            printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
+                   cs_reg_name(arm64handle, op->mem.base));
+          if (op->mem.index != ARM64_REG_INVALID)
+            printf("\t\t\toperands[%u].mem.index: REG = %s\n", i,
+                   cs_reg_name(arm64handle, op->mem.index));
+          if (op->mem.disp != 0)
+            printf("\t\t\toperands[%u].mem.disp: 0x%x\n", i, op->mem.disp);
+
+          break;
+        case ARM64_OP_CIMM:
+          printf("\t\toperands[%u].type: C-IMM = %u(%d)\n", i, (int)op->imm,
+                 op->imm);
+          break;
+        case ARM64_OP_REG_MRS:
+          printf("\t\toperands[%u].type: REG_MRS = 0x%x(%d)\n", i, op->reg,
+                 op->reg);
+          break;
+        case ARM64_OP_REG_MSR:
+          printf("\t\toperands[%u].type: REG_MSR = 0x%x(%d)\n", i, op->reg,
+                 op->reg);
+          break;
+        case ARM64_OP_PSTATE:
+          printf("\t\toperands[%u].type: PSTATE = 0x%x(%d)\n", i, op->pstate,
+                 op->pstate);
+          break;
+        case ARM64_OP_SYS:
+          printf("\t\toperands[%u].type: SYS = 0x%x(%d)\n", i, op->sys,
+                 op->sys);
+          break;
+        case ARM64_OP_PREFETCH:
+          printf("\t\toperands[%u].type: PREFETCH = 0x%x(%d)\n", i,
+                 op->prefetch, op->prefetch);
+          break;
+        case ARM64_OP_BARRIER:
+          printf("\t\toperands[%u].type: BARRIER = 0x%x(%d)\n", i, op->barrier,
+                 op->barrier);
           break;
         }
       }
+
+      printf("\n\n");
     }
-    cs_free(x86insn, x86count);
-  } else {
-    printf("ERROR: Failed to disassemble given code!\n");
   } /*
-
-   csh armhandle;
-   cs_insn *arminsn;
-   size_t armcount;
-
-   if (cs_open(CS_ARCH_ARM, 0, &armhandle) != CS_ERR_OK)
-     return -1;
-   cs_option(armhandle, CS_OPT_DETAIL, CS_OPT_ON);
-   armcount = cs_disasm(armhandle, (uint8_t *)ARM, sizeof(ARM) - 1, 0x1000, 0,
-                        &arminsn);
-   if (armcount > 0) {
-     size_t j;
-
-     printf("\x1b[31marm\x1b[0m\n");
-     print_insn(arminsn, armcount);
-     for (j = 0; j < armcount; j++) {
-       cs_detail *detail = arminsn[j].detail;
-       printf("regs_read_count: %d\n", detail->regs_read_count);
-       cs_arm *arm = &(detail->arm);
-       printf("op distance: %d\n",
-              ((char *)&detail->arm.operands - (char *)&detail->arm));
-       printf("op size: %d\n", sizeof(cs_arm_op));
-       printf("usermode: %d\n", arm->usermode);
-       printf("vector_size: %d\n", arm->vector_size);
-       printf("vector_data: %d\n", arm->vector_data);
-       printf("cps_mode: %d\n", arm->cps_mode);
-       printf("cps_flag: %d\n", arm->cps_flag);
-       printf("cc: %d\n", arm->cc);
-       printf("update_flags: %d\n", arm->update_flags);
-       printf("writeback: %d\n", arm->writeback);
-       printf("post_index: %d\n", arm->post_index);
-       printf("mem_barrier: %d\n", arm->mem_barrier);
-       for (int i = 0; i < arm->op_count; i++) {
-         cs_arm_op *op = &(arm->operands[i]);
-         printf("vector_index: %d\n", op->vector_index);
-         printf("shift.type: %d\n", op->shift.type);
-         printf("shift.value: %d\n", op->shift.value);
-         printf("subtracted: %d\n", op->subtracted);
-         printf("access: %d\n", sizeof(op->access));
-         printf("neon_lane: %d\n", op->neon_lane);
-         printf(
-             "subtracted distance: %d\n",
-             ((char *)&arm->operands[i].subtracted - (char
- *)&arm->operands[i])); switch ((int)op->type) { default: break; case
- ARM_OP_REG: printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
-                  cs_reg_name(armhandle, op->reg), op->reg);
-           break;
-         case ARM_OP_IMM:
-           printf("\t\toperands[%u].type: IMM = 0x%x(%d)\n", i, op->imm,
-                  op->imm);
-           break;
-         case ARM_OP_FP:
- #if defined(_KERNEL_MODE)
-           // Issue #681: Windows kernel does not support formatting float
-           point printf(
-               "\t\toperands[%u].type: FP = <float_point_unsupported>\n", i);
- #else
-           printf("\t\toperands[%u].type: FP = %f(%d)\n", i, op->fp, op->fp);
- #endif
-           break;
-         case ARM_OP_MEM:
-           printf("\t\toperands[%u].type: MEM\n", i);
-           printf("base: %d\n", op->mem.base);
-           printf("index: %d\n", op->mem.index);
-           printf("scale: %d\n", op->mem.scale);
-           printf("disp: %d\n", op->mem.disp);
-           printf("lshift: %d\n", op->mem.lshift);
-           if (op->mem.base != ARM_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
-                    cs_reg_name(armhandle, op->mem.base));
-           if (op->mem.index != ARM_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.index: REG = %s\n", i,
-                    cs_reg_name(armhandle, op->mem.index));
-           if (op->mem.scale != 1)
-             printf("\t\t\toperands[%u].mem.scale: %u\n", i, op->mem.scale);
-           if (op->mem.disp != 0)
-             printf("\t\t\toperands[%u].mem.disp: 0x%x\n", i, op->mem.disp);
-           if (op->mem.lshift != 0)
-             printf("\t\t\toperands[%u].mem.lshift: 0x%x\n", i, op->mem.lshift);
-
-           break;
-         case ARM_OP_PIMM:
-           printf("\t\toperands[%u].type: P-IMM = %u(%d)\n", i, op->imm,
-                  op->imm);
-           break;
-         case ARM_OP_CIMM:
-           printf("\t\toperands[%u].type: C-IMM = %u(%d)\n", i, op->imm,
-                  op->imm);
-           break;
-         case ARM_OP_SETEND:
-           printf("\t\toperands[%u].type: SETEND = %s(%d)\n", i,
-                  op->setend == ARM_SETEND_BE ? "be" : "le", op->setend);
-           break;
-         case ARM_OP_SYSREG:
-           printf("\t\toperands[%u].type: SYSREG = %u(%d)\n", i, op->reg,
-                  op->reg);
-           break;
-         }
-       }
-       printf("\n\n");
-     }
-   }
-
-   csh arm64handle;
-   cs_insn *arm64insn;
-   size_t arm64count;
-   if (cs_open(1, 0, &arm64handle) != CS_ERR_OK)
-     return -1;
-   cs_option(arm64handle, CS_OPT_DETAIL, CS_OPT_ON);
-   arm64count = cs_disasm(arm64handle, (uint8_t *)ARM64, sizeof(ARM64) - 1,
-                          0x1000, 0, &arm64insn);
-   if (arm64count > 0) {
-     size_t j;
-
-     printf("\x1b[31marm64\x1b[0m\n");
-     print_insn(arm64insn, arm64count);
-     for (j = 0; j < arm64count; j++) {
-       cs_detail *detail = arm64insn[j].detail;
-       printf("regs_read_count: %d\n", detail->regs_read_count);
-       cs_arm64 *arm64 = &(detail->arm64);
-       printf("cc: %d\n", arm64->cc);
-       printf("update_flags: %d\n", arm64->update_flags);
-       printf("writeback: %d\n", arm64->writeback);
-       printf("post_index: %d\n", arm64->post_index);
-       printf("op distance: %d\n",
-              ((char *)&detail->arm64.operands - (char *)&detail->arm64));
-       printf("op size: %d\n", sizeof(cs_arm64_op));
-       printf("post_index distance: %d\n",
-              (char *)&arm64->post_index - (char *)&arm64->cc);
-       printf("op_count distance: %d\n",
-              (char *)&arm64->op_count - (char *)&arm64->cc);
-       for (int i = 0; i < arm64->op_count; i++) {
-         cs_arm64_op *op = &(arm64->operands[i]);
-         printf("vector_index: %d\n", op->vector_index);
-         printf("vas: %d\n", op->vas);
-         printf("type: %d\n", op->shift.type);
-         printf("value: %d\n", op->shift.value);
-         printf("ext: %d\n", op->ext);
-         printf("access: %d\n", op->access);
-         printf("svcr distance: %d\n",
-                (char *)&op->svcr - (char *)&op->vector_index);
-         printf("op_type distance: %d\n",
-                (char *)&op->type - (char *)&op->vector_index);
-         printf("ext distance: %d\n",
-                (char *)&op->ext - (char *)&op->vector_index);
-         printf("shift distance: %d\n",
-                (char *)&op->shift - (char *)&op->vector_index);
-         printf("shift.type distance: %d\n",
-                (char *)&op->shift.type - (char *)&op->vector_index);
-         printf("shift.value distance: %d\n",
-                (char *)&op->shift.value - (char *)&op->vector_index);
-         printf("vector_index distance: %d\n",
-                (char *)&op->vector_index - (char *)&op->vector_index);
-         printf("vas distance: %d\n",
-                (char *)&op->vas - (char *)&op->vector_index);
-         printf("reg distance: %d\n",
-                (char *)&op->reg - (char *)&op->vector_index);
-         printf("mem.index distance: %d\n",
-                (char *)&op->mem.index - (char *)&op->vector_index);
-         printf("mem.disp distance: %d\n",
-                (char *)&op->mem.disp - (char *)&op->vector_index);
-         printf("sme_index distance: %d\n",
-                (char *)&op->sme_index - (char *)&op->vector_index);
-         printf("access distance: %d\n",
-                (char *)&op->access - (char *)&op->vector_index);
-
-         switch (op->type) {
-         default:
-           break;
-         case ARM64_OP_REG:
-           printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
-                  cs_reg_name(arm64handle, op->reg), op->reg);
-           break;
-         case ARM64_OP_IMM:
-           printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%d)\n", i,
- op->imm, op->imm); break; case ARM64_OP_FP:
- #if defined(_KERNEL_MODE)
-           // Issue #681: Windows kernel does not support formatting float
-           point printf(
-               "\t\toperands[%u].type: FP = <float_point_unsupported>\n", i);
- #else
-           printf("\t\toperands[%u].type: FP = %f(%d)\n", i, op->fp, op->fp);
- #endif
-           break;
-         case ARM64_OP_MEM:
-           printf("base: %d\n", op->mem.base);
-           printf("index: %d\n", op->mem.index);
-           printf("disp: %d\n", op->mem.disp);
-           printf("\t\toperands[%u].type: MEM\n", i);
-           if (op->mem.base != ARM64_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
-                    cs_reg_name(arm64handle, op->mem.base));
-           if (op->mem.index != ARM64_REG_INVALID)
-             printf("\t\t\toperands[%u].mem.index: REG = %s\n", i,
-                    cs_reg_name(arm64handle, op->mem.index));
-           if (op->mem.disp != 0)
-             printf("\t\t\toperands[%u].mem.disp: 0x%x\n", i, op->mem.disp);
-
-           break;
-         case ARM64_OP_CIMM:
-           printf("\t\toperands[%u].type: C-IMM = %u(%d)\n", i, (int)op->imm,
-                  op->imm);
-           break;
-         case ARM64_OP_REG_MRS:
-           printf("\t\toperands[%u].type: REG_MRS = 0x%x(%d)\n", i, op->reg,
-                  op->reg);
-           break;
-         case ARM64_OP_REG_MSR:
-           printf("\t\toperands[%u].type: REG_MSR = 0x%x(%d)\n", i, op->reg,
-                  op->reg);
-           break;
-         case ARM64_OP_PSTATE:
-           printf("\t\toperands[%u].type: PSTATE = 0x%x(%d)\n", i, op->pstate,
-                  op->pstate);
-           break;
-         case ARM64_OP_SYS:
-           printf("\t\toperands[%u].type: SYS = 0x%x(%d)\n", i, op->sys,
-                  op->sys);
-           break;
-         case ARM64_OP_PREFETCH:
-           printf("\t\toperands[%u].type: PREFETCH = 0x%x(%d)\n", i,
-                  op->prefetch, op->prefetch);
-           break;
-         case ARM64_OP_BARRIER:
-           printf("\t\toperands[%u].type: BARRIER = 0x%x(%d)\n", i, op->barrier,
-                  op->barrier);
-           break;
-         }
-       }
-
-       printf("\n\n");
-     }
-   }
 
   const char *s_addressing_modes[] = {
       "<invalid mode>",

@@ -1,10 +1,10 @@
 import fs from 'fs';
-import { glob } from 'glob';
+import { Glob } from "bun";
 import path from 'path';
 
 function transform(inputFilePaths: string[], outputDir: string): void {
     try {
-        const combinedTsContent: { [key: string]: Set<string> } = {};
+        const combinedTsContent: { [key: string]: { entries: Set<string>, comment?: string } } = {};
 
         for (const inputFilePath of inputFilePaths) {
             const fileName = path.basename(inputFilePath, '.h');
@@ -15,27 +15,30 @@ function transform(inputFilePaths: string[], outputDir: string): void {
             const lines = hFileContent.split("\n");
             let isInEnum = false;
             let current = "";
-
+            let commentBuffer = '';
             for (const line of lines) {
-                if (/enum \S+.*{/g.test(line)) {
+                if (/^\s*\/\/\s*/.test(line)) {
+                    commentBuffer += line.trim() + '\n';
+                } else if (/enum \S+.*{/g.test(line)) {
                     const name = /enum (\S+)/.exec(line)[1];
                     current = name;
                     enums[name] = new Set();
-                    combinedTsContent[name] = combinedTsContent[name] || new Set();
+                    combinedTsContent[name] = { entries: new Set(), comment: commentBuffer.trim() };
                     isInEnum = true;
+                    commentBuffer = '';
                 } else if (isInEnum && line.includes("}")) {
                     isInEnum = false;
                 } else if (isInEnum) {
                     const entry = line.replace(/(\d*)U/g, "$1");
                     enums[current].add(entry);
-                    combinedTsContent[current].add(entry);
+                    combinedTsContent[current].entries.add(entry);
                 }
             }
 
             for (const key in enums) {
-                const enumEntries = enums[key];
-                tsContent += `export enum ${key} {\n`;
-                enumEntries.forEach(entry => tsContent += entry + "\n");
+                const { entries, comment } = combinedTsContent[key];
+                tsContent += `${comment ? comment + '\n' : ''}export enum ${key} {\n`;
+                entries.forEach(entry => tsContent += entry + "\n");
                 tsContent += "}\n\n";
             }
 
@@ -47,8 +50,9 @@ function transform(inputFilePaths: string[], outputDir: string): void {
         const combinedOutputFilePath = path.join(outputDir, 'all_const.ts');
         let combinedTsContentStr = '';
         for (const key in combinedTsContent) {
-            combinedTsContentStr += `export enum ${key} {\n`;
-            combinedTsContent[key].forEach(entry => combinedTsContentStr += entry + "\n");
+            const { entries, comment } = combinedTsContent[key];
+            combinedTsContentStr += `${comment ? comment + '\n' : ''}export enum ${key} {\n`;
+            entries.forEach(entry => combinedTsContentStr += entry + "\n");
             combinedTsContentStr += "}\n\n";
         }
         fs.writeFileSync(combinedOutputFilePath, combinedTsContentStr);
@@ -58,6 +62,10 @@ function transform(inputFilePaths: string[], outputDir: string): void {
     }
 }
 
-const inputFilePaths = glob.sync('capstone/include/capstone/*.h');
+const glob = new Glob("**/*.h");
+
+const inputFilePaths = glob.scanSync({absolute: true, cwd: './capstone/include/capstone'})
+
+console.log(glob.scan('.'))
 const outputDir = 'const';
 transform(inputFilePaths, outputDir);

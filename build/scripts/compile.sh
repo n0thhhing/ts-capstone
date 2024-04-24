@@ -51,6 +51,8 @@ cd build
 cmake --build . -j
 mv libcapstone.a $CURRENT_DIR/build
 
+# irrelevant
+: <<'END_COMMENT'
 EXPORTED_CONSTANTS=(
 	'bindings/python/capstone/arm64_const.py'
 	'bindings/python/capstone/tms320c64x_const.py'
@@ -115,3 +117,4 @@ done
 cd $CURRENT_DIR
 
 combine_files FILES[@] src/constants/all_const.js || echo "Error: Unable to combine files"
+END_COMMENT

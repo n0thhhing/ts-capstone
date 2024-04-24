@@ -13,7 +13,6 @@ test('cs.ARCH_ARM', () => {
   const disassembler = new cs.Capstone(cs.ARCH_ARM, 0);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  let index = 0;
   expect(insns).toEqual([
     {
       id: 358,

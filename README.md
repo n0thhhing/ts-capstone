@@ -13,7 +13,6 @@ import cs, { cs_arch, cs_mode, cs_insn } from "./path/to/wrapper.js"; // soon th
 const arch: cs_arch = cs.ARCH_ARM64; // or cs.ARCH_AARCH64.
 const mode: cs_mode = cs.MODE_ARCH;
 
-// prettier-ignore
 const code: Array<number> = [
   0x00, 0x00, 0x80, 0xd2, // 0x1000: mov x0, #0
   0xfd, 0xfb, 0xff, 0x17, // 0x1004: b #0xfffffffffffffff8
@@ -27,43 +26,66 @@ const code: Array<number> = [
 const disassembler = new cs.Capstone(arch, mode);
 
 const instructions: Array<cs_insn> = disassembler.disasm(code, 0x1000, /* optional length */);
-for (const insn of instructions)
-  console.log(
-    `0x${insn.address.toString(16)}\t${insn.mnemonic}\t${insn.op_str}`,
-  );
-/*
-the instruction array will look sort of like this:
-[
-  {
-    id: 654, // can be found in src/constants/
-    address: 4096, // 0x1000
-    size: 4,
-    mnemonic: "mov",
-    op_str: "x0, #0",
-    bytes: [ 0, 0, 128, 210 ]
+
+// An instruction can be found in this basic format
+const example_insn: cs_insn = {
+    id: 664, // Instruction ID (a numeric ID for the instruction mnemonic)
+    address: 4104, // Address (EIP) of this instruction
+    size: 4, // Size of this instruction
+    mnemonic: 'msr', // Ascii text of instruction mnemonic
+    op_str: 'dbgdtrtx_el0, x12', // Ascii text of instruction operands
+    bytes: [12, 5, 19, 213], // Machine bytes of this instruction, with number of bytes indicated by size above
     // If you have detail enabled you will have
     // a object called detail, most of it depends on
     // the chosen architecture or the instruction
     detail: {
-      regs_write: [ ... ],
-      groups: [ ... ],
-      ​​regs_read: [ ... ],
-      regs_read_count: 1,
-      regs_write_count: 1,
-      groups_count: 1,
-      // ...
+      regs_write: [], // list of implicit registers modified by this insn
+      groups: [6], // list of group this instruction belong to
+      regs_read: [], // list of implicit registers read by this insn
+      regs_read_count: 0, // number of implicit registers read by this insn
+      regs_write_count: 0, // number of implicit registers modified by this insn
+      groups_count: 1, // number of groups this insn belongs to
+      writeback: false, // Instruction has writeback operands.
       // The detail object will have information
       // specific to your chosen architecture, this
       // contains things like operands, registers,
       // and other details involving the instruction.
+      // So... Anything in the object is specific
+      // to cs_arch and the instruction itself.
       arm64: {
-        // ...
-      }
-    }
-  },
-  // ...
-]
-*/
+        operands: [
+          {
+            vector_index: -1,
+            vas: 0,
+            shift: { type: 0, value: 0 },
+            ext: 0,
+            access: 2,
+            type: 68, // ARM64_OP_SYS
+            sys: 38952,
+          },
+          {
+            vector_index: -1,
+            vas: 0,
+            shift: { type: 0, value: 0 },
+            ext: 0,
+            access: 1,
+            type: 1, // ARM64_OP_REG
+            reg: 230,
+          },
+        ],
+        cc: 0,
+        update_flags: false,
+        writeback: false,
+        post_index: false,
+        op_count: 2,
+      },
+    },
+  };
+
+for (const insn of instructions)
+  console.log(
+    `0x${insn.address.toString(16)}\t${insn.mnemonic}\t${insn.op_str}`,
+  );
 
 // if you want to iterate one at a time
 // you can use the disasm_iter method,
@@ -195,11 +217,60 @@ disassembler.reg_name(183); // w15
 
 // insn_name
 
-// this returns the name of the mnemonic
+// This returns the name of the mnemonic
 // corresponding to the id. The id can be
 // found either from the constants file
 // or from disassembly results.
 disassembler.insn_name(191); // s28
+
+// op_index
+
+// This retrieves the "position" of the given type.
+// This can be used to determine operands without
+// having to manually inspect the operands array.
+// This requires the detail object to be present in
+// the insn, so cs.OPT_DETAIL needs to be turned on
+disassembler.op_index(example_insn, cs.ARM64_OP_REG, 1) // 1
+
+// op_count
+
+// This retrieves the operand count for the input
+// type provided an insn, which allows you to easily
+// tell how many of a certain type is present in the // object while not having to manually inspect the
+// detail object. This requires the detail object to
+// be present in the insn, so cs.OPT_DETAIL needs
+// to be turned on
+disassembler.op_count(example_insn, cs.ARM64_OP_REG) // 1
+
+// regs_access
+
+// Retrieve all the registers accessed by an
+// instruction, either explicitly or implicitly.
+disassembler.regs_access(example_insn) // { regs_read: [], regs_read_count: 0, regs_write: [], regs_write_count: 0 }
+
+// reg_read
+
+// Check if a disassembled instruction IMPLICITLY
+// used a particular register. These registers can
+// be found in the constants file corresponding to
+// your chosen architecture (constants/<arch>_const.js)
+disassembler.regs_read(example_insn, cs.ARM64_REG_NZCV) // false
+
+// reg_write
+
+// Check if a disassembled instruction IMPLICITLY
+// modified a particular register. These registers can
+// be found in the constants file corresponding to
+// your chosen architecture (constants/<arch>_const.js)
+disassembler.regs_write(example_insn, cs.ARM64_REG_B0) // false
+
+// insn_group
+
+// Check if a disassembled instruction belong to a
+// particular group. You can find these groups
+// in the constants file corresponding to your
+// chosen architecture (constants/<arch>_const.js
+disassembler.insn_group(example_insn, cs.ARM64_GRP_PRIVILEGE) // true
 
 // close
 
@@ -228,18 +299,18 @@ the best of my ability some helper functions and options
 haven't and soon will if they are relivant, all of this includes
 the following.
 
-| Case             | Compatibility |                                                            Notes |
-| :--------------- | :-----------: | ---------------------------------------------------------------: |
-| Detail           |      ✅       |                    Everything has also been checked and verified |
-| Architectures    |      ✅       |                                        Eveything relative to 5.0 |
-| Options          |      ❌       |                        OPT_MEM, OPT_SKIPDATA_SETUP, OPT_UNSIGNED |
-| Helper functions |      ❌       | reg_read, reg_write, insn_group, op_index, op_count, regs_access |
-| Web              |      ❔       |                                                         untested |
+| Case             | Compatibility |                                                       Notes |
+| :--------------- | :-----------: | ----------------------------------------------------------: |
+| Detail           |      ✅       |               Everything has also been checked and verified |
+| Architectures    |      ✅       |                                   Eveything relative to 5.0 |
+| Options          |      ❌       |                   OPT_MEM, OPT_SKIPDATA_SETUP, OPT_UNSIGNED |
+| Helper functions |      ✅       | Everything including helper functions have been implemented |
+| Web              |      ❔       |                                                    untested |
 
 ## TODO
 
 - [ ] Implement all the options
-- [ ] Add support for all small helper functions
+- [x] Add support for all small helper functions
 - [ ] Make an npm package
 - [ ] Add better tests
 - [x] Implement cs_detail

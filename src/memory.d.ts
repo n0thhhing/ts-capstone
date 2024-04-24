@@ -62,6 +62,7 @@ export declare namespace Memory {
   const allocations: Set<ptr>;
   function malloc(size: number): ptr;
   function free(mem: ptr | Set<ptr> | Array<ptr>): void;
+  function clean(): void;
   function write(
     pointer: ptr,
     value: any,

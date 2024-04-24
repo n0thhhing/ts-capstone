@@ -1,6 +1,7 @@
 EXPORTED_FUNCTIONS=(
 	malloc
 	free
+	printf
 	cs_close
 	cs_open
 	cs_option
