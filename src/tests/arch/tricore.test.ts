@@ -9,9 +9,19 @@ test('cs.ARCH_TRICORE', () => {
   ]);
 
   const disassembler = new cs.Capstone(cs.ARCH_TRICORE, cs.MODE_TRICORE_162);
+  disassembler.option(cs.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  expect(insns).toEqual([
+  expect(
+    insns.map(({ id, address, size, mnemonic, op_str, bytes }) => ({
+      id,
+      address,
+      size,
+      mnemonic,
+      op_str,
+      bytes,
+    })),
+  ).toEqual([
     {
       id: 165,
       address: 4096,

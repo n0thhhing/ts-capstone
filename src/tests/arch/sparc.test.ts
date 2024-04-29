@@ -14,9 +14,19 @@ test('cs.ARCH_SPARC', () => {
     cs.ARCH_SPARC,
     cs.MODE_BIG_ENDIAN + cs.MODE_V9,
   );
+  disassembler.option(cs.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  expect(insns).toEqual([
+  expect(
+    insns.map(({ id, address, size, mnemonic, op_str, bytes }) => ({
+      id,
+      address,
+      size,
+      mnemonic,
+      op_str,
+      bytes,
+    })),
+  ).toEqual([
     {
       id: 33,
       address: 4096,

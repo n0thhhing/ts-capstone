@@ -1,7 +1,8 @@
 EXPORTED_FUNCTIONS=(
+	cs_insn_offset
+	x86_rel_addr
 	malloc
 	free
-	printf
 	cs_close
 	cs_open
 	cs_option
@@ -23,6 +24,7 @@ EXPORTED_FUNCTIONS=(
 	cs_op_count
 	cs_op_index
 )
+
 METHODS=(
 	stringToNewUTF8
 	#POINTER_SIZE
@@ -57,4 +59,4 @@ EMSCRIPTEN_SETTINGS=(
 	--memory-init-file 0
 )
 
-emcc build/libcapstone.a ${EMSCRIPTEN_SETTINGS[*]} -o src/capstone.js
+emcc build/libcapstone.a src/macros.c ${EMSCRIPTEN_SETTINGS[*]} -o ./src/capstone.js

@@ -11,9 +11,19 @@ test('cs.ARCH_MIPS', () => {
     cs.ARCH_MIPS,
     cs.MODE_MIPS32 | cs.MODE_BIG_ENDIAN,
   );
+  disassembler.option(cs.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  expect(insns).toEqual([
+  expect(
+    insns.map(({ id, address, size, mnemonic, op_str, bytes }) => ({
+      id,
+      address,
+      size,
+      mnemonic,
+      op_str,
+      bytes,
+    })),
+  ).toEqual([
     {
       id: 337,
       address: 4096,

@@ -6,9 +6,19 @@ test('cs.ARCH_WASM', () => {
     0x20, 0x00, 0x20, 0x01, 0x41, 0x20, 0x10, 0xc9, 0x01, 0x45, 0x0b,
   ]);
   const disassembler = new cs.Capstone(cs.ARCH_WASM, 0);
+  disassembler.option(cs.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  expect(insns).toEqual([
+  expect(
+    insns.map(({ id, address, size, mnemonic, op_str, bytes }) => ({
+      id,
+      address,
+      size,
+      mnemonic,
+      op_str,
+      bytes,
+    })),
+  ).toEqual([
     {
       id: 32,
       address: 4096,

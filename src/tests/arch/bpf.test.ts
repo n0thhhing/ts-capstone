@@ -9,9 +9,19 @@ test('cs.ARCH_BPF', () => {
     0x00, 0x00, 0x00, 0x00, 0x6d, 0x33, 0x17, 0x02, 0x00, 0x00, 0x00, 0x00,
   ]);
   const disassembler = new cs.Capstone(cs.ARCH_BPF, cs.MODE_BPF_EXTENDED);
+  disassembler.option(cs.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  expect(insns).toEqual([
+  expect(
+    insns.map(({ id, address, size, mnemonic, op_str, bytes }) => ({
+      id,
+      address,
+      size,
+      mnemonic,
+      op_str,
+      bytes,
+    })),
+  ).toEqual([
     {
       id: 23,
       address: 4096,

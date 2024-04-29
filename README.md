@@ -1,4 +1,4 @@
-This module provides thin bindings for the Capstone disassembly framework.
+This module provides bindings for the Capstone disassembly framework.
 
 ```bash
 # soon this will be a npm package
@@ -8,7 +8,7 @@ git clone https://github.com/n0thhhing/capstone-wrapper
 ## Example
 
 ```typescript
-import cs, { cs_arch, cs_mode, cs_insn } from "./path/to/wrapper.js"; // soon this will be a package to import via npm, bun, yarn ect ...
+import cs, { cs_arch, cs_mode, cs_insn, ARM64 } from "./path/to/wrapper.js"; // soon this will be a package to import via npm, bun, yarn ect ...
 
 const arch: cs_arch = cs.ARCH_ARM64; // or cs.ARCH_AARCH64.
 const mode: cs_mode = cs.MODE_ARCH;
@@ -60,7 +60,7 @@ const example_insn: cs_insn = {
             shift: { type: 0, value: 0 },
             ext: 0,
             access: 2,
-            type: 68, // ARM64_OP_SYS
+            type: 68, // ARM64.OP_SYS
             sys: 38952,
           },
           {
@@ -69,7 +69,7 @@ const example_insn: cs_insn = {
             shift: { type: 0, value: 0 },
             ext: 0,
             access: 1,
-            type: 1, // ARM64_OP_REG
+            type: 1, // ARM64.OP_REG
             reg: 230,
           },
         ],
@@ -131,7 +131,7 @@ while (disassembler.disasm_iter(data)) {
 // To reset the mnemonic, recall this with the same
 // id, but with mnemonic set to null(JavaScript null)
 const mnObj = {
-  id: 191, // the id returned in the insn object, in this case, its movz, you can also find more in the constants directory.
+  id: 191, // the id returned in the insn object, in this case, its movz, you can also find more in the Typescript file corresponding to your arch (arch/<arch>.ts)
   mnemonic: "foo", // the new name of the mnemonic, or null
 };
 disassembler.option(
@@ -204,14 +204,14 @@ cs.version(); // 5.0
 // This returns the name of the group
 // that an instruction can belong to
 // These groups can be found in the
-// constants directory or the detail obj
+// arch/<arch>.ts file or the detail obj
 // when CS_DETAIL is turned on.
 disassembler.group_name(2) // call
 
 // reg_name
 
 // These register IDs can be found either in
-// the constants directory or the detail object
+// the arch/<arch>.ts file or the detail object
 // when cs.DETAIL is on, like regs_read/regs_write.
 disassembler.reg_name(183); // w15
 
@@ -219,8 +219,8 @@ disassembler.reg_name(183); // w15
 
 // This returns the name of the mnemonic
 // corresponding to the id. The id can be
-// found either from the constants file
-// or from disassembly results.
+// found either from the (arch/<arch>.ts)
+// file or from disassembly results.
 disassembler.insn_name(191); // s28
 
 // op_index
@@ -230,7 +230,7 @@ disassembler.insn_name(191); // s28
 // having to manually inspect the operands array.
 // This requires the detail object to be present in
 // the insn, so cs.OPT_DETAIL needs to be turned on
-disassembler.op_index(example_insn, cs.ARM64_OP_REG, 1) // 1
+disassembler.op_index(example_insn, ARM64.OP_REG, 1) // 1
 
 // op_count
 
@@ -240,7 +240,7 @@ disassembler.op_index(example_insn, cs.ARM64_OP_REG, 1) // 1
 // detail object. This requires the detail object to
 // be present in the insn, so cs.OPT_DETAIL needs
 // to be turned on
-disassembler.op_count(example_insn, cs.ARM64_OP_REG) // 1
+disassembler.op_count(example_insn, ARM64.OP_REG) // 1
 
 // regs_access
 
@@ -253,24 +253,24 @@ disassembler.regs_access(example_insn) // { regs_read: [], regs_read_count: 0, r
 // Check if a disassembled instruction IMPLICITLY
 // used a particular register. These registers can
 // be found in the constants file corresponding to
-// your chosen architecture (constants/<arch>_const.js)
-disassembler.regs_read(example_insn, cs.ARM64_REG_NZCV) // false
+// your chosen architecture (arch/<arch>.ts)
+disassembler.regs_read(example_insn, ARM64.REG_NZCV) // false
 
 // reg_write
 
 // Check if a disassembled instruction IMPLICITLY
 // modified a particular register. These registers can
 // be found in the constants file corresponding to
-// your chosen architecture (constants/<arch>_const.js)
-disassembler.regs_write(example_insn, cs.ARM64_REG_B0) // false
+// your chosen architecture (arch/<arch>.ts)
+disassembler.regs_write(example_insn, ARM64.REG_B0) // false
 
 // insn_group
 
 // Check if a disassembled instruction belong to a
 // particular group. You can find these groups
 // in the constants file corresponding to your
-// chosen architecture (constants/<arch>_const.js
-disassembler.insn_group(example_insn, cs.ARM64_GRP_PRIVILEGE) // true
+// chosen architecture (arch/<arch>.ts)
+disassembler.insn_group(example_insn, ARM64.GRP_PRIVILEGE) // true
 
 // close
 
@@ -289,8 +289,8 @@ you can also take a look at the [tests](src/tests)
 
 if you would like to see all the options and capstone
 constants, you can find them in either the [wrapper.ts](src/wrapper.ts)
-file or the [constants](src/constants) or things like register ids, options,
-error codes, groups, opcodes, manifest constants, ect
+file or the [typescript file](src/arch) (arch/<arch>.ts) for things like register ids, options,
+error codes, groups, opcodes, manifest constants, insns, ect
 
 ## Compatibility
 
@@ -363,8 +363,9 @@ The makefile provides some commands for necessary builds, which includes
 
 ### Initializing
 
-```javascript
+```typescript
 import Module from './capstone.js'; // capstone.js should be in the src directory after building
+import Memory from './memory.ts' // utilities for working with memory
 
 const Capstone = new Module();
 // Use as necessary

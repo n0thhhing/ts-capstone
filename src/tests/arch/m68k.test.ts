@@ -16,9 +16,19 @@ test('cs.ARCH_M68K', () => {
     0x4e, 0x71, 0x46, 0x06, 0x4e, 0x71,
   ]);
   const disassembler = new cs.Capstone(cs.ARCH_M68K, cs.MODE_M68K_020);
+  disassembler.option(cs.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  expect(insns).toEqual([
+  expect(
+    insns.map(({ id, address, size, mnemonic, op_str, bytes }) => ({
+      id,
+      address,
+      size,
+      mnemonic,
+      op_str,
+      bytes,
+    })),
+  ).toEqual([
     {
       id: 291,
       address: 4096,

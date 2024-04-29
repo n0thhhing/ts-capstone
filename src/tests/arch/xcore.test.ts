@@ -8,9 +8,19 @@ test('cs.ARCH_XCORE', () => {
     0x02, 0x06, 0x1b, 0x10, 0x09, 0xfd, 0xec, 0xa7,
   ]);
   const disassembler = new cs.Capstone(cs.ARCH_XCORE, cs.MODE_BIG_ENDIAN);
+  disassembler.option(cs.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  expect(insns).toEqual([
+  expect(
+    insns.map(({ id, address, size, mnemonic, op_str, bytes }) => ({
+      id,
+      address,
+      size,
+      mnemonic,
+      op_str,
+      bytes,
+    })),
+  ).toEqual([
     {
       id: 43,
       address: 4096,

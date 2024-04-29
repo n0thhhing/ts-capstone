@@ -9,9 +9,19 @@ test('cs.ARCH_SYSZ', () => {
     0xb2, 0x4f, 0x00, 0x78, 0xec, 0x18, 0x00, 0x00, 0xc1, 0x7f,
   ]);
   const disassembler = new cs.Capstone(cs.ARCH_SYSZ, cs.MODE_BIG_ENDIAN);
+  disassembler.option(cs.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  expect(insns).toEqual([
+  expect(
+    insns.map(({ id, address, size, mnemonic, op_str, bytes }) => ({
+      id,
+      address,
+      size,
+      mnemonic,
+      op_str,
+      bytes,
+    })),
+  ).toEqual([
     {
       id: 2,
       address: 4096,

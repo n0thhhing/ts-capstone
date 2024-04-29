@@ -1,6 +1,80 @@
 import Module from './capstone';
 import { Memory } from './memory';
 
+import {
+  // ARM64 architecture
+  type cs_arm64_op,
+  ARM64,
+  cs_arm64,
+  // ARM architecture
+  type cs_arm_op,
+  ARM,
+  cs_arm,
+  // BPF architecture
+  type cs_bpf_op,
+  BPF,
+  cs_bpf,
+  // EVM architecture
+  EVM,
+  cs_evm,
+  // M680X architecture
+  type cs_m680x_op,
+  M680X,
+  cs_m680x,
+  // M68K architecture
+  type cs_m68k_op,
+  M68K,
+  cs_m68k,
+  // MIPS architecture
+  type cs_mips_op,
+  MIPS,
+  cs_mips,
+  // MOS65XX architecture
+  type cs_mos65xx_op,
+  MOS65XX,
+  cs_mos65xx,
+  // PPC architecture
+  type cs_ppc_op,
+  PPC,
+  cs_ppc,
+  // RISCV architecture
+  type cs_riscv_op,
+  RISCV,
+  cs_riscv,
+  // SH architecture
+  type cs_sh_op,
+  SH,
+  cs_sh,
+  // SPARC architecture
+  type cs_sparc_op,
+  SPARC,
+  cs_sparc,
+  // TMS320C64X architecture
+  type cs_tms320c64x_op,
+  TMS320C64X,
+  cs_tms320c64x,
+  // TRICORE architecture
+  type cs_tricore_op,
+  TRICORE,
+  cs_tricore,
+  // WASM architecture
+  type cs_wasm_op,
+  WASM,
+  cs_wasm,
+  // X86 architecture
+  type cs_x86_op,
+  X86,
+  cs_x86,
+  // XCORE architecture
+  type cs_xcore_op,
+  XCORE,
+  cs_xcore,
+  // SYSZ architecture
+  type cs_sysz_op,
+  SYSZ,
+  cs_sysz,
+} from './arch';
+
 const Wrapper: wasm_module = Module() as wasm_module;
 
 type cs_err = number; // All type of errors encountered by Capstone API. These are values returned by cs_errno()
@@ -49,6 +123,8 @@ interface wasm_module {
     op_type: number,
     position: number,
   ) => number; // Retrieve the position of operand of given type in <arch>.operands[] array.
+  _cs_insn_offset: (insns: ptr, post: number) => number; // Calculate the offset of a disassembled instruction in its buffer, given its position in its array of disassembled insn
+  _x86_rel_addr: (insn: ptr) => number; // Calculate relative address for X86-64, given cs_insn structure
   ccall: (
     ident: string, // name of C function
     returnType: wasm_arg, // return type
@@ -288,9 +364,6 @@ namespace cs {
   // Manifest Constants
   export const MNEMONIC_SIZE = 32;
   export const INSN_SIZE = 240;
-  export const M68K_OPERAND_COUNT = 4;
-  export const M680X_OPERAND_COUNT = 9;
-  export const TRICORE_OP_COUNT = 8;
   export const MAX_IMPL_W_REGS = 20;
   export const MAX_IMPL_R_REGS = 20;
   export const MAX_NUM_GROUPS = 8;
@@ -333,47 +406,39 @@ namespace cs {
     private arch: cs_arch;
     private mode: cs_mode;
     private handle_ptr: ptr;
+    private arch_info: { instance: any; entry: string };
 
     constructor(arch: number, mode: number) {
       this.arch = arch;
       this.mode = mode;
       this.handle_ptr = 0;
       this.open();
-      this.init(arch);
+      this.arch_info = this.init(arch);
     }
 
-    private init(arch: cs_arch) {
-      const arch_map: { [key: number]: string } = {
-        [cs.ARCH_ARM]: 'arm',
-        [cs.ARCH_ARM64]: 'arm64',
-        [cs.ARCH_AARCH64]: 'arm64',
-        [cs.ARCH_MIPS]: 'mips',
-        [cs.ARCH_X86]: 'x86',
-        [cs.ARCH_PPC]: 'ppc',
-        [cs.ARCH_SPARC]: 'sparc',
-        [cs.ARCH_SYSZ]: 'sysz',
-        [cs.ARCH_XCORE]: 'xcore',
-        [cs.ARCH_TMS320C64X]: 'tms320c64x',
-        [cs.ARCH_M680X]: 'm680x',
-        [cs.ARCH_M68K]: 'm68k',
-        [cs.ARCH_EVM]: 'evm',
-        [cs.ARCH_MOS65XX]: 'mos65xx',
-        [cs.ARCH_WASM]: 'wasm',
-        [cs.ARCH_BPF]: 'bpf',
-        [cs.ARCH_RISCV]: 'riscv',
-        [cs.ARCH_SH]: 'sh',
-        [cs.ARCH_TRICORE]: 'tricore',
-        [cs.ARCH_MAX]: 'all',
-        [cs.ARCH_ALL]: 'all',
+    private init(arch: cs_arch): { instance: Function; entry: string } {
+      const arch_map: { [key: number]: { instance: any; entry: string } } = {
+        [cs.ARCH_ARM]: { instance: cs_arm, entry: 'arm' },
+        [cs.ARCH_ARM64]: { instance: cs_arm64, entry: 'arm64' },
+        [cs.ARCH_AARCH64]: { instance: cs_arm64, entry: 'arm64' },
+        [cs.ARCH_MIPS]: { instance: cs_mips, entry: 'mips' },
+        [cs.ARCH_X86]: { instance: cs_x86, entry: 'x86' },
+        [cs.ARCH_PPC]: { instance: cs_ppc, entry: 'ppc' },
+        [cs.ARCH_SPARC]: { instance: cs_sparc, entry: 'sparc' },
+        [cs.ARCH_SYSZ]: { instance: cs_sysz, entry: 'sysz' },
+        [cs.ARCH_XCORE]: { instance: cs_xcore, entry: 'xcore' },
+        [cs.ARCH_TMS320C64X]: { instance: cs_tms320c64x, entry: 'tms320c64x' },
+        [cs.ARCH_M680X]: { instance: cs_m680x, entry: 'm680x' },
+        [cs.ARCH_M68K]: { instance: cs_m68k, entry: 'm68k' },
+        [cs.ARCH_EVM]: { instance: cs_evm, entry: 'evm' },
+        [cs.ARCH_MOS65XX]: { instance: cs_mos65xx, entry: 'mos65xx' },
+        [cs.ARCH_WASM]: { instance: cs_wasm, entry: 'wasm' },
+        [cs.ARCH_BPF]: { instance: cs_bpf, entry: 'bpf' },
+        [cs.ARCH_RISCV]: { instance: cs_riscv, entry: 'riscv' },
+        [cs.ARCH_SH]: { instance: cs_sh, entry: 'sh' },
+        [cs.ARCH_TRICORE]: { instance: cs_tricore, entry: 'tricore' },
       };
-
-      const constants: { [key: string]: number } = require(
-        `./constants/${arch_map[arch]}_const`,
-      );
-
-      for (const key in constants) {
-        cs[key] = constants[key];
-      }
+      return arch_map[arch];
     }
 
     private deref(insn_ptr: ptr): cs_insn {
@@ -403,874 +468,904 @@ namespace cs {
       return insn;
     }
 
-    private ref(insn: cs_insn): ptr {
-      const insn_ptr: ptr = Memory.malloc(INSN_SIZE);
+    private ref(insns: Array<cs_insn>): ptr {
+      const count = insns.length;
+      const insns_ptr: ptr = Memory.malloc(INSN_SIZE * count);
+      for (let i = 0; i < count; i++) {
+        const insn = insns[i];
+        const insn_ptr = insns_ptr + i * INSN_SIZE;
+        insn.id !== undefined &&
+          insn.id !== null &&
+          Memory.write(insn_ptr, insn.id, 'i32');
+        insn.address !== undefined &&
+          insn.address !== null &&
+          Memory.write(insn_ptr + 8, insn.address, 'i64');
+        insn.size !== undefined &&
+          insn.size !== null &&
+          Memory.write(insn_ptr + 16, insn.size, 'i16');
+        insn.mnemonic !== undefined &&
+          insn.mnemonic !== null &&
+          Memory.write(insn_ptr + 42, insn.mnemonic, 'char*');
+        insn.op_str !== undefined &&
+          insn.op_str !== null &&
+          Memory.write(insn_ptr + 66 + 8, insn.op_str, 'char*');
 
-      insn.id && Memory.write(insn_ptr, insn.id, 'i32');
-      insn.address && Memory.write(insn_ptr + 8, insn.address, 'i64');
-      insn.size && Memory.write(insn_ptr + 16, insn.size, 'i16');
-      insn.mnemonic && Memory.write(insn_ptr + 42, insn.mnemonic, 'char*');
-      insn.op_str && Memory.write(insn_ptr + 66 + 8, insn.op_str, 'char*');
+        for (let j = 0; j < insn.size; j++) {
+          insn.bytes[j] !== undefined &&
+            insn.bytes[j] !== null &&
+            Memory.write(insn_ptr + 18 + j, insn.bytes[j], 'u8');
+        }
 
-      for (let j = 0; j < insn.size; j++) {
-        insn.bytes[j] && Memory.write(insn_ptr + 18 + j, insn.bytes[j], 'u8');
-      }
-
-      if (insn.detail) {
-        const detail: ptr = insn_ptr + 238;
-        const detail_ptr = Memory.malloc(1864);
-        const arch_info_ptr: ptr = detail_ptr + 96;
-        let arch;
-        let op_ptr;
-        let op;
-        Memory.write(detail, detail_ptr, '*');
-        for (let i = 0; i < insn.detail.regs_read_count; i++)
-          insn.detail.regs_read !== undefined &&
-            insn.detail.regs_read !== null &&
-            Memory.write(detail_ptr + i, insn.detail.regs_read[i], 'i16');
-        insn.detail.regs_read_count !== undefined &&
-          insn.detail.regs_read_count !== null &&
-          Memory.write(detail_ptr + 40, insn.detail.regs_read_count, 'ubyte');
-        for (let i = 0; i < insn.detail.regs_write_count; i++)
-          insn.detail.regs_write[i] !== undefined &&
-            insn.detail.regs_write[i] !== null &&
-            Memory.write(detail_ptr + 42 + i, insn.detail.regs_write[i], 'i16');
-        insn.detail.regs_write_count !== undefined &&
-          insn.detail.regs_write_count !== null &&
-          Memory.write(detail_ptr + 82, insn.detail.regs_write_count, 'ubyte');
-        for (let i = 0; i < insn.detail.groups_count; i++)
-          insn.detail.groups[i] !== undefined &&
-            insn.detail.groups[i] !== null &&
-            Memory.write(detail_ptr + 83 + i, insn.detail.groups[i], 'ubyte');
-        insn.detail.groups_count !== undefined &&
-          insn.detail.groups_count !== null &&
-          Memory.write(detail_ptr + 91, insn.detail.groups_count, 'ubyte');
-        insn.detail.writeback !== undefined &&
-          insn.detail.writeback !== null &&
-          Memory.write(detail_ptr + 92, insn.detail.writeback, 'bool');
-        switch (this.arch) {
-          case ARCH_ARM:
-            arch = insn.detail.arm;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 32, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 40 + i * 48;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr + 12, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.ARM_OP_SYSREG:
-                case cs.ARM_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 16, op.reg, 'i32');
-                  break;
-                case cs.ARM_OP_IMM:
-                case cs.ARM_OP_PIMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 16, op.imm, 'i32');
-                  break;
-                case cs.ARM_OP_FP:
-                  op.fp !== undefined &&
-                    op.fp !== null &&
-                    Memory.write(op_ptr + 16, op.fp, 'double');
-                  break;
-                case cs.ARM_OP_SETEND:
-                  op.setend !== undefined &&
-                    op.setend !== null &&
-                    Memory.write(op_ptr + 16, op.setend, 'i32');
-                  break;
-                case cs.ARM_OP_MEM:
-                  op.mem.base !== undefined &&
-                    op.mem.base !== null &&
-                    Memory.write(op_ptr + 16, op.mem.base, 'i32');
-                  op.mem.index !== undefined &&
-                    op.mem.index !== null &&
-                    Memory.write(op_ptr + 20, op.mem.index, 'i32');
-                  op.mem.scale !== undefined &&
-                    op.mem.scale !== null &&
-                    Memory.write(op_ptr + 24, op.mem.scale, 'i32');
-                  op.mem.disp !== undefined &&
-                    op.mem.disp !== null &&
-                    Memory.write(op_ptr + 28, op.mem.disp, 'i32');
-                  op.mem.lshift !== undefined &&
-                    op.mem.lshift !== null &&
-                    Memory.write(op_ptr + 32, op.mem.lshift, 'i32');
-                  break;
+        if (insn.detail) {
+          const detail: ptr = insn_ptr + 238;
+          const detail_ptr = Memory.malloc(1864);
+          const arch_info_ptr: ptr = detail_ptr + 96;
+          let arch;
+          let op_ptr;
+          let op;
+          Memory.write(detail, detail_ptr, '*');
+          for (let i = 0; i < insn.detail.regs_read_count; i++)
+            insn.detail.regs_read !== undefined &&
+              insn.detail.regs_read !== null &&
+              Memory.write(detail_ptr + i, insn.detail.regs_read[i], 'i16');
+          insn.detail.regs_read_count !== undefined &&
+            insn.detail.regs_read_count !== null &&
+            Memory.write(detail_ptr + 40, insn.detail.regs_read_count, 'ubyte');
+          for (let i = 0; i < insn.detail.regs_write_count; i++)
+            insn.detail.regs_write[i] !== undefined &&
+              insn.detail.regs_write[i] !== null &&
+              Memory.write(
+                detail_ptr + 42 + i,
+                insn.detail.regs_write[i],
+                'i16',
+              );
+          insn.detail.regs_write_count !== undefined &&
+            insn.detail.regs_write_count !== null &&
+            Memory.write(
+              detail_ptr + 82,
+              insn.detail.regs_write_count,
+              'ubyte',
+            );
+          for (let i = 0; i < insn.detail.groups_count; i++)
+            insn.detail.groups[i] !== undefined &&
+              insn.detail.groups[i] !== null &&
+              Memory.write(detail_ptr + 83 + i, insn.detail.groups[i], 'ubyte');
+          insn.detail.groups_count !== undefined &&
+            insn.detail.groups_count !== null &&
+            Memory.write(detail_ptr + 91, insn.detail.groups_count, 'ubyte');
+          insn.detail.writeback !== undefined &&
+            insn.detail.writeback !== null &&
+            Memory.write(detail_ptr + 92, insn.detail.writeback, 'bool');
+          switch (this.arch) {
+            case ARCH_ARM:
+              arch = insn.detail.arm;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 32, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 40 + i * 48;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr + 12, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case ARM.OP_SYSREG:
+                  case ARM.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 16, op.reg, 'i32');
+                    break;
+                  case ARM.OP_IMM:
+                  case ARM.OP_PIMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 16, op.imm, 'i32');
+                    break;
+                  case ARM.OP_FP:
+                    op.fp !== undefined &&
+                      op.fp !== null &&
+                      Memory.write(op_ptr + 16, op.fp, 'double');
+                    break;
+                  case ARM.OP_SETEND:
+                    op.setend !== undefined &&
+                      op.setend !== null &&
+                      Memory.write(op_ptr + 16, op.setend, 'i32');
+                    break;
+                  case ARM.OP_MEM:
+                    op.mem.base !== undefined &&
+                      op.mem.base !== null &&
+                      Memory.write(op_ptr + 16, op.mem.base, 'i32');
+                    op.mem.index !== undefined &&
+                      op.mem.index !== null &&
+                      Memory.write(op_ptr + 20, op.mem.index, 'i32');
+                    op.mem.scale !== undefined &&
+                      op.mem.scale !== null &&
+                      Memory.write(op_ptr + 24, op.mem.scale, 'i32');
+                    op.mem.disp !== undefined &&
+                      op.mem.disp !== null &&
+                      Memory.write(op_ptr + 28, op.mem.disp, 'i32');
+                    op.mem.lshift !== undefined &&
+                      op.mem.lshift !== null &&
+                      Memory.write(op_ptr + 32, op.mem.lshift, 'i32');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_ARM64:
-            arch = insn.detail.arm64;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 7, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 8 + i * 56;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr + 20, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.ARM64_OP_REG:
-                case cs.ARM64_OP_REG_MRS:
-                case cs.ARM64_OP_REG_MSR:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 32, op.reg, 'i32');
-                  break;
-                case cs.ARM64_OP_CIMM:
-                case cs.ARM64_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 32, op.imm, 'i64');
-                  break;
-                case cs.ARM64_OP_FP:
-                  op.fp !== undefined &&
-                    op.fp !== null &&
-                    Memory.write(op_ptr + 32, op.fp, 'double');
-                  break;
-                case cs.ARM64_OP_PSTATE:
-                  op.pstate !== undefined &&
-                    op.pstate !== null &&
-                    Memory.write(op_ptr + 32, op.pstate, 'i32');
-                  break;
-                case cs.ARM64_OP_SYS:
-                  op.sys !== undefined &&
-                    op.sys !== null &&
-                    Memory.write(op_ptr + 32, op.sys, 'i32');
-                  break;
-                case cs.ARM64_OP_BARRIER:
-                  op.barrier !== undefined &&
-                    op.barrier !== null &&
-                    Memory.write(op_ptr + 32, op.barrier, 'i32');
-                  break;
-                case cs.ARM64_OP_PREFETCH:
-                  op.prefetch !== undefined &&
-                    op.prefetch !== null &&
-                    Memory.write(op_ptr + 32, op.prefetch, 'i32');
-                  break;
-                case cs.ARM64_OP_MEM:
-                  op.mem.base !== undefined &&
-                    op.mem.base !== null &&
-                    Memory.write(op_ptr + 32, op.mem.base, 'i32');
-                  op.mem.index !== undefined &&
-                    op.mem.index !== null &&
-                    Memory.write(op_ptr + 36, op.mem.index, 'i32');
-                  op.mem.disp !== undefined &&
-                    op.mem.disp !== null &&
-                    Memory.write(op_ptr + 32, op.mem.disp, 'i32');
-                  break;
-                case cs.ARM64_OP_SVCR:
-                  op.sme_index.reg !== undefined &&
-                    op.sme_index.reg !== null &&
-                    Memory.write(op_ptr + 32, op.sme_index.reg, 'i32');
-                  op.sme_index.base !== undefined &&
-                    op.sme_index.base !== null &&
-                    Memory.write(op_ptr + 36, op.sme_index.base, 'i32');
-                  op.sme_index.disp !== undefined &&
-                    op.sme_index.disp !== null &&
-                    Memory.write(op_ptr + 40, op.sme_index.disp, 'i32');
-                  break;
+              break;
+            case ARCH_ARM64:
+              arch = insn.detail.arm64;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 7, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 8 + i * 56;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr + 20, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case ARM64.OP_REG:
+                  case ARM64.OP_REG_MRS:
+                  case ARM64.OP_REG_MSR:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 32, op.reg, 'i32');
+                    break;
+                  case ARM64.OP_CIMM:
+                  case ARM64.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 32, op.imm, 'i64');
+                    break;
+                  case ARM64.OP_FP:
+                    op.fp !== undefined &&
+                      op.fp !== null &&
+                      Memory.write(op_ptr + 32, op.fp, 'double');
+                    break;
+                  case ARM64.OP_PSTATE:
+                    op.pstate !== undefined &&
+                      op.pstate !== null &&
+                      Memory.write(op_ptr + 32, op.pstate, 'i32');
+                    break;
+                  case ARM64.OP_SYS:
+                    op.sys !== undefined &&
+                      op.sys !== null &&
+                      Memory.write(op_ptr + 32, op.sys, 'i32');
+                    break;
+                  case ARM64.OP_BARRIER:
+                    op.barrier !== undefined &&
+                      op.barrier !== null &&
+                      Memory.write(op_ptr + 32, op.barrier, 'i32');
+                    break;
+                  case ARM64.OP_PREFETCH:
+                    op.prefetch !== undefined &&
+                      op.prefetch !== null &&
+                      Memory.write(op_ptr + 32, op.prefetch, 'i32');
+                    break;
+                  case ARM64.OP_MEM:
+                    op.mem.base !== undefined &&
+                      op.mem.base !== null &&
+                      Memory.write(op_ptr + 32, op.mem.base, 'i32');
+                    op.mem.index !== undefined &&
+                      op.mem.index !== null &&
+                      Memory.write(op_ptr + 36, op.mem.index, 'i32');
+                    op.mem.disp !== undefined &&
+                      op.mem.disp !== null &&
+                      Memory.write(op_ptr + 32, op.mem.disp, 'i32');
+                    break;
+                  case ARM64.OP_SVCR:
+                    op.sme_index.reg !== undefined &&
+                      op.sme_index.reg !== null &&
+                      Memory.write(op_ptr + 32, op.sme_index.reg, 'i32');
+                    op.sme_index.base !== undefined &&
+                      op.sme_index.base !== null &&
+                      Memory.write(op_ptr + 36, op.sme_index.base, 'i32');
+                    op.sme_index.disp !== undefined &&
+                      op.sme_index.disp !== null &&
+                      Memory.write(op_ptr + 40, op.sme_index.disp, 'i32');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_MIPS:
-            arch = insn.detail.mips;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 8 + i * 24;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.MIPS_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 8, op.reg, 'i32');
-                  break;
-                case cs.MIPS_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 8, op.imm, 'long');
-                  break;
-                case cs.MIPS_OP_MEM:
-                  op.mem.base !== undefined &&
-                    op.mem.base !== null &&
-                    Memory.write(op_ptr + 8, op.mem.base, 'i32');
-                  op.mem.disp !== undefined &&
-                    op.mem.disp !== null &&
-                    Memory.write(op_ptr + 12, op.mem.disp, 'long');
-                  break;
+              break;
+            case ARCH_MIPS:
+              arch = insn.detail.mips;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 8 + i * 24;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case MIPS.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 8, op.reg, 'i32');
+                    break;
+                  case MIPS.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 8, op.imm, 'long');
+                    break;
+                  case MIPS.OP_MEM:
+                    op.mem.base !== undefined &&
+                      op.mem.base !== null &&
+                      Memory.write(op_ptr + 8, op.mem.base, 'i32');
+                    op.mem.disp !== undefined &&
+                      op.mem.disp !== null &&
+                      Memory.write(op_ptr + 12, op.mem.disp, 'long');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_X86:
-            arch = insn.detail.x86;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 64, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 72 + i * 48;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.X86_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 8, op.reg, 'i32');
-                  break;
-                case cs.X86_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 8, op.imm, 'long');
-                  break;
-                case cs.X86_OP_MEM:
-                  op.mem.segment !== undefined &&
-                    op.mem.segment !== null &&
-                    Memory.write(op_ptr + 8, op.mem.segment, 'i32');
-                  op.mem.base !== undefined &&
-                    op.mem.base !== null &&
-                    Memory.write(op_ptr + 12, op.mem.base, 'i32');
-                  op.mem.index !== undefined &&
-                    op.mem.index !== null &&
-                    Memory.write(op_ptr + 16, op.mem.index, 'i32');
-                  op.mem.scale !== undefined &&
-                    op.mem.scale !== null &&
-                    Memory.write(op_ptr + 20, op.mem.scale, 'i32');
-                  break;
+              break;
+            case ARCH_X86:
+              arch = insn.detail.x86;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 64, arch.op_count, 'ubyte');
+              arch.disp !== undefined &&
+                arch.disp !== null &&
+                Memory.write(arch_info_ptr + 16, arch.disp, 'long');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 72 + i * 48;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case X86.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 8, op.reg, 'i32');
+                    break;
+                  case X86.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 8, op.imm, 'long');
+                    break;
+                  case X86.OP_MEM:
+                    op.mem.segment !== undefined &&
+                      op.mem.segment !== null &&
+                      Memory.write(op_ptr + 8, op.mem.segment, 'i32');
+                    op.mem.base !== undefined &&
+                      op.mem.base !== null &&
+                      Memory.write(op_ptr + 12, op.mem.base, 'i32');
+                    op.mem.index !== undefined &&
+                      op.mem.index !== null &&
+                      Memory.write(op_ptr + 16, op.mem.index, 'i32');
+                    op.mem.scale !== undefined &&
+                      op.mem.scale !== null &&
+                      Memory.write(op_ptr + 20, op.mem.scale, 'i32');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_PPC:
-            arch = insn.detail.ppc;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 9, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 16 + i * 24;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.PPC_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 8, op.reg, 'i32');
-                  break;
-                case cs.PPC_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 8, op.imm, 'long');
-                  break;
-                case cs.PPC_OP_CRX:
-                  op.crx.scale !== undefined &&
-                    op.crx.scale !== null &&
-                    Memory.write(op_ptr + 8, op.crx.scale, 'u32');
-                  op.crx.reg !== undefined &&
-                    op.crx.reg !== null &&
-                    Memory.write(op_ptr + 12, op.crx.reg, 'i32');
-                  op.crx.cond !== undefined &&
-                    op.crx.cond !== null &&
-                    Memory.write(op_ptr + 16, op.crx.cond, 'i32');
-                  break;
-                case cs.PPC_OP_MEM:
-                  op.mem.base !== undefined &&
-                    op.mem.base !== null &&
-                    Memory.write(op_ptr + 8, op.mem.base, 'i32');
-                  op.mem.disp !== undefined &&
-                    op.mem.disp !== null &&
-                    Memory.write(op_ptr + 12, op.mem.disp, 'long');
-                  break;
+              break;
+            case ARCH_PPC:
+              arch = insn.detail.ppc;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 9, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 16 + i * 24;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case PPC.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 8, op.reg, 'i32');
+                    break;
+                  case PPC.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 8, op.imm, 'long');
+                    break;
+                  case PPC.OP_CRX:
+                    op.crx.scale !== undefined &&
+                      op.crx.scale !== null &&
+                      Memory.write(op_ptr + 8, op.crx.scale, 'u32');
+                    op.crx.reg !== undefined &&
+                      op.crx.reg !== null &&
+                      Memory.write(op_ptr + 12, op.crx.reg, 'i32');
+                    op.crx.cond !== undefined &&
+                      op.crx.cond !== null &&
+                      Memory.write(op_ptr + 16, op.crx.cond, 'i32');
+                    break;
+                  case PPC.OP_MEM:
+                    op.mem.base !== undefined &&
+                      op.mem.base !== null &&
+                      Memory.write(op_ptr + 8, op.mem.base, 'i32');
+                    op.mem.disp !== undefined &&
+                      op.mem.disp !== null &&
+                      Memory.write(op_ptr + 12, op.mem.disp, 'long');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_SPARC:
-            arch = insn.detail.sparc;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 8, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 16 + i * 16;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.SPARC_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 8, op.reg, 'i32');
-                  break;
-                case cs.SPARC_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr, op.imm, 'i32');
-                  break;
-                case cs.SPARC_OP_MEM:
-                  op.mem.base !== undefined &&
-                    op.mem.base !== null &&
-                    Memory.write(op_ptr + 8, op.mem.base, 'ubyte');
-                  op.mem.index !== undefined &&
-                    op.mem.index !== null &&
-                    Memory.write(op_ptr + 9, op.mem.index, 'ubyte');
-                  op.mem.disp !== undefined &&
-                    op.mem.disp !== null &&
-                    Memory.write(op_ptr + 12, op.mem.disp, 'i32');
-                  break;
+              break;
+            case ARCH_SPARC:
+              arch = insn.detail.sparc;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 8, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 16 + i * 16;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case SPARC.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 8, op.reg, 'i32');
+                    break;
+                  case SPARC.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr, op.imm, 'i32');
+                    break;
+                  case SPARC.OP_MEM:
+                    op.mem.base !== undefined &&
+                      op.mem.base !== null &&
+                      Memory.write(op_ptr + 8, op.mem.base, 'ubyte');
+                    op.mem.index !== undefined &&
+                      op.mem.index !== null &&
+                      Memory.write(op_ptr + 9, op.mem.index, 'ubyte');
+                    op.mem.disp !== undefined &&
+                      op.mem.disp !== null &&
+                      Memory.write(op_ptr + 12, op.mem.disp, 'i32');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_SYSZ:
-            arch = insn.detail.sysz;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 4, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 8 + i * 32;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.SYSZ_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 8, op.reg, 'i32');
-                  break;
-                case cs.SYSZ_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 8, op.imm, 'long');
-                  break;
-                case cs.SYSZ_OP_MEM:
-                  op.mem.base !== undefined &&
-                    op.mem.base !== null &&
-                    Memory.write(op_ptr + 8, op.mem.base, 'ubyte');
-                  op.mem.index !== undefined &&
-                    op.mem.index !== null &&
-                    Memory.write(op_ptr + 9, op.mem.index, 'ubyte');
-                  op.mem.length !== undefined &&
-                    op.mem.length !== null &&
-                    Memory.write(op_ptr + 16, op.mem.length, 'ulong');
-                  op.mem.disp !== undefined &&
-                    op.mem.disp !== null &&
-                    Memory.write(op_ptr + 24, op.mem.disp, 'long');
-                  break;
+              break;
+            case ARCH_SYSZ:
+              arch = insn.detail.sysz;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 4, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 8 + i * 32;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case SYSZ.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 8, op.reg, 'i32');
+                    break;
+                  case SYSZ.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 8, op.imm, 'long');
+                    break;
+                  case SYSZ.OP_MEM:
+                    op.mem.base !== undefined &&
+                      op.mem.base !== null &&
+                      Memory.write(op_ptr + 8, op.mem.base, 'ubyte');
+                    op.mem.index !== undefined &&
+                      op.mem.index !== null &&
+                      Memory.write(op_ptr + 9, op.mem.index, 'ubyte');
+                    op.mem.length !== undefined &&
+                      op.mem.length !== null &&
+                      Memory.write(op_ptr + 16, op.mem.length, 'ulong');
+                    op.mem.disp !== undefined &&
+                      op.mem.disp !== null &&
+                      Memory.write(op_ptr + 24, op.mem.disp, 'long');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_XCORE:
-            arch = insn.detail.xcore;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 4 + i * 16;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.XCORE_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 4, op.reg, 'i32');
-                  break;
-                case cs.XCORE_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 4, op.imm, 'i32');
-                  break;
-                case cs.XCORE_OP_MEM:
-                  op.mem.base !== undefined &&
-                    op.mem.base !== null &&
-                    Memory.write(op_ptr + 4, op.mem.base, 'ubyte');
-                  op.mem.index !== undefined &&
-                    op.mem.index !== null &&
-                    Memory.write(op_ptr + 5, op.mem.index, 'ubyte');
-                  op.mem.disp !== undefined &&
-                    op.mem.disp !== null &&
-                    Memory.write(op_ptr + 8, op.mem.disp, 'i32');
-                  op.mem.direct !== undefined &&
-                    op.mem.direct !== null &&
-                    Memory.write(op_ptr + 12, op.mem.direct, 'i32');
-                  break;
+              break;
+            case ARCH_XCORE:
+              arch = insn.detail.xcore;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 4 + i * 16;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case XCORE.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 4, op.reg, 'i32');
+                    break;
+                  case XCORE.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 4, op.imm, 'i32');
+                    break;
+                  case XCORE.OP_MEM:
+                    op.mem.base !== undefined &&
+                      op.mem.base !== null &&
+                      Memory.write(op_ptr + 4, op.mem.base, 'ubyte');
+                    op.mem.index !== undefined &&
+                      op.mem.index !== null &&
+                      Memory.write(op_ptr + 5, op.mem.index, 'ubyte');
+                    op.mem.disp !== undefined &&
+                      op.mem.disp !== null &&
+                      Memory.write(op_ptr + 8, op.mem.disp, 'i32');
+                    op.mem.direct !== undefined &&
+                      op.mem.direct !== null &&
+                      Memory.write(op_ptr + 12, op.mem.direct, 'i32');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_M68K:
-            arch = insn.detail.m68k;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 232, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + i * 56;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.M68K_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr, op.reg, 'i32');
-                  break;
-                case cs.M68K_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr, op.imm, 'ulong');
-                  break;
-                case cs.M68K_OP_FP_DOUBLE:
-                  op.dimm !== undefined &&
-                    op.dimm !== null &&
-                    Memory.write(op_ptr, op.dimm, 'double');
-                  break;
-                case cs.M68K_OP_FP_SINGLE:
-                  op.simm !== undefined &&
-                    op.simm !== null &&
-                    Memory.write(op_ptr, op.simm, 'float');
-                  break;
-                case cs.M68K_OP_REG_PAIR:
-                  break;
-                case cs.M68K_OP_REG_BITS:
-                  op.register_bits !== undefined &&
-                    op.register_bits !== null &&
-                    Memory.write(op_ptr, op.register_bits, 'i32');
-                  break;
-                case cs.M68K_OP_BR_DISP:
-                  op.disp !== undefined &&
-                    op.disp !== null &&
-                    Memory.write(op_ptr + 36, op.disp, 'i32');
-                  op.disp_size !== undefined &&
-                    op.disp_size !== null &&
-                    Memory.write(op_ptr + 40, op.disp_size, 'ubyte');
-                  break;
-                case cs.M68K_OP_MEM:
-                  const mem = op.mem;
-                  mem.base_reg !== undefined &&
-                    mem.base_reg !== null &&
-                    Memory.write(op_ptr + 8, mem.base_reg, 'i32');
-                  mem.index_reg !== undefined &&
-                    mem.index_reg !== null &&
-                    Memory.write(op_ptr + 12, mem.index_reg, 'i32');
-                  mem.in_base_reg !== undefined &&
-                    mem.in_base_reg !== null &&
-                    Memory.write(op_ptr + 16, mem.in_base_reg, 'i32');
-                  mem.in_disp !== undefined &&
-                    mem.in_disp !== null &&
-                    Memory.write(op_ptr + 20, mem.in_disp, 'u32');
-                  mem.out_disp !== undefined &&
-                    mem.out_disp !== null &&
-                    Memory.write(op_ptr + 24, mem.out_disp, 'i32');
-                  mem.disp !== undefined &&
-                    mem.disp !== null &&
-                    Memory.write(op_ptr + 28, mem.disp, 'short');
-                  mem.scale !== undefined &&
-                    mem.scale !== null &&
-                    Memory.write(op_ptr + 30, mem.scale, 'ubyte');
-                  mem.bitfield !== undefined &&
-                    mem.bitfield !== null &&
-                    Memory.write(op_ptr + 31, mem.bitfield, 'ubyte');
-                  mem.width !== undefined &&
-                    mem.width !== null &&
-                    Memory.write(op_ptr + 32, mem.width, 'ubyte');
-                  mem.offset !== undefined &&
-                    mem.offset !== null &&
-                    Memory.write(op_ptr + 33, mem.offset, 'ubyte');
-                  mem.index_size !== undefined &&
-                    mem.index_size !== null &&
-                    Memory.write(op_ptr + 34, mem.index_size, 'ubyte');
-                  break;
+              break;
+            case ARCH_M68K:
+              arch = insn.detail.m68k;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 232, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + i * 56;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case M68K.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr, op.reg, 'i32');
+                    break;
+                  case M68K.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr, op.imm, 'ulong');
+                    break;
+                  case M68K.OP_FP_DOUBLE:
+                    op.dimm !== undefined &&
+                      op.dimm !== null &&
+                      Memory.write(op_ptr, op.dimm, 'double');
+                    break;
+                  case M68K.OP_FP_SINGLE:
+                    op.simm !== undefined &&
+                      op.simm !== null &&
+                      Memory.write(op_ptr, op.simm, 'float');
+                    break;
+                  case M68K.OP_REG_PAIR:
+                    break;
+                  case M68K.OP_REG_BITS:
+                    op.register_bits !== undefined &&
+                      op.register_bits !== null &&
+                      Memory.write(op_ptr, op.register_bits, 'i32');
+                    break;
+                  case M68K.OP_BR_DISP:
+                    op.disp !== undefined &&
+                      op.disp !== null &&
+                      Memory.write(op_ptr + 36, op.disp, 'i32');
+                    op.disp_size !== undefined &&
+                      op.disp_size !== null &&
+                      Memory.write(op_ptr + 40, op.disp_size, 'ubyte');
+                    break;
+                  case M68K.OP_MEM:
+                    const mem = op.mem;
+                    mem.base_reg !== undefined &&
+                      mem.base_reg !== null &&
+                      Memory.write(op_ptr + 8, mem.base_reg, 'i32');
+                    mem.index_reg !== undefined &&
+                      mem.index_reg !== null &&
+                      Memory.write(op_ptr + 12, mem.index_reg, 'i32');
+                    mem.in_base_reg !== undefined &&
+                      mem.in_base_reg !== null &&
+                      Memory.write(op_ptr + 16, mem.in_base_reg, 'i32');
+                    mem.in_disp !== undefined &&
+                      mem.in_disp !== null &&
+                      Memory.write(op_ptr + 20, mem.in_disp, 'u32');
+                    mem.out_disp !== undefined &&
+                      mem.out_disp !== null &&
+                      Memory.write(op_ptr + 24, mem.out_disp, 'i32');
+                    mem.disp !== undefined &&
+                      mem.disp !== null &&
+                      Memory.write(op_ptr + 28, mem.disp, 'short');
+                    mem.scale !== undefined &&
+                      mem.scale !== null &&
+                      Memory.write(op_ptr + 30, mem.scale, 'ubyte');
+                    mem.bitfield !== undefined &&
+                      mem.bitfield !== null &&
+                      Memory.write(op_ptr + 31, mem.bitfield, 'ubyte');
+                    mem.width !== undefined &&
+                      mem.width !== null &&
+                      Memory.write(op_ptr + 32, mem.width, 'ubyte');
+                    mem.offset !== undefined &&
+                      mem.offset !== null &&
+                      Memory.write(op_ptr + 33, mem.offset, 'ubyte');
+                    mem.index_size !== undefined &&
+                      mem.index_size !== null &&
+                      Memory.write(op_ptr + 34, mem.index_size, 'ubyte');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_TMS320C64X:
-            arch = insn.detail.tms320c64x;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 4 + i * 32;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.TMS320C64X_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 4, op.reg, 'i32');
-                  break;
-                case cs.TMS320C64X_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 4, op.imm, 'i32');
-                  break;
-                case cs.TMS320C64X_OP_MEM:
-                  op.mem.base !== undefined &&
-                    op.mem.base !== null &&
-                    Memory.write(op_ptr + 4, op.mem.base, 'u32');
-                  op.mem.disp !== undefined &&
-                    op.mem.disp !== null &&
-                    Memory.write(op_ptr + 8, op.mem.disp, 'i32');
-                  op.mem.unit !== undefined &&
-                    op.mem.unit !== null &&
-                    Memory.write(op_ptr + 12, op.mem.unit, 'i32');
-                  op.mem.scaled !== undefined &&
-                    op.mem.scaled !== null &&
-                    Memory.write(op_ptr + 16, op.mem.scaled, 'i32');
-                  op.mem.disptype !== undefined &&
-                    op.mem.disptype !== null &&
-                    Memory.write(op_ptr + 20, op.mem.disptype, 'i32');
-                  op.mem.direction !== undefined &&
-                    op.mem.direction !== null &&
-                    Memory.write(op_ptr + 24, op.mem.direction, 'i32');
-                  op.mem.modify !== undefined &&
-                    op.mem.modify !== null &&
-                    Memory.write(op_ptr + 28, op.mem.modify, 'i32');
-                  break;
-                case cs.TMS320C64X_OP_REGPAIR:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 4, op.reg, 'u32');
-                  break;
+              break;
+            case ARCH_TMS320C64X:
+              arch = insn.detail.tms320c64x;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 4 + i * 32;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case TMS320C64X.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 4, op.reg, 'i32');
+                    break;
+                  case TMS320C64X.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 4, op.imm, 'i32');
+                    break;
+                  case TMS320C64X.OP_MEM:
+                    op.mem.base !== undefined &&
+                      op.mem.base !== null &&
+                      Memory.write(op_ptr + 4, op.mem.base, 'u32');
+                    op.mem.disp !== undefined &&
+                      op.mem.disp !== null &&
+                      Memory.write(op_ptr + 8, op.mem.disp, 'i32');
+                    op.mem.unit !== undefined &&
+                      op.mem.unit !== null &&
+                      Memory.write(op_ptr + 12, op.mem.unit, 'i32');
+                    op.mem.scaled !== undefined &&
+                      op.mem.scaled !== null &&
+                      Memory.write(op_ptr + 16, op.mem.scaled, 'i32');
+                    op.mem.disptype !== undefined &&
+                      op.mem.disptype !== null &&
+                      Memory.write(op_ptr + 20, op.mem.disptype, 'i32');
+                    op.mem.direction !== undefined &&
+                      op.mem.direction !== null &&
+                      Memory.write(op_ptr + 24, op.mem.direction, 'i32');
+                    op.mem.modify !== undefined &&
+                      op.mem.modify !== null &&
+                      Memory.write(op_ptr + 28, op.mem.modify, 'i32');
+                    break;
+                  case TMS320C64X.OP_REGPAIR:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 4, op.reg, 'u32');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_M680X:
-            arch = insn.detail.m680x;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 1, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 4 + i * 24;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.M680X_OP_IMMEDIATE:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 4, op.imm, 'i32');
-                  break;
-                case cs.M680X_OP_REGISTER:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 4, op.reg, 'i32');
-                  break;
-                case cs.M680X_OP_INDEXED:
-                  op.idx.base_reg !== undefined &&
-                    op.idx.base_reg !== null &&
-                    Memory.write(op_ptr + 4, op.idx.base_reg, 'i32');
-                  op.idx.offset_reg !== undefined &&
-                    op.idx.offset_reg !== null &&
-                    Memory.write(op_ptr + 8, op.idx.offset_reg, 'i32');
-                  op.idx.offset !== undefined &&
-                    op.idx.offset !== null &&
-                    Memory.write(op_ptr + 12, op.idx.offset, 'short');
-                  op.idx.offset_addr !== undefined &&
-                    op.idx.offset_addr !== null &&
-                    Memory.write(op_ptr + 14, op.idx.offset_addr, 'ushort');
-                  op.idx.offset_bits !== undefined &&
-                    op.idx.offset_bits !== null &&
-                    Memory.write(op_ptr + 16, op.idx.offset_bits, 'ubyte');
-                  op.idx.inc_dec !== undefined &&
-                    op.idx.inc_dec !== null &&
-                    Memory.write(op_ptr + 17, op.idx.inc_dec, 'byte');
-                  op.idx.flags !== undefined &&
-                    op.idx.flags !== null &&
-                    Memory.write(op_ptr + 18, op.idx.flags, 'ubyte');
-                  break;
-                case cs.M680X_OP_RELATIVE:
-                  op.rel.address !== undefined &&
-                    op.rel.address !== null &&
-                    Memory.write(op_ptr + 4, op.rel.address, 'ushort');
-                  op.rel.offset !== undefined &&
-                    op.rel.offset !== null &&
-                    Memory.write(op_ptr + 6, op.rel.offset, 'short');
-                  break;
-                case cs.M680X_OP_EXTENDED:
-                  op.ext.address !== undefined &&
-                    op.ext.address !== null &&
-                    Memory.write(op_ptr + 4, op.ext.address, 'ushort');
-                  op.ext.indirect !== undefined &&
-                    op.ext.indirect !== null &&
-                    Memory.write(op_ptr + 6, op.ext.indirect, 'bool');
-                  break;
-                case cs.M680X_OP_DIRECT:
-                  op.direct_addr !== undefined &&
-                    op.direct_addr !== null &&
-                    Memory.write(op_ptr + 4, op.direct_addr, 'ubyte');
-                  break;
-                case cs.M680X_OP_CONSTANT:
-                  op.const_val !== undefined &&
-                    op.const_val !== null &&
-                    Memory.write(op_ptr + 4, op.const_val, 'ubyte');
-                  break;
+              break;
+            case ARCH_M680X:
+              arch = insn.detail.m680x;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 1, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 4 + i * 24;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case M680X.OP_IMMEDIATE:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 4, op.imm, 'i32');
+                    break;
+                  case M680X.OP_REGISTER:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 4, op.reg, 'i32');
+                    break;
+                  case M680X.OP_INDEXED:
+                    op.idx.base_reg !== undefined &&
+                      op.idx.base_reg !== null &&
+                      Memory.write(op_ptr + 4, op.idx.base_reg, 'i32');
+                    op.idx.offset_reg !== undefined &&
+                      op.idx.offset_reg !== null &&
+                      Memory.write(op_ptr + 8, op.idx.offset_reg, 'i32');
+                    op.idx.offset !== undefined &&
+                      op.idx.offset !== null &&
+                      Memory.write(op_ptr + 12, op.idx.offset, 'short');
+                    op.idx.offset_addr !== undefined &&
+                      op.idx.offset_addr !== null &&
+                      Memory.write(op_ptr + 14, op.idx.offset_addr, 'ushort');
+                    op.idx.offset_bits !== undefined &&
+                      op.idx.offset_bits !== null &&
+                      Memory.write(op_ptr + 16, op.idx.offset_bits, 'ubyte');
+                    op.idx.inc_dec !== undefined &&
+                      op.idx.inc_dec !== null &&
+                      Memory.write(op_ptr + 17, op.idx.inc_dec, 'byte');
+                    op.idx.flags !== undefined &&
+                      op.idx.flags !== null &&
+                      Memory.write(op_ptr + 18, op.idx.flags, 'ubyte');
+                    break;
+                  case M680X.OP_RELATIVE:
+                    op.rel.address !== undefined &&
+                      op.rel.address !== null &&
+                      Memory.write(op_ptr + 4, op.rel.address, 'ushort');
+                    op.rel.offset !== undefined &&
+                      op.rel.offset !== null &&
+                      Memory.write(op_ptr + 6, op.rel.offset, 'short');
+                    break;
+                  case M680X.OP_EXTENDED:
+                    op.ext.address !== undefined &&
+                      op.ext.address !== null &&
+                      Memory.write(op_ptr + 4, op.ext.address, 'ushort');
+                    op.ext.indirect !== undefined &&
+                      op.ext.indirect !== null &&
+                      Memory.write(op_ptr + 6, op.ext.indirect, 'bool');
+                    break;
+                  case M680X.OP_DIRECT:
+                    op.direct_addr !== undefined &&
+                      op.direct_addr !== null &&
+                      Memory.write(op_ptr + 4, op.direct_addr, 'ubyte');
+                    break;
+                  case M680X.OP_CONSTANT:
+                    op.const_val !== undefined &&
+                      op.const_val !== null &&
+                      Memory.write(op_ptr + 4, op.const_val, 'ubyte');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_EVM:
-            arch = insn.detail.evm;
-            break;
-          case ARCH_MOS65XX:
-            arch = insn.detail.mos65xx;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 5, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 8 + i * 8;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.MOS65XX_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 4, op.reg, 'i32');
-                  break;
-                case cs.MOS65XX_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 4, op.imm, 'i32');
-                  break;
-                case cs.MOS65XX_OP_MEM:
-                  op.mem !== undefined &&
-                    op.mem !== null &&
-                    Memory.write(op_ptr + 4, op.mem, 'i32');
-                  break;
+              break;
+            case ARCH_EVM:
+              arch = insn.detail.evm;
+              break;
+            case ARCH_MOS65XX:
+              arch = insn.detail.mos65xx;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 5, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 8 + i * 8;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case MOS65XX.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 4, op.reg, 'i32');
+                    break;
+                  case MOS65XX.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 4, op.imm, 'i32');
+                    break;
+                  case MOS65XX.OP_MEM:
+                    op.mem !== undefined &&
+                      op.mem !== null &&
+                      Memory.write(op_ptr + 4, op.mem, 'i32');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_WASM:
-            arch = insn.detail.wasm;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 8 + i * 32;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.WASM_OP_INT7:
-                  op.int7 !== undefined &&
-                    op.int7 !== null &&
-                    Memory.write(op_ptr + 8, op.int7, 'ubyte');
-                  break;
-                case cs.WASM_OP_VARUINT32:
-                  op.varuint32 !== undefined &&
-                    op.varuint32 !== null &&
-                    Memory.write(op_ptr + 8, op.varuint32, 'u32');
-                  break;
-                case cs.WASM_OP_VARUINT64:
-                  op.varuint64 !== undefined &&
-                    op.varuint64 !== null &&
-                    Memory.write(op_ptr + 8, op.varuint64, 'u64');
-                  break;
-                case cs.WASM_OP_UINT32:
-                  op.uint32 !== undefined &&
-                    op.uint32 !== null &&
-                    Memory.write(op_ptr + 8, op.uint32, 'u32');
-                  break;
-                case cs.WASM_OP_UINT64:
-                  op.uint64 !== undefined &&
-                    op.uint64 !== null &&
-                    Memory.write(op_ptr + 8, op.uint64, 'u32');
-                  break;
-                case cs.WASM_OP_IMM:
-                  for (let i = 0; i < 2; i++) {
-                    op.imm[i] !== undefined &&
-                      op.imm[i] !== null &&
-                      Memory.write(op_ptr + 8 + i, op.imm[i], 'u32');
-                  }
-                  break;
-                case cs.WASM_OP_BRTABLE:
-                  op.brtable.length !== undefined &&
-                    op.brtable.length !== null &&
-                    Memory.write(op_ptr + 8, op.brtable.length, 'u32');
-                  op.brtable.address !== undefined &&
-                    op.brtable.address !== null &&
-                    Memory.write(op_ptr + 12, op.brtable.address, 'u64');
-                  op.brtable.default_target !== undefined &&
-                    op.brtable.default_target !== null &&
-                    Memory.write(op_ptr + 20, op.brtable.default_target, 'u32');
-                  break;
+              break;
+            case ARCH_WASM:
+              arch = insn.detail.wasm;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 8 + i * 32;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case WASM.OP_INT7:
+                    op.int7 !== undefined &&
+                      op.int7 !== null &&
+                      Memory.write(op_ptr + 8, op.int7, 'ubyte');
+                    break;
+                  case WASM.OP_VARUINT32:
+                    op.varuint32 !== undefined &&
+                      op.varuint32 !== null &&
+                      Memory.write(op_ptr + 8, op.varuint32, 'u32');
+                    break;
+                  case WASM.OP_VARUINT64:
+                    op.varuint64 !== undefined &&
+                      op.varuint64 !== null &&
+                      Memory.write(op_ptr + 8, op.varuint64, 'u64');
+                    break;
+                  case WASM.OP_UINT32:
+                    op.uint32 !== undefined &&
+                      op.uint32 !== null &&
+                      Memory.write(op_ptr + 8, op.uint32, 'u32');
+                    break;
+                  case WASM.OP_UINT64:
+                    op.uint64 !== undefined &&
+                      op.uint64 !== null &&
+                      Memory.write(op_ptr + 8, op.uint64, 'u32');
+                    break;
+                  case WASM.OP_IMM:
+                    for (let i = 0; i < 2; i++) {
+                      op.imm[i] !== undefined &&
+                        op.imm[i] !== null &&
+                        Memory.write(op_ptr + 8 + i, op.imm[i], 'u32');
+                    }
+                    break;
+                  case WASM.OP_BRTABLE:
+                    op.brtable.length !== undefined &&
+                      op.brtable.length !== null &&
+                      Memory.write(op_ptr + 8, op.brtable.length, 'u32');
+                    op.brtable.address !== undefined &&
+                      op.brtable.address !== null &&
+                      Memory.write(op_ptr + 12, op.brtable.address, 'u64');
+                    op.brtable.default_target !== undefined &&
+                      op.brtable.default_target !== null &&
+                      Memory.write(
+                        op_ptr + 20,
+                        op.brtable.default_target,
+                        'u32',
+                      );
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_BPF:
-            arch = insn.detail.bpf;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 8 + i * 24;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.BPF_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 8, op.reg, 'i32');
-                  break;
-                case cs.BPF_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 8, op.imm, 'long');
-                  break;
-                case cs.BPF_OP_OFF:
-                  op.off !== undefined &&
-                    op.off !== null &&
-                    Memory.write(op_ptr + 8, op.off, 'u32');
-                  break;
-                case cs.BPF_OP_MEM:
-                  op.mem.base !== undefined &&
-                    op.mem.base !== null &&
-                    Memory.write(op_ptr + 8, op.mem.base, 'i32');
-                  op.mem.disp !== undefined &&
-                    op.mem.disp !== null &&
-                    Memory.write(op_ptr + 12, op.mem.disp, 'u32');
-                  break;
-                case cs.BPF_OP_MMEM:
-                  op.mmem !== undefined &&
-                    op.mmem !== null &&
-                    Memory.write(op_ptr + 8, op.mmem, 'u32');
-                  break;
-                case cs.BPF_OP_MSH:
-                  op.msh !== undefined &&
-                    op.msh !== null &&
-                    Memory.write(op_ptr + 8, op.msh, 'u32');
-                  break;
-                case cs.BPF_OP_EXT:
-                  op.ext !== undefined &&
-                    op.ext !== null &&
-                    Memory.write(op_ptr + 8, op.ext, 'u32');
-                  break;
+              break;
+            case ARCH_BPF:
+              arch = insn.detail.bpf;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 8 + i * 24;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case BPF.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 8, op.reg, 'i32');
+                    break;
+                  case BPF.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 8, op.imm, 'long');
+                    break;
+                  case BPF.OP_OFF:
+                    op.off !== undefined &&
+                      op.off !== null &&
+                      Memory.write(op_ptr + 8, op.off, 'u32');
+                    break;
+                  case BPF.OP_MEM:
+                    op.mem.base !== undefined &&
+                      op.mem.base !== null &&
+                      Memory.write(op_ptr + 8, op.mem.base, 'i32');
+                    op.mem.disp !== undefined &&
+                      op.mem.disp !== null &&
+                      Memory.write(op_ptr + 12, op.mem.disp, 'u32');
+                    break;
+                  case BPF.OP_MMEM:
+                    op.mmem !== undefined &&
+                      op.mmem !== null &&
+                      Memory.write(op_ptr + 8, op.mmem, 'u32');
+                    break;
+                  case BPF.OP_MSH:
+                    op.msh !== undefined &&
+                      op.msh !== null &&
+                      Memory.write(op_ptr + 8, op.msh, 'u32');
+                    break;
+                  case BPF.OP_EXT:
+                    op.ext !== undefined &&
+                      op.ext !== null &&
+                      Memory.write(op_ptr + 8, op.ext, 'u32');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_RISCV:
-            arch = insn.detail.riscv;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 1, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 8 + i * 24;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.RISCV_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 8, op.reg, 'u32');
-                  break;
-                case cs.RISCV_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 8, op.imm, 'i32');
-                  break;
-                case cs.RISCV_OP_MEM:
-                  op.mem.base !== undefined &&
-                    op.mem.base !== null &&
-                    Memory.write(op_ptr + 8, op.mem.base, 'u32');
-                  op.mem.disp !== undefined &&
-                    op.mem.disp !== null &&
-                    Memory.write(op_ptr + 12, op.mem.disp, 'i64');
-                  break;
+              break;
+            case ARCH_RISCV:
+              arch = insn.detail.riscv;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 1, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 8 + i * 24;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case RISCV.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 8, op.reg, 'u32');
+                    break;
+                  case RISCV.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 8, op.imm, 'i32');
+                    break;
+                  case RISCV.OP_MEM:
+                    op.mem.base !== undefined &&
+                      op.mem.base !== null &&
+                      Memory.write(op_ptr + 8, op.mem.base, 'u32');
+                    op.mem.disp !== undefined &&
+                      op.mem.disp !== null &&
+                      Memory.write(op_ptr + 12, op.mem.disp, 'i64');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_SH:
-            arch = insn.detail.sh;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 5, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 8 + i * 58;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.SH_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 8, op.reg, 'i32');
-                  break;
-                case cs.SH_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 8, op.imm, 'long');
-                  break;
-                case cs.SH_OP_MEM:
-                  op.mem.address !== undefined &&
-                    op.mem.address !== null &&
-                    Memory.write(op_ptr + 8, op.mem.address, 'i32');
-                  op.mem.reg !== undefined &&
-                    op.mem.reg !== null &&
-                    Memory.write(op_ptr + 12, op.mem.reg, 'i32');
-                  op.mem.disp !== undefined &&
-                    op.mem.disp !== null &&
-                    Memory.write(op_ptr + 16, op.mem.disp, 'i32');
-                  break;
+              break;
+            case ARCH_SH:
+              arch = insn.detail.sh;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 5, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 8 + i * 58;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case SH.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 8, op.reg, 'i32');
+                    break;
+                  case SH.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 8, op.imm, 'long');
+                    break;
+                  case SH.OP_MEM:
+                    op.mem.address !== undefined &&
+                      op.mem.address !== null &&
+                      Memory.write(op_ptr + 8, op.mem.address, 'i32');
+                    op.mem.reg !== undefined &&
+                      op.mem.reg !== null &&
+                      Memory.write(op_ptr + 12, op.mem.reg, 'i32');
+                    op.mem.disp !== undefined &&
+                      op.mem.disp !== null &&
+                      Memory.write(op_ptr + 16, op.mem.disp, 'i32');
+                    break;
+                }
               }
-            }
-            break;
-          case ARCH_TRICORE:
-            arch = insn.detail.tricore;
-            arch.op_count !== undefined &&
-              arch.op_count !== null &&
-              Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
-            for (let i = 0; i < arch.op_count; i++) {
-              op_ptr = arch_info_ptr + 4 + i * 16;
-              op = arch.operands[i];
-              op.type !== undefined &&
-                op.type !== null &&
-                Memory.write(op_ptr, op.type, 'i32');
-              switch (arch.operands[i].type) {
-                case cs.TRICORE_OP_REG:
-                  op.reg !== undefined &&
-                    op.reg !== null &&
-                    Memory.write(op_ptr + 4, op.reg, 'u32');
-                  break;
-                case cs.TRICORE_OP_IMM:
-                  op.imm !== undefined &&
-                    op.imm !== null &&
-                    Memory.write(op_ptr + 4, op.imm, 'i32');
-                  break;
-                case cs.TRICORE_OP_MEM:
-                  op.mem.base !== undefined &&
-                    op.mem.base !== null &&
-                    Memory.write(op_ptr + 4, op.mem.base, 'ubyte');
-                  op.mem.disp !== undefined &&
-                    op.mem.disp !== null &&
-                    Memory.write(op_ptr + 8, op.mem.disp, 'i32');
-                  break;
+              break;
+            case ARCH_TRICORE:
+              arch = insn.detail.tricore;
+              arch.op_count !== undefined &&
+                arch.op_count !== null &&
+                Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
+              for (let i = 0; i < arch.op_count; i++) {
+                op_ptr = arch_info_ptr + 4 + i * 16;
+                op = arch.operands[i];
+                op.type !== undefined &&
+                  op.type !== null &&
+                  Memory.write(op_ptr, op.type, 'i32');
+                switch (arch.operands[i].type) {
+                  case TRICORE.OP_REG:
+                    op.reg !== undefined &&
+                      op.reg !== null &&
+                      Memory.write(op_ptr + 4, op.reg, 'u32');
+                    break;
+                  case TRICORE.OP_IMM:
+                    op.imm !== undefined &&
+                      op.imm !== null &&
+                      Memory.write(op_ptr + 4, op.imm, 'i32');
+                    break;
+                  case TRICORE.OP_MEM:
+                    op.mem.base !== undefined &&
+                      op.mem.base !== null &&
+                      Memory.write(op_ptr + 4, op.mem.base, 'ubyte');
+                    op.mem.disp !== undefined &&
+                      op.mem.disp !== null &&
+                      Memory.write(op_ptr + 8, op.mem.disp, 'i32');
+                    break;
+                }
               }
-            }
-            break;
+              break;
+          }
         }
       }
-
-      return insn_ptr;
+      return insns_ptr;
     }
 
     private get_detail(pointer: ptr): cs_detail {
@@ -1300,705 +1395,10 @@ namespace cs {
         detail.groups[i] = Memory.read(pointer + 83 + i, 'ubyte');
       }
 
-      let arch: any;
-      let op: any;
-      let op_ptr: number;
-
-      switch (this.arch) {
-        case ARCH_X86:
-          detail.x86 = {};
-          arch = detail.x86;
-          arch.prefix = [];
-          arch.opcode = [];
-          const encoding_ptr: ptr = pointer + 552;
-          for (let i = 0; i < 4; i++) {
-            arch.prefix[i] = Memory.read(arch_info_ptr + i, 'ubyte');
-            arch.opcode[i] = Memory.read(arch_info_ptr + i + 4, 'ubyte');
-          }
-          arch.rex = Memory.read(arch_info_ptr + 8, 'ubyte');
-          arch.addr_size = Memory.read(arch_info_ptr + 9, 'ubyte');
-          arch.modrm = Memory.read(arch_info_ptr + 10, 'ubyte');
-          arch.sib = Memory.read(arch_info_ptr + 12, 'ubyte');
-          arch.disp = Memory.read(arch_info_ptr + 16, 'long');
-          arch.sib_index = Memory.read(arch_info_ptr + 24, 'i32');
-          arch.sib_scale = Memory.read(arch_info_ptr + 28, 'byte');
-          arch.sib_base = Memory.read(arch_info_ptr + 29, 'i32');
-          arch.xop_cc = Memory.read(arch_info_ptr + 33, 'i32');
-          arch.sse_cc = Memory.read(arch_info_ptr + 37, 'i32');
-          arch.avx_cc = Memory.read(arch_info_ptr + 41, 'i32');
-          arch.avx_sae = Memory.read(arch_info_ptr + 45, 'bool');
-          arch.avx_rm = Memory.read(arch_info_ptr + 46, 'i32');
-          arch.eflags = Memory.read(arch_info_ptr + 50, 'ulong');
-          arch.fpu_flags = Memory.read(arch_info_ptr + 56, 'ulong');
-          arch.op_count = Memory.read(arch_info_ptr + 64, 'ubyte');
-          arch.encoding = {
-            modrm_offset: Memory.read(encoding_ptr, 'ubyte'),
-            disp_offset: Memory.read(encoding_ptr + 1, 'ubyte'),
-            disp_size: Memory.read(encoding_ptr + 2, 'ubyte'),
-            imm_offset: Memory.read(encoding_ptr + 3, 'ubyte'),
-            imm_size: Memory.read(encoding_ptr + 4, 'ubyte'),
-          };
-          arch.operands = [];
-
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 72 + i * 48;
-            op.size = Memory.read(op_ptr + 32, 'ubyte');
-            op.access = Memory.read(op_ptr + 33, 'ubyte');
-            op.avx_bcast = Memory.read(op_ptr + 36, 'i32');
-            op.avx_zero_opmask = Memory.read(op_ptr + 40, 'bool');
-            op.type = Memory.read(op_ptr, 'i32');
-            switch (op.type) {
-              case cs.X86_OP_REG:
-                op.reg = Memory.read(op_ptr + 8, 'i32');
-                break;
-              case cs.X86_OP_IMM:
-                op.imm = Memory.read(op_ptr + 8, 'i64');
-                break;
-              case cs.X86_OP_MEM:
-                op.mem = {
-                  segment: Memory.read(op_ptr + 8, 'i32'),
-                  base: Memory.read(op_ptr + 12, 'i32'),
-                  index: Memory.read(op_ptr + 16, 'i32'),
-                  scale: Memory.read(op_ptr + 20, 'i32'),
-                  disp: Memory.read(op_ptr + 24, 'i64'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case cs.ARCH_ARM:
-          detail.arm = {};
-          arch = detail.arm;
-          arch.operands = [];
-          arch.usermode = Memory.read(arch_info_ptr, 'bool');
-          arch.vector_size = Memory.read(arch_info_ptr + 4, 'i32');
-          arch.vector_data = Memory.read(arch_info_ptr + 9, 'i32');
-          arch.cps_mode = Memory.read(arch_info_ptr + 12, 'i32');
-          arch.cps_flag = Memory.read(arch_info_ptr + 16, 'i32');
-          arch.cc = Memory.read(arch_info_ptr + 20, 'i32');
-          arch.update_flags = Memory.read(arch_info_ptr + 24, 'bool');
-          arch.writeback = Memory.read(arch_info_ptr + 25, 'bool');
-          arch.post_index = Memory.read(arch_info_ptr + 26, 'bool');
-          arch.mem_barrier = Memory.read(arch_info_ptr + 28, 'i32');
-          arch.op_count = Memory.read(arch_info_ptr + 32, 'ubyte');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 40 + i * 48;
-            op.vector_index = Memory.read(op_ptr + 0, 'i32');
-            op.shift = {
-              type: Memory.read(op_ptr + 4, 'i32'),
-              value: Memory.read(op_ptr + 8, 'u32'),
-            };
-            op.subtracted = Memory.read(op_ptr + 40, 'bool');
-            op.access = Memory.read(op_ptr + 41, 'ubyte');
-            op.neon_lane = Memory.read(op_ptr + 42, 'i8');
-            op.type = Memory.read(op_ptr + 12, 'i32');
-            switch (op.type) {
-              case cs.ARM_OP_SYSREG:
-              case cs.ARM_OP_REG:
-                op.reg = Memory.read(op_ptr + 16, 'i32');
-                break;
-              case cs.ARM_OP_IMM:
-              case cs.ARM_OP_PIMM:
-                op.imm = Memory.read(op_ptr + 16, 'i32');
-                break;
-              case cs.ARM_OP_FP:
-                op.fp = Memory.read(op_ptr + 16, 'double');
-                break;
-              case cs.ARM_OP_SETEND:
-                op.setend = Memory.read(op_ptr + 16, 'i32');
-                break;
-              case cs.ARM_OP_MEM:
-                op.mem = {
-                  base: Memory.read(op_ptr + 16, 'i32'),
-                  index: Memory.read(op_ptr + 20, 'i32'),
-                  scale: Memory.read(op_ptr + 24, 'i32'),
-                  disp: Memory.read(op_ptr + 28, 'i32'),
-                  lshift: Memory.read(op_ptr + 32, 'i32'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_ARM64:
-          detail.arm64 = {};
-          arch = detail.arm64;
-          arch.operands = [];
-          arch.cc = Memory.read(arch_info_ptr, 'i32');
-          arch.update_flags = Memory.read(arch_info_ptr + 4, 'bool');
-          arch.writeback = Memory.read(arch_info_ptr + 5, 'bool');
-          arch.post_index = Memory.read(arch_info_ptr + 6, 'bool');
-          arch.op_count = Memory.read(arch_info_ptr + 7, 'i8');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 8 + i * 56;
-            op.vector_index = Memory.read(op_ptr + 0, 'i32');
-            op.vas = Memory.read(op_ptr + 4, 'i32');
-            op.shift = {
-              type: Memory.read(op_ptr + 8, 'i32'),
-              value: Memory.read(op_ptr + 12, 'i32'),
-            };
-            op.ext = Memory.read(op_ptr + 16, 'i32');
-            op.access = Memory.read(op_ptr + 48, 'i32');
-            op.type = Memory.read(op_ptr + 20, 'i32');
-            switch (op.type) {
-              case cs.ARM64_OP_REG:
-              case cs.ARM64_OP_REG_MRS:
-              case cs.ARM64_OP_REG_MSR:
-                op.reg = Memory.read(op_ptr + 32, 'i32');
-                break;
-              case cs.ARM64_OP_IMM:
-              case cs.ARM64_OP_CIMM:
-                op.imm = Memory.read(op_ptr + 32, 'i64');
-                break;
-              case cs.ARM64_OP_FP:
-                op.fp = Memory.read(op_ptr + 32, 'double');
-                break;
-              case cs.ARM64_OP_PSTATE:
-                op.pstate = Memory.read(op_ptr + 32, 'i32');
-                break;
-              case cs.ARM64_OP_SYS:
-                op.sys = Memory.read(op_ptr + 32, 'i32');
-                break;
-              case cs.ARM64_OP_SVCR:
-                op.svcr = Memory.read(op_ptr + 24, 'i32');
-                break;
-              case cs.ARM64_OP_BARRIER:
-                op.barrier = Memory.read(op_ptr + 32, 'i32');
-                break;
-              case cs.ARM64_OP_PREFETCH:
-                op.prefetch = Memory.read(op_ptr + 32, 'i32');
-                break;
-              case cs.ARM64_OP_MEM:
-                op.mem = {
-                  base: Memory.read(op_ptr + 32, 'i32'),
-                  index: Memory.read(op_ptr + 36, 'i32'),
-                  disp: Memory.read(op_ptr + 40, 'i32'),
-                };
-                break;
-              case cs.ARM64_OP_SME_INDEX:
-                op.sme_index = {
-                  reg: Memory.read(op_ptr + 32, 'i32'),
-                  base: Memory.read(op_ptr + 36, 'i32'),
-                  disp: Memory.read(op_ptr + 40, 'i32'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_M68K:
-          detail.m68k = {};
-          arch = detail.m68k;
-          arch.operands = [];
-          arch.op_count = Memory.read(arch_info_ptr + 232, 'ubyte');
-          arch.op_size = {
-            type: Memory.read(arch_info_ptr + 224, 'i32'),
-          };
-          switch (arch.op_size.type) {
-            case cs.M68K_SIZE_TYPE_CPU:
-              arch.op_size.cpu_size = Memory.read(arch_info_ptr + 228, 'i32');
-              break;
-            case cs.M68K_SIZE_TYPE_FPU:
-              arch.op_size.fpu_size = Memory.read(arch_info_ptr + 228, 'i32');
-              break;
-          }
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + i * 56;
-            op.address_mode = Memory.read(op_ptr + 52, 'i32');
-            op.type = Memory.read(op_ptr + 48, 'i32');
-            switch (op.type) {
-              case cs.M68K_OP_REG:
-                op.reg = Memory.read(op_ptr + 0, 'i32');
-                break;
-              case cs.M68K_OP_IMM:
-                op.imm = Memory.read(op_ptr + 0, 'ulong');
-                break;
-              case cs.M68K_OP_MEM:
-                op.mem = {
-                  base_reg: Memory.read(op_ptr + 8, 'i32'),
-                  index_reg: Memory.read(op_ptr + 12, 'i32'),
-                  in_base_reg: Memory.read(op_ptr + 16, 'i32'),
-                  in_disp: Memory.read(op_ptr + 20, 'u32'),
-                  out_disp: Memory.read(op_ptr + 24, 'i32'),
-                  disp: Memory.read(op_ptr + 28, 'short'),
-                  scale: Memory.read(op_ptr + 30, 'ubyte'),
-                  bitfield: Memory.read(op_ptr + 31, 'ubyte'),
-                  width: Memory.read(op_ptr + 32, 'ubyte'),
-                  offset: Memory.read(op_ptr + 33, 'ubyte'),
-                  index_size: Memory.read(op_ptr + 34, 'ubyte'),
-                };
-                break;
-              case cs.M68K_OP_FP_DOUBLE:
-                op.dimm = Memory.read(op_ptr + 0, 'double');
-                break;
-              case cs.M68K_OP_FP_SINGLE:
-                op.simm = Memory.read(op_ptr + 0, 'float');
-                break;
-              case cs.M68K_OP_REG_BITS:
-                op.register_bits = Memory.read(op_ptr + 44, 'i32');
-                break;
-              case cs.M68K_OP_REG_PAIR:
-                op.reg_pair = {
-                  reg_0: Memory.read(op_ptr + 0, 'i32'),
-                  reg_1: Memory.read(op_ptr + 4, 'i32'),
-                };
-                break;
-              case cs.M68K_OP_BR_DISP:
-                op.br_disp = {
-                  disp: Memory.read(op_ptr + 36, 'i32'),
-                  disp_size: Memory.read(op_ptr + 40, 'ubyte'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_MIPS:
-          detail.mips = {};
-          arch = detail.mips;
-          arch.operands = [];
-          arch.op_count = Memory.read(arch_info_ptr, 'ubyte');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 8 + i * 24;
-            op.type = Memory.read(op_ptr + 0, 'i32');
-            switch (op.type) {
-              case cs.MIPS_OP_REG:
-                op.reg = Memory.read(op_ptr + 8, 'i32');
-                break;
-              case cs.MIPS_OP_IMM:
-                op.imm = Memory.read(op_ptr + 8, 'long');
-                break;
-              case cs.MIPS_OP_MEM:
-                op.mem = {
-                  base: Memory.read(op_ptr + 8, 'i32'),
-                  disp: Memory.read(op_ptr + 12, 'long'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_PPC:
-          detail.ppc = {};
-          arch = detail.ppc;
-          arch.operands = [];
-          arch.bc = Memory.read(arch_info_ptr + 0, 'i32');
-          arch.bh = Memory.read(arch_info_ptr + 4, 'i32');
-          arch.update_cr0 = Memory.read(arch_info_ptr + 8, 'bool');
-          arch.op_count = Memory.read(arch_info_ptr + 9, 'ubyte');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 16 + i * 24;
-            op.type = Memory.read(op_ptr, 'i32');
-            switch (op.type) {
-              case cs.PPC_OP_REG:
-                op.reg = Memory.read(op_ptr + 8, 'i32');
-                break;
-              case cs.PPC_OP_IMM:
-                op.imm = Memory.read(op_ptr + 8, 'long');
-                break;
-              case cs.PPC_OP_CRX:
-                op.crx = {
-                  scale: Memory.read(op_ptr + 8, 'u32'),
-                  reg: Memory.read(op_ptr + 12, 'i32'),
-                  cond: Memory.read(op_ptr + 16, 'i32'),
-                };
-                break;
-              case cs.PPC_OP_MEM:
-                op.mem = {
-                  base: Memory.read(op_ptr + 8, 'i32'),
-                  disp: Memory.read(op_ptr + 12, 'i32'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_SPARC:
-          detail.sparc = {};
-          arch = detail.sparc;
-          arch.operands = [];
-          arch.cc = Memory.read(arch_info_ptr + 0, 'i32');
-          arch.hint = Memory.read(arch_info_ptr + 4, 'i32');
-          arch.op_count = Memory.read(arch_info_ptr + 8, 'ubyte');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 16 + i * 16;
-            op.type = Memory.read(op_ptr + 0, 'i32');
-            switch (op.type) {
-              case cs.SPARC_OP_REG:
-                op.reg = Memory.read(op_ptr + 8, 'i32');
-                break;
-              case cs.SPARC_OP_IMM:
-                op.imm = Memory.read(op_ptr + 8, 'long');
-                break;
-              case cs.SPARC_OP_MEM:
-                op.mem = {
-                  base: Memory.read(op_ptr + 8, 'ubyte'),
-                  index: Memory.read(op_ptr + 9, 'ubyte'),
-                  disp: Memory.read(op_ptr + 12, 'i32'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_SYSZ:
-          detail.sysz = {};
-          arch = detail.sysz;
-          arch.operands = [];
-          arch.cc = Memory.read(arch_info_ptr + 0, 'i32');
-          arch.op_count = Memory.read(arch_info_ptr + 4, 'ubyte');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 8 + i * 32;
-            op.type = Memory.read(op_ptr + 0, 'i32');
-            switch (op.type) {
-              case cs.SYSZ_OP_REG:
-                op.reg = Memory.read(op_ptr + 8, 'i32');
-                break;
-              case cs.SYSZ_OP_IMM:
-                op.imm = Memory.read(op_ptr + 8, 'i64');
-                break;
-              case cs.SYSZ_OP_MEM:
-                op.mem = {
-                  base: Memory.read(op_ptr + 8, 'ubyte'),
-                  index: Memory.read(op_ptr + 9, 'ubyte'),
-                  length: Memory.read(op_ptr + 16, 'ulong'),
-                  disp: Memory.read(op_ptr + 24, 'long'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_XCORE:
-          detail.xcore = {};
-          arch = detail.xcore;
-          arch.operands = [];
-          arch.op_count = Memory.read(arch_info_ptr + 0, 'ubyte');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 4 + i * 16;
-            op.type = Memory.read(op_ptr + 0, 'i32');
-            switch (op.type) {
-              case cs.XCORE_OP_REG:
-                op.reg = Memory.read(op_ptr + 4, 'i32');
-                break;
-              case cs.XCORE_OP_IMM:
-                op.imm = Memory.read(op_ptr + 4, 'i32');
-                break;
-              case cs.XCORE_OP_MEM:
-                op.mem = {
-                  base: Memory.read(op_ptr + 4, 'ubyte'),
-                  index: Memory.read(op_ptr + 5, 'ubyte'),
-                  disp: Memory.read(op_ptr + 8, 'i32'),
-                  direct: Memory.read(op_ptr + 12, 'i32'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_TMS320C64X:
-          detail.tms320c64x = {};
-          arch = detail.tms320c64x;
-          arch.operands = [];
-          arch.op_count = Memory.read(arch_info_ptr + 0, 'ubyte');
-          arch.condition = {
-            reg: Memory.read(arch_info_ptr + 260, 'i32'),
-            zero: Memory.read(arch_info_ptr + 264, 'i32'),
-          };
-          arch.funit = {
-            unit: Memory.read(arch_info_ptr + 268, 'u32'),
-            side: Memory.read(arch_info_ptr + 272, 'u32'),
-            crosspath: Memory.read(arch_info_ptr + 276, 'u32'),
-          };
-          arch.parallel = Memory.read(arch_info_ptr + 280, 'u32');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 4 + i * 32;
-            op.type = Memory.read(op_ptr, 'i32');
-            switch (op.type) {
-              case cs.TMS320C64X_OP_REG:
-                op.reg = Memory.read(op_ptr + 4, 'u32');
-                break;
-              case cs.TMS320C64X_OP_IMM:
-                op.imm = Memory.read(op_ptr + 4, 'i32');
-                break;
-              case cs.TMS320C64X_OP_MEM:
-                op.mem = {
-                  base: Memory.read(op_ptr + 4, 'u32'),
-                  disp: Memory.read(op_ptr + 8, 'i32'),
-                  unit: Memory.read(op_ptr + 12, 'i32'),
-                  scaled: Memory.read(op_ptr + 16, 'i32'),
-                  disptype: Memory.read(op_ptr + 20, 'i32'),
-                  direction: Memory.read(op_ptr + 24, 'i32'),
-                  modify: Memory.read(op_ptr + 28, 'i32'),
-                };
-                break;
-              case cs.TMS320C64X_OP_REGPAIR:
-                op.reg = Memory.read(op_ptr + 4, 'u32');
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_M680X:
-          detail.m680x = {};
-          arch = detail.m680x;
-          arch.operands = [];
-          arch.flags = Memory.read(arch_info_ptr + 0, 'ubyte');
-          arch.op_count = Memory.read(arch_info_ptr + 1, 'ubyte');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 4 + i * 24;
-            op.type = Memory.read(op_ptr, 'i32');
-            op.size = Memory.read(op_ptr + 20, 'ubyte');
-            op.access = Memory.read(op_ptr + 21, 'ubyte');
-            switch (op.type) {
-              case cs.M680X_OP_IMMEDIATE:
-                op.imm = Memory.read(op_ptr + 4, 'i32');
-                break;
-              case cs.M680X_OP_REGISTER:
-                op.reg = Memory.read(op_ptr + 4, 'i32');
-                break;
-              case cs.M680X_OP_INDEXED:
-                op.idx = {
-                  base_reg: Memory.read(op_ptr + 4, 'i32'),
-                  offset_reg: Memory.read(op_ptr + 8, 'i32'),
-                  offset: Memory.read(op_ptr + 12, 'short'),
-                  offset_addr: Memory.read(op_ptr + 14, 'ushort'),
-                  offset_bits: Memory.read(op_ptr + 16, 'ubyte'),
-                  inc_dec: Memory.read(op_ptr + 17, 'byte'),
-                  flags: Memory.read(op_ptr + 18, 'ubyte'),
-                };
-                break;
-              case cs.M680X_OP_RELATIVE:
-                op.rel = {
-                  address: Memory.read(op_ptr + 4, 'ushort'),
-                  offset: Memory.read(op_ptr + 6, 'short'),
-                };
-                break;
-              case cs.M680X_OP_EXTENDED:
-                op.ext = {
-                  address: Memory.read(op_ptr + 4, 'ushort'),
-                  indirect: Memory.read(op_ptr + 6, 'bool'),
-                };
-                break;
-              case cs.M680X_OP_DIRECT:
-                op.direct_addr = Memory.read(op_ptr + 4, 'ubyte');
-                break;
-              case cs.M680X_OP_CONSTANT:
-                op.const_val = Memory.read(op_ptr + 4, 'ubyte');
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_EVM:
-          detail.evm = {};
-          arch = detail.evm;
-          arch.pop = Memory.read(arch_info_ptr + 0, 'ubyte');
-          arch.push = Memory.read(arch_info_ptr + 1, 'ubyte');
-          arch.fee = Memory.read(arch_info_ptr + 4, 'ubyte');
-          break;
-        case ARCH_MOS65XX:
-          detail.mos65xx = {};
-          arch = detail.mos65xx;
-          arch.operands = [];
-          arch.am = Memory.read(arch_info_ptr + 0, 'i32');
-          arch.modifies_flags = Memory.read(arch_info_ptr + 4, 'bool');
-          arch.op_count = Memory.read(arch_info_ptr + 5, 'ubyte');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 8 + i * 8;
-            op.type = Memory.read(op_ptr, 'i32');
-            switch (op.type) {
-              case cs.MOS65XX_OP_REG:
-                op.reg = Memory.read(op_ptr + 4, 'i32');
-                break;
-              case cs.MOS65XX_OP_IMM:
-                op.imm = Memory.read(op_ptr + 4, 'i32');
-                break;
-              case cs.MOS65XX_OP_MEM:
-                op.mem = Memory.read(op_ptr + 4, 'i32');
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_WASM:
-          detail.wasm = {};
-          arch = detail.wasm;
-          arch.operands = [];
-          arch.op_count = Memory.read(arch_info_ptr + 0, 'ubyte');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 8 + i * 32;
-            op.type = Memory.read(op_ptr, 'i32');
-            op.size = Memory.read(op_ptr + 4, 'i32');
-            switch (op.type) {
-              case cs.WASM_OP_INT7:
-                op.int7 = Memory.read(op_ptr + 8, 'ubyte');
-                break;
-              case cs.WASM_OP_VARUINT32:
-                op.varuint32 = Memory.read(op_ptr + 8, 'u32');
-                break;
-              case cs.WASM_OP_VARUINT64:
-                op.varuint64 = Memory.read(op_ptr + 8, 'u64');
-                break;
-              case cs.WASM_OP_UINT32:
-                op.uint32 = Memory.read(op_ptr + 8, 'u32');
-                break;
-              case cs.WASM_OP_UINT64:
-                op.uint64 = Memory.read(op_ptr + 8, 'u64');
-                break;
-              case cs.WASM_OP_IMM:
-                op.imm = [];
-                for (let i = 0; i < 2; i++)
-                  op.imm[i] = Memory.read(op_ptr + 8 + i, 'u32');
-                break;
-              case cs.WASM_OP_BRTABLE:
-                op.brtable = {
-                  length: Memory.read(op_ptr + 8, 'u32'),
-                  address: Memory.read(op_ptr + 12, 'u64'),
-                  default_target: Memory.read(op_ptr + 20, 'u32'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_BPF:
-          detail.bpf = {};
-          arch = detail.bpf;
-          arch.operands = [];
-          arch.op_count = Memory.read(arch_info_ptr + 0, 'ubyte');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 8 + i * 24;
-            op.type = Memory.read(op_ptr + 0, 'i32');
-            op.access = Memory.read(op_ptr + 16, 'u32');
-            switch (op.type) {
-              case cs.BPF_OP_REG:
-                op.reg = Memory.read(op_ptr + 8, 'ubyte');
-                break;
-              case cs.BPF_OP_IMM:
-                op.imm = Memory.read(op_ptr + 8, 'i64');
-                break;
-              case cs.BPF_OP_OFF:
-                op.off = Memory.read(op_ptr + 8, 'u32');
-                break;
-              case cs.BPF_OP_MEM:
-                op.mem = {
-                  base: Memory.read(op_ptr + 8, 'i32'),
-                  disp: Memory.read(op_ptr + 12, 'u32'),
-                };
-                break;
-              case cs.BPF_OP_MMEM:
-                op.mmem = Memory.read(op_ptr + 8, 'u32');
-                break;
-              case cs.BPF_OP_MSH:
-                op.msh = Memory.read(op_ptr + 8, 'u32');
-                break;
-              case cs.BPF_OP_EXT:
-                op.ext = Memory.read(op_ptr + 8, 'u32');
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_RISCV:
-          detail.riscv = {};
-          arch = detail.riscv;
-          arch.operands = [];
-          arch.need_effective_addr = Memory.read(arch_info_ptr + 0, 'bool');
-          arch.op_count = Memory.read(arch_info_ptr + 1, 'ubyte');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 8 + i * 24;
-            op.type = Memory.read(op_ptr + 0, 'i32');
-            switch (op.type) {
-              case cs.RISCV_OP_REG:
-                op.reg = Memory.read(op_ptr + 8, 'u32');
-                break;
-              case cs.RISCV_OP_IMM:
-                op.imm = Memory.read(op_ptr + 8, 'i32');
-                break;
-              case cs.RISCV_OP_MEM:
-                op.mem = {
-                  base: Memory.read(op_ptr + 8, 'u32'),
-                  disp: Memory.read(op_ptr + 16, 'i64'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_SH:
-          detail.sh = {};
-          arch = detail.sh;
-          arch.operands = [];
-          arch.insn = Memory.read(arch_info_ptr + 0, 'u32');
-          arch.size = Memory.read(arch_info_ptr + 4, 'ubyte');
-          arch.op_count = Memory.read(arch_info_ptr + 5, 'ubyte');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 8 + i * 58;
-            op.type = Memory.read(op_ptr + 0, 'i32');
-            switch (op.type) {
-              case cs.SH_OP_IMM:
-                op.imm = Memory.read(op_ptr + 8, 'i64');
-                break;
-              case cs.SH_OP_REG:
-                op.reg = Memory.read(op_ptr + 8, 'i32');
-                break;
-              case cs.SH_OP_MEM:
-                op.mem = {
-                  address: Memory.read(op_ptr + 8, 'i32'),
-                  reg: Memory.read(op_ptr + 12, 'i32'),
-                  disp: Memory.read(op_ptr + 16, 'i32'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-        case ARCH_TRICORE:
-          detail.tricore = {};
-          arch = detail.tricore;
-          arch.operands = [];
-          arch.op_count = Memory.read(arch_info_ptr + 0, 'ubyte');
-          arch.update_flags = Memory.read(arch_info_ptr + 132, 'bool');
-          for (let i = 0; i < arch.op_count; i++) {
-            op = {};
-            op_ptr = arch_info_ptr + 4 + i * 16;
-            op.type = Memory.read(op_ptr + 0, 'i32');
-            switch (op.type) {
-              case cs.TRICORE_OP_REG:
-                op.reg = Memory.read(op_ptr + 4, 'u32');
-                break;
-              case cs.TRICORE_OP_IMM:
-                op.imm = Memory.read(op_ptr + 4, 'i32');
-                break;
-              case cs.TRICORE_OP_MEM:
-                op.mem = {
-                  base: Memory.read(op_ptr + 4, 'ubyte'),
-                  disp: Memory.read(op_ptr + 8, 'i32'),
-                };
-                break;
-            }
-            arch.operands[i] = op;
-          }
-          break;
-      }
+      detail[this.arch_info.entry] = new this.arch_info.instance(
+        arch_info_ptr,
+        Memory,
+      );
       return detail;
     }
 
@@ -2220,7 +1620,7 @@ namespace cs {
           'capstone: In order to use regs_access() you need to have cs.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const insn_pointer: ptr = this.ref(insn);
+      const insn_pointer: ptr = this.ref([insn]);
       const regs_read_ptr = Memory.malloc(64 * 2);
       const regs_read_count_ptr = Memory.malloc(1);
       const regs_write_ptr = Memory.malloc(64 * 2);
@@ -2271,7 +1671,7 @@ namespace cs {
           'capstone: In order to use op_count() you need to have cs.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: ptr = this.ref(insn);
+      const pointer: ptr = this.ref([insn]);
       const operand_count: number = Wrapper._cs_op_count(
         handle,
         pointer,
@@ -2287,7 +1687,7 @@ namespace cs {
           'capstone: In order to use op_index() you need to have cs.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: ptr = this.ref(insn);
+      const pointer: ptr = this.ref([insn]);
       const index: number = Wrapper._cs_op_index(
         handle,
         pointer,
@@ -2304,7 +1704,7 @@ namespace cs {
           'capstone: In order to use insn_group() you need to have cs.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: ptr = this.ref(insn);
+      const pointer: ptr = this.ref([insn]);
 
       const valid_group: boolean = Boolean(
         Wrapper._cs_insn_group(handle, pointer, group_id),
@@ -2319,7 +1719,7 @@ namespace cs {
           'capstone: In order to use reg_read() you need to have cs.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: ptr = this.ref(insn);
+      const pointer: ptr = this.ref([insn]);
 
       const valid_reg: boolean = Boolean(
         Wrapper._cs_reg_read(handle, pointer, reg_id),
@@ -2334,7 +1734,7 @@ namespace cs {
           'capstone: In order to use reg_write() you need to have cs.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: ptr = this.ref(insn);
+      const pointer: ptr = this.ref([insn]);
 
       const valid_reg: boolean = Boolean(
         Wrapper._cs_reg_write(handle, pointer, reg_id),
@@ -2375,96 +1775,21 @@ namespace cs {
       );
       return ret;
     }
-  }
-}
 
-declare namespace cs {
-  const X86_OP_REG: number;
-  const X86_OP_IMM: number;
-  const X86_OP_MEM: number;
-  const ARM64_OP_REG: number;
-  const ARM64_OP_REG_MRS: number;
-  const ARM64_OP_REG_MSR: number;
-  const ARM64_OP_CIMM: number;
-  const ARM64_OP_IMM: number;
-  const ARM64_OP_FP: number;
-  const ARM64_OP_PSTATE: number;
-  const ARM64_OP_SYS: number;
-  const ARM64_OP_BARRIER: number;
-  const ARM64_OP_PREFETCH: number;
-  const ARM64_OP_MEM: number;
-  const ARM64_OP_SVCR: number;
-  const ARM64_OP_SME_INDEX: number;
-  const M68K_OP_REG: number;
-  const M68K_OP_IMM: number;
-  const M68K_OP_FP_DOUBLE: number;
-  const M68K_OP_FP_SINGLE: number;
-  const M68K_OP_REG_PAIR: number;
-  const M68K_OP_REG_BITS: number;
-  const M68K_OP_BR_DISP: number;
-  const M68K_OP_MEM: number;
-  const MIPS_OP_REG: number;
-  const MIPS_OP_IMM: number;
-  const MIPS_OP_MEM: number;
-  const PPC_OP_REG: number;
-  const PPC_OP_IMM: number;
-  const PPC_OP_CRX: number;
-  const PPC_OP_MEM: number;
-  const SPARC_OP_REG: number;
-  const SPARC_OP_IMM: number;
-  const SPARC_OP_MEM: number;
-  const SYSZ_OP_REG: number;
-  const SYSZ_OP_IMM: number;
-  const SYSZ_OP_MEM: number;
-  const XCORE_OP_REG: number;
-  const XCORE_OP_IMM: number;
-  const XCORE_OP_MEM: number;
-  const ARM_OP_REG: number;
-  const ARM_OP_IMM: number;
-  const ARM_OP_PIMM: number;
-  const ARM_OP_FP: number;
-  const ARM_OP_SETEND: number;
-  const ARM_OP_MEM: number;
-  const ARM_OP_SYSREG: number;
-  const M68K_SIZE_TYPE_CPU: number;
-  const M68K_SIZE_TYPE_FPU: number;
-  const TMS320C64X_OP_REG: number;
-  const TMS320C64X_OP_IMM: number;
-  const TMS320C64X_OP_MEM: number;
-  const TMS320C64X_OP_REGPAIR: number;
-  const M680X_OP_IMMEDIATE: number;
-  const M680X_OP_REGISTER: number;
-  const M680X_OP_INDEXED: number;
-  const M680X_OP_RELATIVE: number;
-  const M680X_OP_EXTENDED: number;
-  const M680X_OP_DIRECT: number;
-  const M680X_OP_CONSTANT: number;
-  const MOS65XX_OP_REG: number;
-  const MOS65XX_OP_IMM: number;
-  const MOS65XX_OP_MEM: number;
-  const WASM_OP_INT7: number;
-  const WASM_OP_VARUINT32: number;
-  const WASM_OP_VARUINT64: number;
-  const WASM_OP_UINT32: number;
-  const WASM_OP_UINT64: number;
-  const WASM_OP_IMM: number;
-  const WASM_OP_BRTABLE: number;
-  const BPF_OP_REG: number;
-  const BPF_OP_IMM: number;
-  const BPF_OP_OFF: number;
-  const BPF_OP_MEM: number;
-  const BPF_OP_MMEM: number;
-  const BPF_OP_MSH: number;
-  const BPF_OP_EXT: number;
-  const RISCV_OP_REG: number;
-  const RISCV_OP_IMM: number;
-  const RISCV_OP_MEM: number;
-  const SH_OP_REG: number;
-  const SH_OP_IMM: number;
-  const SH_OP_MEM: number;
-  const TRICORE_OP_REG: number;
-  const TRICORE_OP_IMM: number;
-  const TRICORE_OP_MEM: number;
+    public INSN_OFFSET(insns: Array<cs_insn>, position: number): number {
+      const pointer = this.ref(insns);
+      const offset = Wrapper._cs_insn_offset(pointer, position);
+      Memory.free(pointer);
+      return offset;
+    }
+
+    public X86_REL_ADDR(insn: cs_insn): number {
+      const pointer = this.ref([insn]);
+      const addr = Wrapper._x86_rel_addr(pointer);
+      Memory.free(pointer);
+      return addr;
+    }
+  }
 }
 
 export default cs;
@@ -2483,4 +1808,54 @@ export {
   cs_op_type,
   cs_ac_type,
   cs_regs,
+  type cs_arm64_op,
+  ARM64,
+  cs_arm64,
+  type cs_arm_op,
+  ARM,
+  cs_arm,
+  type cs_bpf_op,
+  BPF,
+  cs_bpf,
+  EVM,
+  cs_evm,
+  type cs_m680x_op,
+  M680X,
+  cs_m680x,
+  type cs_m68k_op,
+  M68K,
+  cs_m68k,
+  type cs_mips_op,
+  MIPS,
+  cs_mips,
+  type cs_mos65xx_op,
+  MOS65XX,
+  cs_mos65xx,
+  type cs_ppc_op,
+  PPC,
+  cs_ppc,
+  type cs_riscv_op,
+  RISCV,
+  cs_riscv,
+  type cs_sh_op,
+  SH,
+  cs_sh,
+  type cs_sparc_op,
+  SPARC,
+  cs_sparc,
+  type cs_tms320c64x_op,
+  TMS320C64X,
+  cs_tms320c64x,
+  type cs_tricore_op,
+  TRICORE,
+  cs_tricore,
+  type cs_wasm_op,
+  WASM,
+  cs_wasm,
+  type cs_x86_op,
+  X86,
+  cs_x86,
+  type cs_xcore_op,
+  XCORE,
+  cs_xcore,
 };

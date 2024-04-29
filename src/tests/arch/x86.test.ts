@@ -11,10 +11,20 @@ test('cs.ARCH_X86', () => {
     0x74, 0xfc,
   ]);
   const disassembler = new cs.Capstone(cs.ARCH_X86, cs.MODE_16);
+  disassembler.option(cs.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  let index = 0;
-  expect(insns).toEqual([
+  //console.log(require('util').inspect(insns, { depth: null }));
+  expect(
+    insns.map(({ id, address, size, mnemonic, op_str, bytes }) => ({
+      id,
+      address,
+      size,
+      mnemonic,
+      op_str,
+      bytes,
+    })),
+  ).toEqual([
     {
       id: 332,
       address: 4096,

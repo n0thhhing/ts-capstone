@@ -14,7 +14,6 @@ test('disasm ARM64', () => {
   ]);
 
   const disassembler = new cs.Capstone(cs.ARCH_ARM64, cs.MODE_ARM);
-  //disassembler.option(cs.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
   const expectedInstructions = [
     {

@@ -12,9 +12,19 @@ test('cs.ARCH_M680X', () => {
     0x00,
   ]);
   const disassembler = new cs.Capstone(cs.ARCH_M680X, cs.MODE_M680X_CPU12);
+  disassembler.option(cs.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  expect(insns).toEqual([
+  expect(
+    insns.map(({ id, address, size, mnemonic, op_str, bytes }) => ({
+      id,
+      address,
+      size,
+      mnemonic,
+      op_str,
+      bytes,
+    })),
+  ).toEqual([
     {
       id: 42,
       address: 4096,

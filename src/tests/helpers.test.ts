@@ -1,5 +1,5 @@
 import { expect, test, afterAll } from 'bun:test';
-import cs from '../wrapper';
+import cs, { ARM64 } from '../wrapper';
 
 const disassembler = new cs.Capstone(cs.ARCH_ARM64, cs.MODE_ARM);
 disassembler.option(cs.OPT_DETAIL, true);
@@ -311,8 +311,8 @@ test('op_index', () => {
     },
   };
 
-  const failure = disassembler.op_index(insn, cs.ARM64_OP_REG, 2);
-  const success = disassembler.op_index(insn, cs.ARM64_OP_REG, 1);
+  const failure = disassembler.op_index(insn, ARM64.OP_REG, 2);
+  const success = disassembler.op_index(insn, ARM64.OP_REG, 1);
   expect(failure).toBe(-1);
   expect(success).toBe(1);
 });
