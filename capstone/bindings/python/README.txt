@@ -19,8 +19,7 @@ specific version of libcapstone you would like to use.
 If you don't want to build your own copy of Capstone, you can use a precompiled
 binary distribution from PyPI. Saying `pip install capstone` should
 automatically obtain an appropriate copy for your system. If it does not, please
-open an issue at https://github.com/aquynh/capstone and tag @rhelmot - she
-will fix this, probably!
+open an issue at https://github.com/capstone-engine/capstone.
 
 --------------------------------------------------------------------------------
 
@@ -30,7 +29,7 @@ disasm engine for binary analysis and reversing in the security community.
 Created by Nguyen Anh Quynh, then developed and maintained by a small community,
 Capstone offers some unparalleled features:
 
-- Support multiple hardware architectures: ARM, ARM64 (ARMv8), Mips, PPC, Sparc,
+- Support multiple hardware architectures: ARM, AARCH64 (ARMv8), Mips, PPC, Sparc,
   SystemZ, XCore and X86 (including X86_64).
 
 - Having clean/simple/lightweight/intuitive architecture-neutral API.

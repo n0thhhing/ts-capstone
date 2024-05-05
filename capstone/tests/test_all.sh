@@ -1,5 +1,5 @@
 ./test_arm
-./test_arm64
+./test_aarch64
 ./test_basic
 ./test_bpf
 ./test_customized_mnem
@@ -19,3 +19,5 @@
 ./test_winkernel
 ./test_x86
 ./test_xcore
+./test_alpha
+./test_hppa

@@ -70,8 +70,8 @@ CFLAGS += -DCAPSTONE_HAS_ARM
 SOURCES += test_arm.c
 endif
 ifneq (,$(findstring aarch64,$(CAPSTONE_ARCHS)))
-CFLAGS += -DCAPSTONE_HAS_ARM64
-SOURCES += test_arm64.c
+CFLAGS += -DCAPSTONE_HAS_AARCH64
+SOURCES += test_aarch64.c
 endif
 ifneq (,$(findstring m68k,$(CAPSTONE_ARCHS)))
 CFLAGS += -DCAPSTONE_HAS_M68K
@@ -130,8 +130,22 @@ CFLAGS += -DCAPSTONE_HAS_BPF
 SOURCES += test_bpf.c
 endif
 ifneq (,$(findstring tricore,$(CAPSTONE_ARCHS)))
+CFLAGS += -DCAPSTONE_HAS_TRICORE
 SOURCES += test_tricore.c
 endif
+ifneq (,$(findstring sh,$(CAPSTONE_ARCHS)))
+CFLAGS += -DCAPSTONE_HAS_SH
+SOURCES += test_sh.c
+endif
+ifneq (,$(findstring alpha,$(CAPSTONE_ARCHS)))
+CFLAGS += -DCAPSTONE_HAS_ALPHA
+SOURCES += test_alpha.c
+endif
+ifneq (,$(findstring hppa,$(CAPSTONE_ARCHS)))
+CFLAGS += -DCAPSTONE_HAS_HPPA
+SOURCES += test_hppa.c
+endif
+
 
 OBJS = $(addprefix $(OBJDIR)/,$(SOURCES:.c=.o))
 BINARY = $(addprefix $(TESTDIR)/,$(SOURCES:.c=$(BIN_EXT)))

@@ -10,7 +10,7 @@
 
 char *get_detail_evm(csh *handle, cs_mode mode, cs_insn *ins);
 char *get_detail_arm(csh *handle, cs_mode mode, cs_insn *ins);
-char *get_detail_arm64(csh *handle, cs_mode mode, cs_insn *ins);
+char *get_detail_aarch64(csh *handle, cs_mode mode, cs_insn *ins);
 char *get_detail_m680x(csh *handle, cs_mode mode, cs_insn *ins);
 char *get_detail_mips(csh *handle, cs_mode mode, cs_insn *ins);
 char *get_detail_ppc(csh *handle, cs_mode mode, cs_insn *ins);
@@ -24,5 +24,7 @@ char *get_detail_mos65xx(csh *handle, cs_mode mode, cs_insn *ins);
 char *get_detail_tms320c64x(csh *handle, cs_mode mode, cs_insn *ins);
 char *get_detail_bpf(csh *handle, cs_mode mode, cs_insn *ins);
 char *get_detail_tricore(csh *handle, cs_mode mode, cs_insn *ins);
+char *get_detail_alpha(csh *handle, cs_mode mode, cs_insn *ins);
+char *get_detail_hppa(csh *handle, cs_mode mode, cs_insn *ins);
 
 #endif /* FACTORY_H */

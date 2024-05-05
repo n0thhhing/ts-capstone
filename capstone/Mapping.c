@@ -3,6 +3,8 @@
 /*    Rot127 <unisono@quyllur.org>, 2022-2023 */
 
 #include "Mapping.h"
+#include "capstone/capstone.h"
+#include "utils.h"
 
 // create a cache for fast id lookup
 static unsigned short *make_id2insn(const insn_map *insns, unsigned int size)
@@ -85,6 +87,49 @@ void map_add_implicit_write(MCInst *MI, uint32_t Reg)
 	}
 }
 
+/// Adds a register to the implicit read register list.
+/// It will not add the same register twice.
+void map_add_implicit_read(MCInst *MI, uint32_t Reg)
+{
+	if (!MI->flat_insn->detail)
+		return;
+
+	uint16_t *regs_read = MI->flat_insn->detail->regs_read;
+	for (int i = 0; i < MAX_IMPL_R_REGS; ++i) {
+		if (i == MI->flat_insn->detail->regs_read_count) {
+			regs_read[i] = Reg;
+			MI->flat_insn->detail->regs_read_count++;
+			return;
+		}
+		if (regs_read[i] == Reg)
+			return;
+	}
+}
+
+/// Removes a register from the implicit write register list.
+void map_remove_implicit_write(MCInst *MI, uint32_t Reg)
+{
+	if (!MI->flat_insn->detail)
+		return;
+
+	uint16_t *regs_write = MI->flat_insn->detail->regs_write;
+	bool shorten_list = false;
+	for (int i = 0; i < MAX_IMPL_W_REGS; ++i) {
+		if (shorten_list) {
+			regs_write[i - 1] = regs_write[i];
+		}
+		if (i >= MI->flat_insn->detail->regs_write_count)
+			return;
+
+		if (regs_write[i] == Reg) {
+			MI->flat_insn->detail->regs_write_count--;
+			// The register should exist only once in the list.
+			assert(!shorten_list);
+			shorten_list = true;
+		}
+	}
+}
+
 /// Copies the implicit read registers of @imap to @MI->flat_insn.
 /// Already present registers will be preserved.
 void map_implicit_reads(MCInst *MI, const insn_map *imap)
@@ -135,6 +180,28 @@ void map_implicit_writes(MCInst *MI, const insn_map *imap)
 #endif // CAPSTONE_DIET
 }
 
+/// Adds a given group to @MI->flat_insn.
+/// A group is never added twice.
+void add_group(MCInst *MI, unsigned /* arch_group */ group)
+{
+#ifndef CAPSTONE_DIET
+	if (!MI->flat_insn->detail)
+		return;
+
+	cs_detail *detail = MI->flat_insn->detail;
+	if (detail->groups_count >= MAX_NUM_GROUPS) {
+		printf("ERROR: Too many groups defined.\n");
+		return;
+	}
+	for (int i = 0; i < detail->groups_count; ++i) {
+		if (detail->groups[i] == group) {
+			return;
+		}
+	}
+	detail->groups[detail->groups_count++] = group;
+#endif // CAPSTONE_DIET
+}
+
 /// Copies the groups from @imap to @MI->flat_insn.
 /// Already present groups will be preserved.
 void map_groups(MCInst *MI, const insn_map *imap)
@@ -155,6 +222,19 @@ void map_groups(MCInst *MI, const insn_map *imap)
 		detail->groups[detail->groups_count++] = group;
 		group = imap[Opcode].groups[++i];
 	}
+#endif // CAPSTONE_DIET
+}
+
+/// Returns the pointer to the supllementary information in
+/// the instruction mapping table @imap or NULL in case of failure.
+const void *map_get_suppl_info(MCInst *MI, const insn_map *imap)
+{
+#ifndef CAPSTONE_DIET
+	if (!MI->flat_insn->detail)
+		return NULL;
+
+	unsigned Opcode = MCInst_getOpcode(MI);
+	return &imap[Opcode].suppl_info;
 #endif // CAPSTONE_DIET
 }
 
@@ -252,3 +332,67 @@ const cs_ac_type mapping_get_op_access(MCInst *MI, unsigned OpNum,
 DEFINE_get_detail_op(arm, ARM);
 DEFINE_get_detail_op(ppc, PPC);
 DEFINE_get_detail_op(tricore, TriCore);
+DEFINE_get_detail_op(aarch64, AArch64);
+DEFINE_get_detail_op(alpha, Alpha);
+DEFINE_get_detail_op(hppa, HPPA);
+
+/// Returns true if for this architecture the
+/// alias operands should be filled.
+/// TODO: Replace this with a proper option.
+/// 			So it can be toggled between disas() calls.
+bool map_use_alias_details(const MCInst *MI) {
+	assert(MI);
+	return !(MI->csh->detail_opt & CS_OPT_DETAIL_REAL);
+}
+
+/// Sets the setDetailOps flag to @p Val.
+/// If detail == NULLit refuses to set the flag to true.
+void map_set_fill_detail_ops(MCInst *MI, bool Val) {
+	assert(MI);
+	if (!detail_is_set(MI)) {
+		MI->fillDetailOps = false;
+		return;
+	}
+
+	MI->fillDetailOps = Val;
+}
+
+/// Sets the instruction alias flags and the given alias id.
+void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias) {
+	assert(MI);
+	MI->isAliasInstr = Val;
+	MI->flat_insn->is_alias = Val;
+	MI->flat_insn->alias_id = Alias;
+}
+
+static inline bool char_ends_mnem(const char c) {
+	return (!c || c == ' ' || c == '\t');
+}
+
+/// Sets an alternative id for some instruction.
+/// Or -1 if it fails.
+/// You must add (<ARCH>_INS_ALIAS_BEGIN + 1) to the id to get the real id.
+void map_set_alias_id(MCInst *MI, const SStream *O, const name_map *alias_mnem_id_map, int map_size) {
+	if (!MCInst_isAlias(MI))
+		return;
+
+	char alias_mnem[16] = { 0 };
+	int i = 0, j = 0;
+	const char *asm_str_buf = O->buffer;
+	// Skip spaces and tabs
+	while (is_blank_char(asm_str_buf[i])) {
+		if (!asm_str_buf[i]) {
+			MI->flat_insn->alias_id = -1;
+			return;
+		}
+		++i;
+	}
+	for (; j < sizeof(alias_mnem) - 1; ++j, ++i) {
+		if (char_ends_mnem(asm_str_buf[i]))
+			break;
+		alias_mnem[j] = asm_str_buf[i];
+	}
+
+	MI->flat_insn->alias_id = name2id(alias_mnem_id_map, map_size, alias_mnem);
+}
+

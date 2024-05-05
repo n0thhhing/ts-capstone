@@ -6,6 +6,7 @@
 #include <string.h>
 
 #include "../../cs_priv.h"
+#include "../../Mapping.h"
 #include "../../utils.h"
 
 #include "EVMMapping.h"
@@ -14,7 +15,6 @@
 static const cs_evm insns[256] = {
 #include "EVMMappingInsn.inc"
 };
-#endif
 
 // look for @id in @insns, given its size in @max.
 // return -1 if not found
@@ -29,6 +29,7 @@ static int evm_insn_find(const cs_evm *insns, unsigned int max, unsigned int id)
 
 	return (int)id;
 }
+#endif
 
 // fill in details
 void EVM_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
@@ -36,7 +37,7 @@ void EVM_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 	insn->id = id;
 #ifndef CAPSTONE_DIET
 	if (evm_insn_find(insns, ARR_SIZE(insns), id) > 0) {
-		if (h->detail) {
+		if (h->detail_opt) {
 			memcpy(&insn->detail->evm, &insns[id], sizeof(insns[id]));
 		}
 	}

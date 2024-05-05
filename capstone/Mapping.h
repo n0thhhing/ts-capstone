@@ -21,13 +21,16 @@ typedef struct insn_map {
 	unsigned short mapid;		    // The Capstone instruction id
 #ifndef CAPSTONE_DIET
 	uint16_t regs_use[MAX_IMPL_R_REGS]; ///< list of implicit registers used by
-		///< this instruction
+					    ///< this instruction
 	uint16_t regs_mod[MAX_IMPL_W_REGS]; ///< list of implicit registers modified
-		///< by this instruction
+					    ///< by this instruction
 	unsigned char groups
 		[MAX_NUM_GROUPS]; ///< list of group this instruction belong to
 	bool branch;		  // branch instruction?
 	bool indirect_branch;	  // indirect branch instruction?
+	union {
+		ppc_suppl_info ppc;
+	} suppl_info; // Supplementary information for each instruction.
 #endif
 } insn_map;
 
@@ -39,7 +42,7 @@ unsigned short insn_find(const insn_map *m, unsigned int max, unsigned int id,
 unsigned int find_cs_id(unsigned MC_Opcode, const insn_map *imap,
 			unsigned imap_size);
 
-#define MAX_NO_DATA_TYPES 10
+#define MAX_NO_DATA_TYPES 16
 
 ///< A LLVM<->CS Mapping entry of an MCOperand.
 typedef struct {
@@ -47,7 +50,7 @@ typedef struct {
 	uint8_t /* cs_ac_type */ access; ///< The access type (read, write)
 	uint8_t				 /* cs_data_type */
 		dtypes[MAX_NO_DATA_TYPES]; ///< List of op types. Terminated by
-		///< CS_DATA_TYPE_LAST
+					   ///< CS_DATA_TYPE_LAST
 } mapping_op;
 
 #define MAX_NO_INSN_MAP_OPS 16
@@ -98,14 +101,20 @@ int name2id(const name_map *map, int max, const char *name);
 const char *id2name(const name_map *map, int max, const unsigned int id);
 
 void map_add_implicit_write(MCInst *MI, uint32_t Reg);
+void map_add_implicit_read(MCInst *MI, uint32_t Reg);
+void map_remove_implicit_write(MCInst *MI, uint32_t Reg);
 
 void map_implicit_reads(MCInst *MI, const insn_map *imap);
 
 void map_implicit_writes(MCInst *MI, const insn_map *imap);
 
+void add_group(MCInst *MI, unsigned /* arch_group */ group);
+
 void map_groups(MCInst *MI, const insn_map *imap);
 
 void map_cs_id(MCInst *MI, const insn_map *imap, unsigned int imap_size);
+
+const void *map_get_suppl_info(MCInst *MI, const insn_map *imap);
 
 #define DECL_get_detail_op(arch, ARCH) \
 	cs_##arch##_op *ARCH##_get_detail_op(MCInst *MI, int offset);
@@ -113,6 +122,9 @@ void map_cs_id(MCInst *MI, const insn_map *imap, unsigned int imap_size);
 DECL_get_detail_op(arm, ARM);
 DECL_get_detail_op(ppc, PPC);
 DECL_get_detail_op(tricore, TriCore);
+DECL_get_detail_op(aarch64, AArch64);
+DECL_get_detail_op(alpha, Alpha);
+DECL_get_detail_op(hppa, HPPA);
 
 /// Increments the detail->arch.op_count by one.
 #define DEFINE_inc_detail_op_count(arch, ARCH) \
@@ -134,6 +146,12 @@ DEFINE_inc_detail_op_count(ppc, PPC);
 DEFINE_dec_detail_op_count(ppc, PPC);
 DEFINE_inc_detail_op_count(tricore, TriCore);
 DEFINE_dec_detail_op_count(tricore, TriCore);
+DEFINE_inc_detail_op_count(aarch64, AArch64);
+DEFINE_dec_detail_op_count(aarch64, AArch64);
+DEFINE_inc_detail_op_count(alpha, Alpha);
+DEFINE_dec_detail_op_count(alpha, Alpha);
+DEFINE_inc_detail_op_count(hppa, HPPA);
+DEFINE_dec_detail_op_count(hppa, HPPA);
 
 /// Returns true if a memory operand is currently edited.
 static inline bool doing_mem(const MCInst *MI)
@@ -158,11 +176,14 @@ static inline void set_doing_mem(const MCInst *MI, bool status)
 DEFINE_get_arch_detail(arm, ARM);
 DEFINE_get_arch_detail(ppc, PPC);
 DEFINE_get_arch_detail(tricore, TriCore);
+DEFINE_get_arch_detail(aarch64, AArch64);
+DEFINE_get_arch_detail(alpha, Alpha);
+DEFINE_get_arch_detail(hppa, HPPA);
 
 static inline bool detail_is_set(const MCInst *MI)
 {
 	assert(MI && MI->flat_insn);
-	return MI->flat_insn->detail != NULL;
+	return MI->flat_insn->detail != NULL && MI->csh->detail_opt & CS_OPT_ON;
 }
 
 static inline cs_detail *get_detail(const MCInst *MI)
@@ -170,5 +191,25 @@ static inline cs_detail *get_detail(const MCInst *MI)
 	assert(MI && MI->flat_insn);
 	return MI->flat_insn->detail;
 }
+
+/// Returns if the given instruction is an alias instruction.
+#define RETURN_IF_INSN_IS_ALIAS(MI) \
+do { \
+	if (MI->isAliasInstr) \
+		return; \
+} while(0)
+
+void map_set_fill_detail_ops(MCInst *MI, bool Val);
+
+static inline bool map_fill_detail_ops(MCInst *MI) {
+	assert(MI);
+	return MI->fillDetailOps;
+}
+
+void map_set_is_alias_insn(MCInst *MI, bool Val, uint64_t Alias);
+
+bool map_use_alias_details(const MCInst *MI);
+
+void map_set_alias_id(MCInst *MI, const SStream *O, const name_map *alias_mnem_id_map, int map_size);
 
 #endif // CS_MAPPING_H

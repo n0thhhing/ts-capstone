@@ -7,6 +7,7 @@
 #include <string.h>
 #include <assert.h>
 
+#include "../../Mapping.h"
 #include "../../utils.h"
 #include "../../cs_simple_types.h"
 
@@ -17,7 +18,7 @@
 
 #include "TriCoreGenInstrInfo.inc"
 
-static insn_map insns[] = {
+static const insn_map insns[] = {
 	// dummy item
 	{ 0,
 	  0,
@@ -39,7 +40,7 @@ void TriCore_get_insn_id(cs_struct *h, cs_insn *insn, unsigned int id)
 }
 
 #ifndef CAPSTONE_DIET
-static tricore_reg flag_regs[] = { TRICORE_REG_PSW };
+static const tricore_reg flag_regs[] = { TRICORE_REG_PSW };
 #endif // CAPSTONE_DIET
 
 static inline void check_updates_flags(MCInst *MI)
@@ -72,14 +73,14 @@ void TriCore_set_instr_map_data(MCInst *MI)
 
 #ifndef CAPSTONE_DIET
 
-static const char *insn_names[] = {
+static const char * const insn_names[] = {
 	NULL,
 
 #include "TriCoreGenCSMappingInsnName.inc"
 };
 
 // special alias insn
-static name_map alias_insn_names[] = { { 0, NULL } };
+static const name_map alias_insn_names[] = { { 0, NULL } };
 #endif
 
 const char *TriCore_insn_name(csh handle, unsigned int id)
@@ -103,7 +104,7 @@ const char *TriCore_insn_name(csh handle, unsigned int id)
 }
 
 #ifndef CAPSTONE_DIET
-static name_map group_name_maps[] = {
+static const name_map group_name_maps[] = {
 	{ TRICORE_GRP_INVALID, NULL },
 	{ TRICORE_GRP_CALL, "call" },
 	{ TRICORE_GRP_JUMP, "jump" },
@@ -123,20 +124,7 @@ const char *TriCore_group_name(csh handle, unsigned int id)
 }
 
 #ifndef CAPSTONE_DIET
-/// A LLVM<->CS Mapping entry of an operand.
-typedef struct insn_op {
-	uint8_t /* cs_op_type */ type;	 ///< Operand type (e.g.: reg, imm, mem)
-	uint8_t /* cs_ac_type */ access; ///< The access type (read, write)
-	uint8_t				 /* cs_data_type */
-		dtypes[10]; ///< List of op types. Terminated by CS_DATA_TYPE_LAST
-} insn_op;
-
-///< Operands of an instruction.
-typedef struct {
-	insn_op ops[16]; ///< NULL terminated array of operands.
-} insn_ops;
-
-const insn_ops insn_operands[] = {
+static const map_insn_ops insn_operands[] = {
 #include "TriCoreGenCSMappingInsnOp.inc"
 };
 #endif
@@ -144,7 +132,7 @@ const insn_ops insn_operands[] = {
 void TriCore_set_access(MCInst *MI)
 {
 #ifndef CAPSTONE_DIET
-	if (!(MI->csh->detail == CS_OPT_ON && MI->flat_insn->detail))
+	if (!(MI->csh->detail_opt == CS_OPT_ON && MI->flat_insn->detail))
 		return;
 
 	assert(MI->Opcode < ARR_SIZE(insn_operands));

@@ -5,10 +5,12 @@ Capstone source is organized as followings.
 
 .                   <- core engine + README + COMPILE.TXT etc
 ├── arch            <- code handling disasm engine for each arch
-│   ├── AArch64     <- ARM64 (aka ARMv8) engine
+│   ├── AArch64     <- AArch64 engine
+│   ├── Alpha       <- Alpha engine
 │   ├── ARM         <- ARM engine
 │   ├── BPF         <- Berkeley Packet Filter engine
 │   ├── EVM         <- Ethereum engine
+│   ├── HPPA        <- HPPA engine
 │   ├── M680X       <- M680X engine
 │   ├── M68K        <- M68K engine
 │   ├── Mips        <- Mips engine
@@ -37,7 +39,7 @@ Capstone source is organized as followings.
 └── xcode           <- Xcode support (for MacOSX compile)
 
 
-Follow instructions in COMPILE.TXT for how to compile and run test code.
+Follow the instructions in COMPILE.TXT for how to compile and run test code.
 
 Note: if you find some strange bugs, it is recommended to firstly clean
 the code and try to recompile/reinstall again. This can be done with:
@@ -61,9 +63,34 @@ Coding style
 - C code follows Linux kernel coding style, using tabs for indentation.
 - Python code uses 4 spaces for indentation.
 
+Updating an Architecture
+------------------------
+
+The update tool for Capstone is called `auto-sync` and can be found in `suite/auto-sync`.
+
+Not all architectures are supported yet.
+Run `suite/auto-sync/Updater/ASUpdater.py -h` to get a list of currently supported architectures.
+
+The documentation how to update with `auto-sync` or refactor an architecture module
+can be found in [docs/AutoSync.md](docs/AutoSync.md).
+
+If a module does not support `auto-sync` yet, it is highly recommended to refactor it
+instead of attempting to update it manually.
+Refactoring will take less time and updates it during the procedure.
+
+The one exception is `x86`. In LLVM we use several emitter backends to generate C code.
+One of those LLVM backends (the `DecoderEmitter`) has two versions.
+One for `x86` and another for all the other architectures.
+Until now it was not worth it to refactoring this unique `x86` backend. So `x86` is not
+supported currently.
 
 Adding an architecture
 ----------------------
+
+If your architecture is supported in LLVM or one of its forks, you can use `auto-sync` to
+add the new module.
+
+<!-- TODO: Move this info to the auto-sync docs -->
 
 Obviously, you first need to write all the logic and put it in a new directory arch/newarch
 Then, you have to modify other files.

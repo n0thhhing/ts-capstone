@@ -71,7 +71,6 @@ jobs:
         python-version: ${{ matrix.config.python-version }}
 
     - name: prepare
-      shell: 'script -q -e -c "bash {0}"'
       run: |
         export LD_LIBRARY_PATH=`pwd`/tests/:$LD_LIBRARY_PATH
         wget https://github.com/groundx/capstonefuzz/raw/master/corpus/corpus-libFuzzer-capstone_fuzz_disasmnext-latest.zip
@@ -81,37 +80,71 @@ jobs:
 
     - name: make
       if: startsWith(matrix.config.build-system, 'make')
-      shell: 'script -q -e -c "bash {0}"'
       run: |
-        ./make.sh;
-        make check;
+        ./make.sh
+        make check
+        sudo make install
         cp libcapstone.so.5 libcapstone.so.5.0
-        # sudo make install
 
     - name: cmake
       if: startsWith(matrix.config.build-system, 'cmake')
-      shell: 'script -q -e -c "bash {0}"'
       run: |
-        mkdir build && cd build;
-        cmake -DCAPSTONE_INSTALL=1 -DBUILD_SHARED_LIBS=1 ..;
-        cmake --build . --config Release;
-        cp libcapstone.* ../;
-        # sudo make install;
+        mkdir build && cd build
+        # build static library
+        cmake -DCAPSTONE_INSTALL=1 -DCMAKE_INSTALL_PREFIX=/usr ..
+        cmake --build . --config Release
+        # build shared library
+        cmake -DCAPSTONE_INSTALL=1 -DBUILD_SHARED_LIBS=1 -DCMAKE_INSTALL_PREFIX=/usr ..
+        sudo cmake --build . --config Release --target install
+        cp libcapstone.* ../
+        cp libcapstone.* ../tests/
+        cp test_* ../tests/
 
-    - name: build python binding
-      shell: 'script -q -e -c "bash {0}"'
+    - name: cstool - reaches disassembler engine
       run: |
-        mkdir -p bindings/python/capstone/lib && cp libcapstone.so.5.* bindings/python/capstone/lib/libcapstone.so;
-        cd bindings/python;
-        make && make check ; 
-        cd ../..;
+        sh suite/run_invalid_cstool.sh
 
     - name: cstest
-      shell: 'script -q -e -c "bash {0}"'
       run: |
-        cd suite/cstest && ./build_cstest.sh;
-        python cstest_report.py -D -t build/cstest -d ../MC;
-        python cstest_report.py -D -t build/cstest -f issues.cs; cd ..;
+        cd suite/cstest && ./build_cstest.sh
+        python cstest_report.py -D -t build/cstest -d ../MC
+        python cstest_report.py -D -t build/cstest -f issues.cs; cd ..
+
+    - name: verify python binding
+      run: |
+        mkdir -p bindings/python/capstone/lib && cp libcapstone.so.5.* bindings/python/capstone/lib/libcapstone.so
+        cd bindings/python
+
+        # check if the generated *_const.py files are up-to-date
+        mkdir capstone_old && cp capstone/*_const.py capstone_old/
+        make gen_const
+        for f in ./capstone/*_const.py; do
+          diff  -u -w "$f" "./capstone_old/`basename $f`"
+          if [ ! $? -eq 0 ]; then
+            exit 1
+          fi
+        done
+        rm -rf capstone_old
+
+        # smoke test api usage
+        make check
+
+    - name: run python binding test
+      run: |
+        cp libcapstone.* bindings/python/prebuilt
+        cd bindings/python
+        make install3
+        cd ..
+        BUILD_TESTS=no make tests
+
+    - name: run cython binding test
+      run: |
+        pip install cython
+        cd bindings/python
+        make install3_cython
+        cd ..
+        python -c "import capstone;print(capstone.debug())" | grep Cython
+        BUILD_TESTS=no make tests
 
   Windows:
     runs-on: ${{ matrix.config.os }}

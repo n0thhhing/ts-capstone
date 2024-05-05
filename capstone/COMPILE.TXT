@@ -17,7 +17,7 @@ Capstone requires no prerequisite packages, so it is easy to compile & install.
 
 (0) Tailor Capstone to your need.
 
-  Out of all archtitectures supported by Capstone, if you just need several
+  Out of all architectures supported by Capstone, if you just need several
   selected archs, choose the ones you want to compile in by editing "config.mk"
   before going to next steps.
 
@@ -85,9 +85,11 @@ Capstone requires no prerequisite packages, so it is easy to compile & install.
 
 	/usr/include/capstone/arm.h
 	/usr/include/capstone/arm64.h
+	/usr/include/capstone/alpha.h
 	/usr/include/capstone/bpf.h
 	/usr/include/capstone/capstone.h
 	/usr/include/capstone/evm.h
+	/usr/include/capstone/hppa.h
 	/usr/include/capstone/m680x.h
 	/usr/include/capstone/m68k.h
 	/usr/include/capstone/mips.h
@@ -148,7 +150,7 @@ Capstone requires no prerequisite packages, so it is easy to compile & install.
 (5) Cross-compile for Android
 
   To cross-compile for Android (smartphone/tablet), Android NDK is required.
-  NOTE: Only ARM and ARM64 are currently supported.
+  NOTE: Only ARM and AARCH64 are currently supported.
 
 	$ NDK=/android/android-ndk-r10e ./make.sh cross-android arm
   or

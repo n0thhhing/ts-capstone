@@ -38,12 +38,11 @@ struct MCOperand {
 		kDFPImmediate, ///< Double-Floating-point immediate operand.
 		kExpr,	       ///< Relocatable immediate operand.
 		kInst	       ///< Sub-instruction operand.
-
 	} MachineOperandType;
 	unsigned char Kind;
 
 	union {
-		unsigned RegVal;
+		uint64_t RegVal;
 		int64_t ImmVal;
 		double FPImmVal;
 	};
@@ -69,7 +68,7 @@ unsigned MCOperand_getReg(const MCOperand *op);
 /// setReg - Set the register number.
 void MCOperand_setReg(MCOperand *op, unsigned Reg);
 
-int64_t MCOperand_getImm(MCOperand *op);
+int64_t MCOperand_getImm(const MCOperand *op);
 
 void MCOperand_setImm(MCOperand *op, int64_t Val);
 
@@ -130,6 +129,9 @@ struct MCInst {
 	cs_wasm_op wasm_data;    // for WASM operand
 	MCRegisterInfo *MRI;
 	uint8_t xAcquireRelease;   // X86 xacquire/xrelease
+	bool isAliasInstr; // Flag if this MCInst is an alias.
+	bool fillDetailOps; // If set, detail->operands gets filled.
+	hppa_ext hppa_ext;	///< for HPPA operand. Contains info about modifiers and their effect on the instruction
 };
 
 void MCInst_Init(MCInst *inst);
@@ -151,7 +153,7 @@ MCOperand *MCInst_getOperand(MCInst *inst, unsigned i);
 
 unsigned MCInst_getNumOperands(const MCInst *inst);
 
-// This addOperand2 function doesnt free Op
+// This addOperand2 function doesn't free Op
 void MCInst_addOperand2(MCInst *inst, MCOperand *Op);
 
 bool MCInst_isPredicable(const MCInstrDesc *MIDesc);
@@ -161,5 +163,15 @@ void MCInst_handleWriteback(MCInst *MI, const MCInstrDesc *InstDesc);
 bool MCInst_opIsTied(const MCInst *MI, unsigned OpNum);
 
 bool MCInst_opIsTying(const MCInst *MI, unsigned OpNum);
+
+uint64_t MCInst_getOpVal(MCInst *MI, unsigned OpNum);
+
+void MCInst_setIsAlias(MCInst *MI, bool Flag);
+
+static inline bool MCInst_isAlias(const MCInst *MI) {
+	return MI->isAliasInstr;
+}
+
+void MCInst_updateWithTmpMI(MCInst *MI, MCInst *TmpMI);
 
 #endif

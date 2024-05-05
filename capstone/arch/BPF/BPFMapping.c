@@ -5,6 +5,7 @@
 
 #include "BPFConstants.h"
 #include "BPFMapping.h"
+#include "../../Mapping.h"
 #include "../../utils.h"
 
 #ifndef CAPSTONE_DIET
@@ -68,6 +69,9 @@ static const name_map insn_name_maps[BPF_INS_ENDING] = {
 	{ BPF_INS_BE16, "be16" },
 	{ BPF_INS_BE32, "be32" },
 	{ BPF_INS_BE64, "be64" },
+	{ BPF_INS_BSWAP16, "bswap16" },
+	{ BPF_INS_BSWAP32, "bswap32" },
+	{ BPF_INS_BSWAP64, "bswap64" },
 
 	{ BPF_INS_LDW, "ldw" },
 	{ BPF_INS_LDH, "ldh" },
@@ -210,6 +214,19 @@ static bpf_insn op2insn_alu(unsigned opcode)
 {
 	/* Endian is a special case */
 	if (BPF_OP(opcode) == BPF_ALU_END) {
+		if (BPF_CLASS(opcode) == BPF_CLASS_ALU64) {
+			switch (opcode ^ BPF_CLASS_ALU64 ^ BPF_ALU_END ^ BPF_SRC_LITTLE) {
+			case (16 << 4):
+				return BPF_INS_BSWAP16;
+			case (32 << 4):
+				return BPF_INS_BSWAP32;
+			case (64 << 4):
+				return BPF_INS_BSWAP64;
+			default:
+				return BPF_INS_INVALID;
+			}
+		}
+
 		switch (opcode ^ BPF_CLASS_ALU ^ BPF_ALU_END) {
 		case BPF_SRC_LITTLE | (16 << 4):
 			return BPF_INS_LE16;
@@ -282,6 +299,7 @@ static bpf_insn op2insn_jmp(unsigned opcode)
 	return BPF_INS_INVALID;
 }
 
+#ifndef CAPSTONE_DIET
 static void update_regs_access(cs_struct *ud, cs_detail *detail,
 		bpf_insn insn_id, unsigned int opcode)
 {
@@ -356,6 +374,7 @@ static void update_regs_access(cs_struct *ud, cs_detail *detail,
 		break;
 	}
 }
+#endif
 
 /*
  * 1. Convert opcode(id) to BPF_INS_*
@@ -365,12 +384,12 @@ void BPF_get_insn_id(cs_struct *ud, cs_insn *insn, unsigned int opcode)
 {
 	// No need to care the mode (cBPF or eBPF) since all checks has be done in
 	// BPF_getInstruction, we can simply map opcode to BPF_INS_*.
-	cs_detail *detail;
 	bpf_insn id = BPF_INS_INVALID;
+#ifndef CAPSTONE_DIET
+	cs_detail *detail;
 	bpf_insn_group grp;
 
 	detail = insn->detail;
-#ifndef CAPSTONE_DIET
  #define PUSH_GROUP(grp) do { \
 		if (detail) { \
 			detail->groups[detail->groups_count] = grp; \
@@ -378,7 +397,7 @@ void BPF_get_insn_id(cs_struct *ud, cs_insn *insn, unsigned int opcode)
 		} \
 	} while(0)
 #else
- #define PUSH_GROUP
+ #define PUSH_GROUP(grp) do {} while(0)
 #endif
 
 	switch (BPF_CLASS(opcode)) {
@@ -399,13 +418,15 @@ void BPF_get_insn_id(cs_struct *ud, cs_insn *insn, unsigned int opcode)
 		PUSH_GROUP(BPF_GRP_ALU);
 		break;
 	case BPF_CLASS_JMP:
-		grp = BPF_GRP_JUMP;
 		id = op2insn_jmp(opcode);
+#ifndef CAPSTONE_DIET
+		grp = BPF_GRP_JUMP;
 		if (id == BPF_INS_CALL || id == BPF_INS_CALLX)
 			grp = BPF_GRP_CALL;
 		else if (id == BPF_INS_EXIT)
 			grp = BPF_GRP_RETURN;
 		PUSH_GROUP(grp);
+#endif
 		break;
 	case BPF_CLASS_RET:
 		id = BPF_INS_RET;

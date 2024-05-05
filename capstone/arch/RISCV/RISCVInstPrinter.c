@@ -97,7 +97,7 @@ void RISCV_printInst(MCInst *MI, SStream *O, void *info)
     		printInstruction(MI, O, MRI);
   		//printAnnotation(O, Annot);
 	// fix load/store type insttuction
-    	if (MI->csh->detail && 
+    	if (MI->csh->detail_opt && 
 	    MI->flat_insn->detail->riscv.need_effective_addr)
 		fixDetailOfEffectiveAddr(MI);
 	
@@ -123,7 +123,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
   	if (MCOperand_isReg(MO)) {
     		reg = MCOperand_getReg(MO);
     		printRegName(O, reg);
-    		if (MI->csh->detail) {
+    		if (MI->csh->detail_opt) {
       			MI->flat_insn->detail->riscv.operands[MI->flat_insn->detail->riscv.op_count].type = RISCV_OP_REG;
       			MI->flat_insn->detail->riscv.operands[MI->flat_insn->detail->riscv.op_count].reg = reg;
       			MI->flat_insn->detail->riscv.op_count++;
@@ -143,7 +143,7 @@ static void printOperand(MCInst *MI, unsigned OpNo, SStream *O)
 				SStream_concat(O, "-%" PRIu64, -Imm);
     		}
 
-    		if (MI->csh->detail) {
+    		if (MI->csh->detail_opt) {
       			MI->flat_insn->detail->riscv.operands[MI->flat_insn->detail->riscv.op_count].type = RISCV_OP_IMM;
       			MI->flat_insn->detail->riscv.operands[MI->flat_insn->detail->riscv.op_count].imm = Imm;
       			MI->flat_insn->detail->riscv.op_count++;
@@ -292,8 +292,8 @@ static const char *getCSRSystemRegisterName(unsigned CsrNo)
 	case 0x03ba: return "pmpaddr10";
 	case 0x03bb: return "pmpaddr11";
 	case 0x03bc: return "pmpaddr12";
-	case 0x03bd: return "pmpaddr14";
-	case 0x03be: return "pmpaddr13";
+	case 0x03bd: return "pmpaddr13";
+	case 0x03be: return "pmpaddr14";
 	case 0x03bf: return "pmpaddr15";
 
 	case 0x0b00: return "mcycle";

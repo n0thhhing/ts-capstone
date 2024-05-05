@@ -25,10 +25,32 @@ project(capstone
     VERSION 5.0
 )
 
+set(UNIX_COMPILER_OPTIONS -Werror -Wall -Warray-bounds -Wshift-negative-value -Wreturn-type -Wformat -Wmissing-braces -Wunused-function -Warray-bounds -Wunused-variable -Wparentheses -Wint-in-bool-context -Wmisleading-indentation)
+
+# maybe-unitialzied is only supported by newer versions of GCC.
+# Unfortunately, it is pretty unreliable and reports wrong results.
+# So we disable it for all compilers versions which support it.
+include(CheckCCompilerFlag)
+check_c_compiler_flag("-Wno-maybe-unitialized" SUPPORTS_MU)
+check_c_compiler_flag("-Wshadow=local" SUPPORTS_SHADOWING)
+check_c_compiler_flag("-Wsometimes-uninitialized" SUPPORTS_SUNINIT)
+
+if (SUPPORTS_MU)
+    set(UNIX_COMPILER_OPTIONS ${UNIX_COMPILER_OPTIONS} -Wno-maybe-unitialized)
+endif()
+
+if (SUPPORTS_SHADOWING)
+    set(UNIX_COMPILER_OPTIONS ${UNIX_COMPILER_OPTIONS} -Wshadow=local)
+endif()
+
+if (SUPPORTS_SUNINIT)
+    set(UNIX_COMPILER_OPTIONS ${UNIX_COMPILER_OPTIONS} -Wsometimes-uninitialized)
+endif()
+
 if (MSVC)
     add_compile_options(/W1 /w14189)
 else()
-    add_compile_options(-Wmissing-braces -Wunused-function -Warray-bounds -Wunused-variable -Wparentheses -Wint-in-bool-context)
+    add_compile_options(${UNIX_COMPILER_OPTIONS})
 endif()
 
 
@@ -36,17 +58,24 @@ endif()
 # Don't edit the makefile!
 option(BUILD_SHARED_LIBS "Build shared library" OFF)
 option(CAPSTONE_BUILD_STATIC_RUNTIME "Embed static runtime" ${BUILD_SHARED_LIBS})
+option(CAPSTONE_BUILD_MACOS_THIN "Disable universal2 builds on macOS" OFF)
 option(CAPSTONE_BUILD_DIET "Build diet library" OFF)
 option(CAPSTONE_BUILD_TESTS "Build tests" ${PROJECT_IS_TOP_LEVEL})
 option(CAPSTONE_BUILD_CSTOOL "Build cstool" ${PROJECT_IS_TOP_LEVEL})
 option(CAPSTONE_BUILD_CSTEST "Build cstest" OFF)
 option(CAPSTONE_USE_DEFAULT_ALLOC "Use default memory allocation functions" ON)
+option(CAPSTONE_USE_ARCH_REGISTRATION "Use explicit architecture registration" OFF)
 option(CAPSTONE_ARCHITECTURE_DEFAULT "Whether architectures are enabled by default" ON)
 option(CAPSTONE_DEBUG "Whether to enable extra debug assertions" OFF)
 option(CAPSTONE_INSTALL "Generate install target" ${PROJECT_IS_TOP_LEVEL})
 
-set(SUPPORTED_ARCHITECTURES ARM ARM64 M68K MIPS PPC SPARC SYSZ XCORE X86 TMS320C64X M680X EVM MOS65XX WASM BPF RISCV SH TRICORE)
-set(SUPPORTED_ARCHITECTURE_LABELS ARM ARM64 M68K MIPS PowerPC Sparc SystemZ XCore x86 TMS320C64x M680x EVM MOS65XX WASM BPF RISCV SH TriCore)
+# If building for OSX it's best to allow CMake to handle building both architectures
+if(APPLE AND NOT CAPSTONE_BUILD_MACOS_THIN)
+    set(CMAKE_OSX_ARCHITECTURES "x86_64;arm64")
+endif()
+
+set(SUPPORTED_ARCHITECTURES ARM AARCH64 M68K MIPS PPC SPARC SYSZ XCORE X86 TMS320C64X M680X EVM MOS65XX WASM BPF RISCV SH TRICORE ALPHA HPPA)
+set(SUPPORTED_ARCHITECTURE_LABELS ARM AARCH64 M68K MIPS PowerPC Sparc SystemZ XCore x86 TMS320C64x M680x EVM MOS65XX WASM BPF RISCV SH TriCore Alpha HPPA)
 
 list(LENGTH SUPPORTED_ARCHITECTURES count)
 math(EXPR count "${count}-1")
@@ -55,15 +84,6 @@ foreach(i RANGE ${count})
     list(GET SUPPORTED_ARCHITECTURES ${i} supported_architecture)
     list(GET SUPPORTED_ARCHITECTURE_LABELS ${i} supported_architecture_label)
     option("CAPSTONE_${supported_architecture}_SUPPORT" "${supported_architecture_label} support" ${CAPSTONE_ARCHITECTURE_DEFAULT})
-endforeach()
-
-# propagate architecture support variables to preprocessor
-foreach(supported_architecture ${SUPPORTED_ARCHITECTURES})
-    set(option_name "CAPSTONE_${supported_architecture}_SUPPORT")
-    if(${option_name})
-        message("Enabling ${option_name}")
-        add_definitions("-D${option_name}")
-    endif()
 endforeach()
 
 option(CAPSTONE_X86_REDUCE "x86 with reduce instruction sets to minimize library" OFF)
@@ -76,6 +96,19 @@ endif()
 
 if(CAPSTONE_USE_DEFAULT_ALLOC)
     add_definitions(-DCAPSTONE_USE_SYS_DYN_MEM)
+endif()
+
+if(CAPSTONE_USE_ARCH_REGISTRATION)
+    add_definitions(-DCAPSTONE_USE_ARCH_REGISTRATION)
+elseif(CAPSTONE_ARCHITECTURE_DEFAULT)
+    # propagate architecture support variables to preprocessor
+    foreach(supported_architecture ${SUPPORTED_ARCHITECTURES})
+        set(option_name "CAPSTONE_${supported_architecture}_SUPPORT")
+        if(${option_name})
+            message("Enabling ${option_name}")
+            add_definitions("-D${option_name}")
+        endif()
+    endforeach()
 endif()
 
 if(CAPSTONE_X86_REDUCE)
@@ -101,6 +134,7 @@ set(SOURCES_ENGINE
     Mapping.c
     MCInst.c
     MCInstrDesc.c
+    MCInstPrinter.c
     MCRegisterInfo.c
     SStream.c
     utils.c
@@ -115,15 +149,17 @@ set(HEADERS_ENGINE
     MCFixedLenDisassembler.h
     MCInst.h
     MCInstrDesc.h
+    MCInstPrinter.h
     MCRegisterInfo.h
     SStream.h
     utils.h
 )
 
 set(HEADERS_COMMON
-    include/capstone/arm64.h
+    include/capstone/aarch64.h
     include/capstone/arm.h
     include/capstone/capstone.h
+    include/capstone/cs_operand.h
     include/capstone/evm.h
     include/capstone/wasm.h
     include/capstone/mips.h
@@ -141,6 +177,9 @@ set(HEADERS_COMMON
     include/capstone/sh.h
     include/capstone/tricore.h
     include/capstone/platform.h
+    include/capstone/sh.h
+    include/capstone/alpha.h
+    include/capstone/hppa.h
 )
 
 set(TEST_SOURCES test_basic.c test_detail.c test_skipdata.c test_iter.c)
@@ -149,7 +188,9 @@ set(TEST_SOURCES test_basic.c test_detail.c test_skipdata.c test_iter.c)
 if(CAPSTONE_ARM_SUPPORT)
     add_definitions(-DCAPSTONE_HAS_ARM)
     set(SOURCES_ARM
+        arch/ARM/ARMBaseInfo.c
         arch/ARM/ARMDisassembler.c
+        arch/ARM/ARMDisassemblerExtension.c
         arch/ARM/ARMInstPrinter.c
         arch/ARM/ARMMapping.c
         arch/ARM/ARMModule.c
@@ -157,53 +198,53 @@ if(CAPSTONE_ARM_SUPPORT)
     set(HEADERS_ARM
         arch/ARM/ARMAddressingModes.h
         arch/ARM/ARMBaseInfo.h
-        arch/ARM/ARMDisassembler.h
+        arch/ARM/ARMDisassemblerExtension.h
         arch/ARM/ARMInstPrinter.h
+        arch/ARM/ARMLinkage.h
         arch/ARM/ARMMapping.h
         arch/ARM/ARMGenAsmWriter.inc
         arch/ARM/ARMGenDisassemblerTables.inc
         arch/ARM/ARMGenInstrInfo.inc
         arch/ARM/ARMGenRegisterInfo.inc
         arch/ARM/ARMGenSubtargetInfo.inc
-        arch/ARM/ARMMappingInsn.inc
-        arch/ARM/ARMMappingInsnOp.inc
-        arch/ARM/ARMGenRegisterName.inc
-        arch/ARM/ARMGenRegisterName_digit.inc
+        arch/ARM/ARMGenCSFeatureName.inc
+        arch/ARM/ARMGenCSMappingInsn.inc
+        arch/ARM/ARMGenCSMappingInsnOp.inc
+        arch/ARM/ARMGenCSMappingInsnName.inc
         arch/ARM/ARMGenSystemRegister.inc
-        arch/ARM/ARMMappingInsnName.inc
     )
     set(TEST_SOURCES ${TEST_SOURCES} test_arm.c)
 endif()
 
-if(CAPSTONE_ARM64_SUPPORT)
-    add_definitions(-DCAPSTONE_HAS_ARM64)
-    set(SOURCES_ARM64
+if(CAPSTONE_AARCH64_SUPPORT)
+    add_definitions(-DCAPSTONE_HAS_AARCH64)
+    set(SOURCES_AARCH64
         arch/AArch64/AArch64BaseInfo.c
         arch/AArch64/AArch64Disassembler.c
+        arch/AArch64/AArch64DisassemblerExtension.c
         arch/AArch64/AArch64InstPrinter.c
         arch/AArch64/AArch64Mapping.c
         arch/AArch64/AArch64Module.c
     )
-    set(HEADERS_ARM64
+    set(HEADERS_AARCH64
         arch/AArch64/AArch64AddressingModes.h
         arch/AArch64/AArch64BaseInfo.h
-        arch/AArch64/AArch64Disassembler.h
+        arch/AArch64/AArch64DisassemblerExtension.h
         arch/AArch64/AArch64InstPrinter.h
+        arch/AArch64/AArch64Linkage.h
         arch/AArch64/AArch64Mapping.h
         arch/AArch64/AArch64GenAsmWriter.inc
         arch/AArch64/AArch64GenDisassemblerTables.inc
         arch/AArch64/AArch64GenInstrInfo.inc
         arch/AArch64/AArch64GenRegisterInfo.inc
         arch/AArch64/AArch64GenRegisterName.inc
-        arch/AArch64/AArch64GenRegisterV.inc
         arch/AArch64/AArch64GenSubtargetInfo.inc
         arch/AArch64/AArch64GenSystemOperands.inc
-        arch/AArch64/AArch64GenSystemOperands_enum.inc
-        arch/AArch64/AArch64MappingInsn.inc
-        arch/AArch64/AArch64MappingInsnName.inc
-        arch/AArch64/AArch64MappingInsnOp.inc
+        arch/AArch64/AArch64GenCSMappingInsn.inc
+        arch/AArch64/AArch64GenCSMappingInsnName.inc
+        arch/AArch64/AArch64GenCSMappingInsnOp.inc
     )
-    set(TEST_SOURCES ${TEST_SOURCES} test_arm64.c)
+    set(TEST_SOURCES ${TEST_SOURCES} test_aarch64.c)
 endif()
 
 if(CAPSTONE_MIPS_SUPPORT)
@@ -247,19 +288,23 @@ if(CAPSTONE_PPC_SUPPORT)
         arch/PowerPC/PPCModule.c
     )
     set(HEADERS_PPC
-        arch/PowerPC/PPCDisassembler.h
-        arch/PowerPC/PPCGenAsmWriter.inc
+        arch/PowerPC/PPCInstrInfo.h
         arch/PowerPC/PPCInstPrinter.h
+        arch/PowerPC/PPCLinkage.h
         arch/PowerPC/PPCMapping.h
+        arch/PowerPC/PPCMCTargetDesc.h
         arch/PowerPC/PPCPredicates.h
+        arch/PowerPC/PPCRegisterInfo.h
         arch/PowerPC/PPCGenAsmWriter.inc
-        arch/PowerPC/PPCGenRegisterName.inc
+        arch/PowerPC/PPCGenCSFeatureName.inc
+        arch/PowerPC/PPCGenCSMappingInsn.inc
+        arch/PowerPC/PPCGenCSMappingInsnOp.inc
+        arch/PowerPC/PPCGenCSMappingInsnName.inc
+        arch/PowerPC/PPCGenCSOpGroup.inc
         arch/PowerPC/PPCGenDisassemblerTables.inc
-        arch/PowerPC/PPCMappingInsn.inc
-        arch/PowerPC/PPCMappingInsnName.inc
+        arch/PowerPC/PPCGenInstrInfo.inc
         arch/PowerPC/PPCGenSubtargetInfo.inc
         arch/PowerPC/PPCGenRegisterInfo.inc
-        arch/PowerPC/PPCGenInstrInfo.inc
     )
     set(TEST_SOURCES ${TEST_SOURCES} test_ppc.c)
 endif()
@@ -559,6 +604,48 @@ if (CAPSTONE_TRICORE_SUPPORT)
     set(TEST_SOURCES ${TEST_SOURCES} test_tricore.c)
 endif ()
 
+if (CAPSTONE_ALPHA_SUPPORT)
+    add_definitions(-DCAPSTONE_HAS_ALPHA)
+    set(SOURCES_ALPHA
+            arch/Alpha/AlphaDisassembler.c
+            arch/Alpha/AlphaInstPrinter.c
+            arch/Alpha/AlphaMapping.c
+            arch/Alpha/AlphaModule.c
+            )
+    set(HEADERS_ALPHA
+            arch/Alpha/AlphaDisassembler.h
+            arch/Alpha/AlphaGenAsmWriter.inc
+            arch/Alpha/AlphaGenDisassemblerTables.inc
+            arch/Alpha/AlphaGenInstrInfo.inc
+            arch/Alpha/AlphaGenRegisterInfo.inc
+            arch/Alpha/AlphaLinkage.h
+            arch/Alpha/AlphaMapping.h
+            arch/Alpha/AlphaModule.h
+            arch/Alpha/AlphaGenCSMappingInsnOp.inc
+            arch/Alpha/AlphaGenCSMappingInsn.inc
+            arch/Alpha/AlphaGenCSMappingInsnName.inc
+            )
+    set(TEST_SOURCES ${TEST_SOURCES} test_alpha.c)
+endif ()
+
+if(CAPSTONE_HPPA_SUPPORT)
+    add_definitions(-DCAPSTONE_HAS_HPPA)
+    set(SOURCES_HPPA
+        arch/HPPA/HPPADisassembler.c
+        arch/HPPA/HPPAInstPrinter.c
+        arch/HPPA/HPPAMapping.c
+        arch/HPPA/HPPAModule.c
+    )
+    set(HEADERS_HPPA
+        arch/HPPA/HPPAConstants.h
+        arch/HPPA/HPPADisassembler.h
+        arch/HPPA/HPPAInstPrinter.h
+        arch/HPPA/HPPAMapping.h
+        arch/HPPA/HPPAModule.h
+    )
+    set(TEST_SOURCES ${TEST_SOURCES} test_hppa.c)
+endif()
+
 if (CAPSTONE_OSXKERNEL_SUPPORT)
     add_definitions(-DCAPSTONE_HAS_OSXKERNEL)
 endif()
@@ -566,7 +653,7 @@ endif()
 set(ALL_SOURCES
     ${SOURCES_ENGINE}
     ${SOURCES_ARM}
-    ${SOURCES_ARM64}
+    ${SOURCES_AARCH64}
     ${SOURCES_MIPS}
     ${SOURCES_PPC}
     ${SOURCES_X86}
@@ -583,13 +670,15 @@ set(ALL_SOURCES
     ${SOURCES_RISCV}
     ${SOURCES_SH}
     ${SOURCES_TRICORE}
+    ${SOURCES_ALPHA}
+    ${SOURCES_HPPA}
 )
 
 set(ALL_HEADERS
     ${HEADERS_COMMON}
     ${HEADERS_ENGINE}
     ${HEADERS_ARM}
-    ${HEADERS_ARM64}
+    ${HEADERS_AARCH64}
     ${HEADERS_MIPS}
     ${HEADERS_PPC}
     ${HEADERS_X86}
@@ -606,6 +695,8 @@ set(ALL_HEADERS
     ${HEADERS_RISCV}
     ${HEADERS_SH}
     ${HEADERS_TRICORE}
+    ${HEADERS_ALPHA}
+    ${HEADERS_HPPA}
 )
 
 ## properties
@@ -652,7 +743,7 @@ endif()
 
 source_group("Source\\Engine" FILES ${SOURCES_ENGINE})
 source_group("Source\\ARM" FILES ${SOURCES_ARM})
-source_group("Source\\ARM64" FILES ${SOURCES_ARM64})
+source_group("Source\\AARCH64" FILES ${SOURCES_AARCH64})
 source_group("Source\\Mips" FILES ${SOURCES_MIPS})
 source_group("Source\\PowerPC" FILES ${SOURCES_PPC})
 source_group("Source\\Sparc" FILES ${SOURCES_SPARC})
@@ -669,11 +760,13 @@ source_group("Source\\BPF" FILES ${SOURCES_BPF})
 source_group("Source\\RISCV" FILES ${SOURCES_RISCV})
 source_group("Source\\SH" FILES ${SOURCES_SH})
 source_group("Source\\TriCore" FILES ${SOURCES_TRICORE})
+source_group("Source\\Alpha" FILES ${SOURCES_ALPHA})
+source_group("Source\\HPPA" FILES ${SOURCES_HPPA})
 
 source_group("Include\\Common" FILES ${HEADERS_COMMON})
 source_group("Include\\Engine" FILES ${HEADERS_ENGINE})
 source_group("Include\\ARM" FILES ${HEADERS_ARM})
-source_group("Include\\ARM64" FILES ${HEADERS_ARM64})
+source_group("Include\\AARCH64" FILES ${HEADERS_AARCH64})
 source_group("Include\\Mips" FILES ${HEADERS_MIPS})
 source_group("Include\\PowerPC" FILES ${HEADERS_PPC})
 source_group("Include\\Sparc" FILES ${HEADERS_SPARC})
@@ -690,12 +783,15 @@ source_group("Include\\BPF" FILES ${HEADERS_BPF})
 source_group("Include\\RISCV" FILES ${HEADERS_RISCV})
 source_group("Include\\SH" FILES ${HEADERS_SH})
 source_group("Include\\TriCore" FILES ${HEADERS_TRICORE})
+source_group("Include\\Alpha" FILES ${HEADERS_ALPHA})
+source_group("Include\\HPPA" FILES ${HEADERS_HPPA})
 
 ## installation
 if(CAPSTONE_INSTALL)
     include("GNUInstallDirs")
 
     install(FILES ${HEADERS_COMMON} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/capstone)
+    install(FILES ${HEADERS_INC} DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}/capstone/inc)
 
     configure_file(capstone.pc.in ${CMAKE_BINARY_DIR}/capstone.pc @ONLY)
     install(FILES ${CMAKE_BINARY_DIR}/capstone.pc DESTINATION ${CMAKE_INSTALL_LIBDIR}/pkgconfig)

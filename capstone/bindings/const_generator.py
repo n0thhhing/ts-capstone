@@ -5,7 +5,7 @@ import sys, re
 
 INCL_DIR = '../include/capstone/'
 
-include = [ 'arm.h', 'arm64.h', 'm68k.h', 'mips.h', 'x86.h', 'ppc.h', 'sparc.h', 'systemz.h', 'xcore.h', 'tms320c64x.h', 'm680x.h', 'evm.h', 'mos65xx.h', 'wasm.h', 'bpf.h' ,'riscv.h', 'tricore.h' ]
+include = [ 'arm.h', 'm68k.h', 'mips.h', 'x86.h', 'ppc.h', 'sparc.h', 'systemz.h', 'xcore.h', 'tms320c64x.h', 'm680x.h', 'evm.h', 'mos65xx.h', 'wasm.h', 'bpf.h' ,'riscv.h', 'sh.h', 'tricore.h', 'alpha.h', 'hppa.h' ]
 
 template = {
     'java': {
@@ -15,7 +15,6 @@ template = {
             'out_file': './java/capstone/%s_const.java',
             # prefixes for constant filenames of all archs - case sensitive
             'arm.h': 'Arm',
-            'arm64.h': 'Arm64',
             'm68k.h': 'M68k',
             'mips.h': 'Mips',
             'x86.h': 'X86',
@@ -31,14 +30,13 @@ template = {
             'comment_close': '',
         },
     'python': {
-            'header': "from . import CS_OP_INVALID, CS_OP_REG, CS_OP_IMM, CS_OP_MEM\n"
+            'header': "from . import CS_OP_INVALID, CS_OP_REG, CS_OP_IMM, CS_OP_FP, CS_OP_PRED, CS_OP_SPECIAL, CS_OP_MEM\n"
                       "# For Capstone Engine. AUTO-GENERATED FILE, DO NOT EDIT [%s_const.py]\n",
             'footer': "",
             'line_format': '%s = %s\n',
             'out_file': './python/capstone/%s_const.py',
             # prefixes for constant filenames of all archs - case sensitive
             'arm.h': 'arm',
-            'arm64.h': 'arm64',
             'm68k.h': 'm68k',
             'mips.h': 'mips',
             'x86.h': 'x86',
@@ -53,7 +51,10 @@ template = {
             'mos65xx.h': 'mos65xx',
             'bpf.h': 'bpf',
             'riscv.h': 'riscv',
+            'sh.h': 'sh',
             'tricore.h': ['TRICORE', 'TriCore'],
+            'alpha.h': ['ALPHA', 'Alpha'],
+            'hppa.h': 'hppa',
             'comment_open': '#',
             'comment_close': '',
         },
@@ -64,7 +65,6 @@ template = {
             'out_file': './ocaml/%s_const.ml',
             # prefixes for constant filenames of all archs - case sensitive
             'arm.h': 'arm',
-            'arm64.h': 'arm64',
             'mips.h': 'mips',
             'm68k.h': 'm68k',
             'x86.h': 'x86',
@@ -79,81 +79,85 @@ template = {
             'comment_open': '(*',
             'comment_close': ' *)',
         },
-    'swift': {
-            'header': "// For Capstone Engine. AUTO-GENERATED FILE, DO NOT EDIT (%s)\n\n",
-            'footer': "",
-            'enum_doc': '/// %s\n',
-            'enum_header': 'public enum %s: %s {\n',
-            'enum_default_type': 'UInt32',
-            'enum_types': {
-                'UInt16': r'^\w+Reg$',
-                'UInt8': r'^\w+Grp$'
-            },
-            'option_set_header': 'public struct %s: OptionSet {\n    public typealias RawValue = %s\n    public let rawValue: RawValue\n    public init(rawValue: RawValue) { self.rawValue = rawValue }\n',
-            'option_sets': {
-                'X86Eflags': 'UInt64',
-                'X86FpuFlags': 'UInt64',
-                'SparcHint': 'UInt32',
-                'M680xIdx': 'UInt8',
-                'M680xOpFlags': 'UInt8',
-            },
-            'rename': {
-                r'^M680X_(\w+_OP_IN_MNEM)$': r'M680X_OP_FLAGS_\1',
-            },
-            'option_format': '    public static let {option} = {type}(rawValue: {value})\n',
-            'enum_extra_options': {
-                # swift enum != OptionSet, so options must be specified
-                'ArmSysreg': {
-                    'spsrCx': 'spsrC + spsrX',
-                    'spsrCs': 'spsrC + spsrS',
-                    'spsrXs': 'spsrX + spsrS',
-                    'spsrCxs': 'spsrC + spsrX + spsrS',
-                    'spsrCf': 'spsrC + spsrF',
-                    'spsrXf': 'spsrX + spsrF',
-                    'spsrCxf': 'spsrC + spsrX + spsrF',
-                    'spsrSf': 'spsrS + spsrF',
-                    'spsrCsf': 'spsrC + spsrS + spsrF',
-                    'spsrXsf': 'spsrX + spsrS + spsrF',
-                    'spsrCxsf': 'spsrC + spsrX + spsrS + spsrF',
-                    'cpsrCx': 'cpsrC + cpsrX',
-                    'cpsrCs': 'cpsrC + cpsrS',
-                    'cpsrXs': 'cpsrX + cpsrS',
-                    'cpsrCxs': 'cpsrC + cpsrX + cpsrS',
-                    'cpsrCf': 'cpsrC + cpsrF',
-                    'cpsrXf': 'cpsrX + cpsrF',
-                    'cpsrCxf': 'cpsrC + cpsrX + cpsrF',
-                    'cpsrSf': 'cpsrS + cpsrF',
-                    'cpsrCsf': 'cpsrC + cpsrS + cpsrF',
-                    'cpsrXsf': 'cpsrX + cpsrS + cpsrF',
-                    'cpsrCxsf': 'cpsrC + cpsrX + cpsrS + cpsrF',
-                }
-            },
-            'enum_footer': '}\n\n',
-            'doc_line_format': '    /// %s\n',
-            'line_format': '    case %s = %s\n',
-            'dup_line_format': '    public static let %s = %s\n',
-            'out_file': './swift/Sources/Capstone/%sEnums.swift',
-            'reserved_words': [
-                'break', 'class', 'for', 'false', 'in', 'init', 'return', 'true'
-            ],
-            'reserved_word_format': '`%s`',
-            # prefixes for constant filenames of all archs - case sensitive
-            'arm.h': 'Arm',
-            'arm64.h': 'Arm64',
-            'm68k.h': 'M68k',
-            'mips.h': 'Mips',
-            'x86.h': 'X86',
-            'ppc.h': 'Ppc',
-            'sparc.h': 'Sparc',
-            'systemz.h': 'Sysz',
-            'xcore.h': 'Xcore',
-            'tms320c64x.h': 'TMS320C64x',
-            'm680x.h': 'M680x',
-            'evm.h': 'Evm',
-            'mos65xx.h': 'Mos65xx',
-            'comment_open': '\t//',
-            'comment_close': '',
-        },
+    # 'swift': {
+    #         'header': "// For Capstone Engine. AUTO-GENERATED FILE, DO NOT EDIT (%s)\n\n",
+    #         'footer': "",
+    #         'enum_doc': '/// %s\n',
+    #         'enum_header': 'public enum %s: %s {\n',
+    #         'enum_default_type': 'UInt32',
+    #         'enum_types': {
+    #             'UInt16': r'^\w+Reg$',
+    #             'UInt8': r'^\w+Grp$'
+    #         },
+    #         'option_set_header': 'public struct %s: OptionSet {\n    public typealias RawValue = %s\n    public let rawValue: RawValue\n    public init(rawValue: RawValue) { self.rawValue = rawValue }\n',
+    #         'option_sets': {
+    #             'X86Eflags': 'UInt64',
+    #             'X86FpuFlags': 'UInt64',
+    #             'SparcHint': 'UInt32',
+    #             'M680xIdx': 'UInt8',
+    #             'M680xOpFlags': 'UInt8',
+    #         },
+    #         'rename': {
+    #             r'^M680X_(\w+_OP_IN_MNEM)$': r'M680X_OP_FLAGS_\1',
+    #         },
+    #         'option_format': '    public static let {option} = {type}(rawValue: {value})\n',
+    #         'enum_extra_options': {
+    #             # swift enum != OptionSet, so options must be specified
+    #             'ArmSysreg': {
+    #                 'spsrCx': 'spsrC + spsrX',
+    #                 'spsrCs': 'spsrC + spsrS',
+    #                 'spsrXs': 'spsrX + spsrS',
+    #                 'spsrCxs': 'spsrC + spsrX + spsrS',
+    #                 'spsrCf': 'spsrC + spsrF',
+    #                 'spsrXf': 'spsrX + spsrF',
+    #                 'spsrCxf': 'spsrC + spsrX + spsrF',
+    #                 'spsrSf': 'spsrS + spsrF',
+    #                 'spsrCsf': 'spsrC + spsrS + spsrF',
+    #                 'spsrXsf': 'spsrX + spsrS + spsrF',
+    #                 'spsrCxsf': 'spsrC + spsrX + spsrS + spsrF',
+    #                 'cpsrCx': 'cpsrC + cpsrX',
+    #                 'cpsrCs': 'cpsrC + cpsrS',
+    #                 'cpsrXs': 'cpsrX + cpsrS',
+    #                 'cpsrCxs': 'cpsrC + cpsrX + cpsrS',
+    #                 'cpsrCf': 'cpsrC + cpsrF',
+    #                 'cpsrXf': 'cpsrX + cpsrF',
+    #                 'cpsrCxf': 'cpsrC + cpsrX + cpsrF',
+    #                 'cpsrSf': 'cpsrS + cpsrF',
+    #                 'cpsrCsf': 'cpsrC + cpsrS + cpsrF',
+    #                 'cpsrXsf': 'cpsrX + cpsrS + cpsrF',
+    #                 'cpsrCxsf': 'cpsrC + cpsrX + cpsrS + cpsrF',
+    #             }
+    #         },
+    #         'enum_footer': '}\n\n',
+    #         'doc_line_format': '    /// %s\n',
+    #         'line_format': '    case %s = %s\n',
+    #         'dup_line_format': '    public static let %s = %s\n',
+    #         'out_file': './swift/Sources/Capstone/%sEnums.swift',
+    #         'reserved_words': [
+    #             'break', 'class', 'for', 'false', 'in', 'init', 'return', 'true'
+    #         ],
+    #         'reserved_word_format': '`%s`',
+    #         # prefixes for constant filenames of all archs - case sensitive
+    #         'arm.h': 'Arm',
+    #         'arm64.h': 'Arm64',
+    #         'm68k.h': 'M68k',
+    #         'mips.h': 'Mips',
+    #         'x86.h': 'X86',
+    #         'ppc.h': 'Ppc',
+    #         'sparc.h': 'Sparc',
+    #         'systemz.h': 'Sysz',
+    #         'xcore.h': 'Xcore',
+    #         'tms320c64x.h': 'TMS320C64x',
+    #         'm680x.h': 'M680x',
+    #         'evm.h': 'Evm',
+    #         'mos65xx.h': 'Mos65xx',
+    #         'comment_open': '\t//',
+    #         'comment_close': '',
+    #     },
+}
+
+excluded_prefixes = {
+    'arm.h': ["ARMCC_CondCodes", "ARMVCC_VPTCodes"],
 }
 
 # markup for comments to be added to autogen files
@@ -245,6 +249,8 @@ def gen(lang):
                 line = ' '.join(xline)
 
             def is_with_prefix(x):
+                if target in excluded_prefixes and any(x.startswith(excl_pre) for excl_pre in excluded_prefixes[target]):
+                    return False
                 if prefixs:
                     return any(x.startswith(pre) for pre in prefixs)
                 else:

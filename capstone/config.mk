@@ -4,7 +4,7 @@
 ################################################################################
 # Specify which archs you want to compile in. By default, we build all archs.
 
-CAPSTONE_ARCHS ?= arm aarch64 m68k mips powerpc sparc systemz x86 xcore tms320c64x m680x evm riscv mos65xx wasm bpf sh tricore
+CAPSTONE_ARCHS ?= arm aarch64 m68k mips powerpc sparc systemz x86 xcore tms320c64x m680x evm riscv mos65xx wasm bpf sh tricore alpha hppa
 
 
 ################################################################################
@@ -25,7 +25,7 @@ CAPSTONE_USE_SYS_DYN_MEM ?= yes
 # such as @regs_read/write & @group. The amount of binary size reduced is
 # up to 50% in some individual archs.
 #
-# NOTE: we still keep all those related fileds @mnemonic, @op_str, @regs_read,
+# NOTE: we still keep all those related fields @mnemonic, @op_str, @regs_read,
 # @regs_write, @groups, etc in fields in cs_insn structure regardless, but they
 # will not be updated (i.e empty), thus become irrelevant.
 

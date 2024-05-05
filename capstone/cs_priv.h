@@ -24,19 +24,21 @@ typedef const char *(*GetName_t)(csh handle, unsigned int id);
 
 typedef void (*GetID_t)(cs_struct *h, cs_insn *insn, unsigned int id);
 
-// return register name, given register ID
-typedef const char *(*GetRegisterName_t)(unsigned RegNo);
-
 // return registers accessed by instruction
 typedef void (*GetRegisterAccess_t)(const cs_insn *insn,
 		cs_regs regs_read, uint8_t *regs_read_count,
 		cs_regs regs_write, uint8_t *regs_write_count);
 
 // for ARM only
-typedef struct ARM_ITStatus {
+typedef struct ARM_ITBlock {
 	unsigned char ITStates[8];
 	unsigned int size;
-} ARM_ITStatus;
+} ARM_ITBlock;
+
+typedef struct ARM_VPTBlock {
+	unsigned char VPTStates[8];
+	unsigned int size;
+} ARM_VPTBlock;
 
 // Customize mnemonic for instructions with alternative name.
 struct customized_mnem {
@@ -64,13 +66,15 @@ struct cs_struct {
 	GetID_t insn_id;
 	PostPrinter_t post_printer;
 	cs_err errnum;
-	ARM_ITStatus ITBlock;	// for Arm only
-	cs_opt_value detail, imm_unsigned;
+	ARM_ITBlock ITBlock;	// for Arm only
+	ARM_VPTBlock VPTBlock;  // for ARM only
+	bool PrintBranchImmNotAsAddress;
+	bool ShowVSRNumsAsVR;
+	cs_opt_value detail_opt, imm_unsigned;
 	int syntax;	// asm syntax for simple printer such as ARM, Mips & PPC
 	bool doing_mem;	// handling memory operand in InstPrinter code
 	bool doing_SME_Index; // handling a SME instruction that has index
 	unsigned short *insn_cache;	// index caching for mapping.c
-	GetRegisterName_t get_regname;
 	bool skipdata;	// set this to True if we skip data when disassembling
 	uint8_t skipdata_size;	// how many bytes to skip
 	cs_opt_skipdata skipdata_setup;	// user-defined skipdata setup
@@ -83,6 +87,13 @@ struct cs_struct {
 
 // Returns a bool (0 or 1) whether big endian is enabled for a mode
 #define MODE_IS_BIG_ENDIAN(mode) (((mode) & CS_MODE_BIG_ENDIAN) != 0)
+
+/// Returns true of the 16bit flag is set.
+#define IS_16BIT(mode) ((mode & CS_MODE_16) != 0)
+/// Returns true of the 32bit flag is set.
+#define IS_32BIT(mode) ((mode & CS_MODE_32) != 0)
+/// Returns true of the 64bit flag is set.
+#define IS_64BIT(mode) ((mode & CS_MODE_64) != 0)
 
 extern cs_malloc_t cs_mem_malloc;
 extern cs_calloc_t cs_mem_calloc;

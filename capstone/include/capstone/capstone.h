@@ -17,6 +17,7 @@ extern "C" {
 #include <stdio.h>
 #endif
 
+#include "cs_operand.h"
 #include "platform.h"
 
 #ifdef _MSC_VER
@@ -53,12 +54,71 @@ extern "C" {
 // Version for bleeding edge code of the Github's "next" branch.
 // Use this if you want the absolutely latest development code.
 // This version number will be bumped up whenever we have a new major change.
-#define CS_NEXT_VERSION 5
+#define CS_NEXT_VERSION 6
 
 // Capstone package version
 #define CS_VERSION_MAJOR CS_API_MAJOR
 #define CS_VERSION_MINOR CS_API_MINOR
 #define CS_VERSION_EXTRA 0
+
+/// Macro for meta programming.
+/// Meant for projects using Capstone and need to support multiple
+/// versions of it.
+/// These macros replace several instances of the old "ARM64" with
+/// the new "AArch64" name depending on the CS version.
+#if CS_NEXT_VERSION < 6
+#define CS_AARCH64(x) ARM64##x
+#else
+#define CS_AARCH64(x) AArch64##x
+#endif
+
+#if CS_NEXT_VERSION < 6
+#define CS_AARCH64pre(x) x##ARM64
+#else
+#define CS_AARCH64pre(x) x##AARCH64
+#endif
+
+#if CS_NEXT_VERSION < 6
+#define CS_AARCH64CC(x) ARM64_CC##x
+#else
+#define CS_AARCH64CC(x) AArch64CC##x
+#endif
+
+#if CS_NEXT_VERSION < 6
+#define CS_AARCH64_VL_(x) ARM64_VAS_##x
+#else
+#define CS_AARCH64_VL_(x) AArch64Layout_VL_##x
+#endif
+
+#if CS_NEXT_VERSION < 6
+#define CS_aarch64_ arm64
+#else
+#define CS_aarch64_ aarch64
+#endif
+
+#if CS_NEXT_VERSION < 6
+#define CS_aarch64(x) arm64##x
+#else
+#define CS_aarch64(x) aarch64##x
+#endif
+
+#if CS_NEXT_VERSION < 6
+#define CS_aarch64_op() cs_arm64_op
+#define CS_aarch64_reg() arm64_reg
+#define CS_aarch64_cc() arm64_cc
+#define CS_cs_aarch64() cs_arm64
+#define CS_aarch64_extender() arm64_extender
+#define CS_aarch64_shifter() arm64_shifter
+#define CS_aarch64_vas() arm64_vas
+#else
+#define CS_aarch64_op() cs_aarch64_op
+#define CS_aarch64_reg() aarch64_reg
+#define CS_aarch64_cc() AArch64CC_CondCode
+#define CS_cs_aarch64() cs_aarch64
+#define CS_aarch64_extender() aarch64_extender
+#define CS_aarch64_shifter() aarch64_shifter
+#define CS_aarch64_vas() AArch64Layout_VectorLayout
+#endif
 
 /// Macro to create combined version which can be compared to
 /// result of cs_version() API.
@@ -73,7 +133,7 @@ typedef size_t csh;
 /// Architecture type
 typedef enum cs_arch {
 	CS_ARCH_ARM = 0,	///< ARM architecture (including Thumb, Thumb-2)
-	CS_ARCH_ARM64,		///< ARM-64, also called AArch64
+	CS_ARCH_AARCH64,	///< AArch64
 	CS_ARCH_MIPS,		///< Mips architecture
 	CS_ARCH_X86,		///< X86 architecture (including x86 & x86-64)
 	CS_ARCH_PPC,		///< PowerPC architecture
@@ -90,6 +150,8 @@ typedef enum cs_arch {
 	CS_ARCH_RISCV,          ///< RISCV architecture
 	CS_ARCH_SH,             ///< SH architecture
 	CS_ARCH_TRICORE,	///< TriCore architecture
+	CS_ARCH_ALPHA, 		///< Alpha architecture
+	CS_ARCH_HPPA, 		///< HPPA architecture
 	CS_ARCH_MAX,
 	CS_ARCH_ALL = 0xFFFF, // All architectures - for cs_support()
 } cs_arch;
@@ -169,6 +231,9 @@ typedef enum cs_mode {
 	CS_MODE_TRICORE_160 = 1 << 5, ///< Tricore 1.6
 	CS_MODE_TRICORE_161 = 1 << 6, ///< Tricore 1.6.1
 	CS_MODE_TRICORE_162 = 1 << 7, ///< Tricore 1.6.2
+	CS_MODE_HPPA_11 = 1 << 1, ///< HPPA 1.1
+	CS_MODE_HPPA_20 = 1 << 2, ///< HPPA 2.0
+	CS_MODE_HPPA_20W = CS_MODE_HPPA_20 | (1 << 3), ///< HPPA 2.0 wide
 } cs_mode;
 
 typedef void* (CAPSTONE_API *cs_malloc_t)(size_t size);
@@ -216,32 +281,17 @@ typedef enum cs_opt_type {
 /// Runtime option value (associated with option type above)
 typedef enum cs_opt_value {
 	CS_OPT_OFF = 0,  ///< Turn OFF an option - default for CS_OPT_DETAIL, CS_OPT_SKIPDATA, CS_OPT_UNSIGNED.
-	CS_OPT_ON = 3, ///< Turn ON an option (CS_OPT_DETAIL, CS_OPT_SKIPDATA).
-	CS_OPT_SYNTAX_DEFAULT = 0, ///< Default asm syntax (CS_OPT_SYNTAX).
-	CS_OPT_SYNTAX_INTEL, ///< X86 Intel asm syntax - default on X86 (CS_OPT_SYNTAX).
-	CS_OPT_SYNTAX_ATT,   ///< X86 ATT asm syntax (CS_OPT_SYNTAX).
-	CS_OPT_SYNTAX_NOREGNAME, ///< Prints register name with only number (CS_OPT_SYNTAX)
-	CS_OPT_SYNTAX_MASM, ///< X86 Intel Masm syntax (CS_OPT_SYNTAX).
-	CS_OPT_SYNTAX_MOTOROLA, ///< MOS65XX use $ as hex prefix
+	CS_OPT_ON = 1 << 0, ///< Turn ON an option (CS_OPT_DETAIL, CS_OPT_SKIPDATA).
+	CS_OPT_SYNTAX_DEFAULT = 1 << 1, ///< Default asm syntax (CS_OPT_SYNTAX).
+	CS_OPT_SYNTAX_INTEL = 1 << 2, ///< X86 Intel asm syntax - default on X86 (CS_OPT_SYNTAX).
+	CS_OPT_SYNTAX_ATT = 1 << 3,   ///< X86 ATT asm syntax (CS_OPT_SYNTAX).
+	CS_OPT_SYNTAX_NOREGNAME = 1 << 4, ///< Prints register name with only number (CS_OPT_SYNTAX)
+	CS_OPT_SYNTAX_MASM = 1 << 5, ///< X86 Intel Masm syntax (CS_OPT_SYNTAX).
+	CS_OPT_SYNTAX_MOTOROLA = 1 << 6, ///< MOS65XX use $ as hex prefix
+	CS_OPT_SYNTAX_CS_REG_ALIAS = 1 << 7, ///< Prints common register alias which are not defined in LLVM (ARM: r9 = sb etc.)
+	CS_OPT_SYNTAX_PERCENT = 1 << 8, ///< Prints the % in front of PPC registers.
+	CS_OPT_DETAIL_REAL = 1 << 1, ///< If enabled, always sets the real instruction detail. Even if the instruction is an alias.
 } cs_opt_value;
-
-/// Common instruction operand types - to be consistent across all architectures.
-typedef enum cs_op_type {
-	CS_OP_INVALID = 0, ///< uninitialized/invalid operand.
-	CS_OP_REG,	   ///< Register operand.
-	CS_OP_IMM,	   ///< Immediate operand.
-	CS_OP_FP,	   ///< Floating-Point operand.
-	CS_OP_MEM =
-		0x80, ///< Memory operand. Can be ORed with another operand type.
-} cs_op_type;
-
-/// Common instruction operand access types - to be consistent across all architectures.
-/// It is possible to combine access types, for example: CS_AC_READ | CS_AC_WRITE
-typedef enum cs_ac_type {
-	CS_AC_INVALID = 0,        ///< Uninitialized/invalid access type.
-	CS_AC_READ    = 1 << 0,   ///< Operand read from memory or register.
-	CS_AC_WRITE   = 1 << 1,   ///< Operand write to memory or register.
-} cs_ac_type;
 
 /// Common instruction groups - to be consistent across all architectures.
 typedef enum cs_group_type {
@@ -286,7 +336,7 @@ typedef struct cs_opt_skipdata {
 	/// NOTE: if this callback pointer is NULL, Capstone would skip a number
 	/// of bytes depending on architectures, as following:
 	/// Arm:     2 bytes (Thumb mode) or 4 bytes.
-	/// Arm64:   4 bytes.
+	/// AArch64: 4 bytes.
 	/// Mips:    4 bytes.
 	/// M680x:   1 byte.
 	/// PowerPC: 4 bytes.
@@ -308,7 +358,7 @@ typedef struct cs_opt_skipdata {
 
 
 #include "arm.h"
-#include "arm64.h"
+#include "aarch64.h"
 #include "m68k.h"
 #include "mips.h"
 #include "ppc.h"
@@ -325,8 +375,10 @@ typedef struct cs_opt_skipdata {
 #include "bpf.h"
 #include "sh.h"
 #include "tricore.h"
+#include "alpha.h"
+#include "hppa.h"
 
-#define MAX_IMPL_W_REGS 20
+#define MAX_IMPL_W_REGS 47
 #define MAX_IMPL_R_REGS 20
 #define MAX_NUM_GROUPS 8
 
@@ -352,7 +404,7 @@ typedef struct cs_detail {
 	/// Architecture-specific instruction info
 	union {
 		cs_x86 x86;     ///< X86 architecture, including 16-bit, 32-bit & 64-bit mode
-		cs_arm64 arm64; ///< ARM64 architecture (aka AArch64)
+		cs_aarch64 aarch64; ///< AARCH64 architecture (aka AArch64)
 		cs_arm arm;     ///< ARM architecture (including Thumb/Thumb2)
 		cs_m68k m68k;   ///< M68K architecture
 		cs_mips mips;   ///< MIPS architecture
@@ -369,6 +421,8 @@ typedef struct cs_detail {
 		cs_riscv riscv; ///< RISCV architecture
 		cs_sh sh;        ///< SH architecture
 		cs_tricore tricore; ///< TriCore architecture
+		cs_alpha alpha; ///< Alpha architecture
+		cs_hppa hppa; ///< HPPA architecture
 	};
 } cs_detail;
 
@@ -381,6 +435,12 @@ typedef struct cs_insn {
 	/// This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
 	/// NOTE: in Skipdata mode, "data" instruction has 0 for this id field.
 	unsigned int id;
+
+	/// If this instruction is an alias instruction, this member is set with
+	/// the alias ID.
+	/// Otherwise to <ARCH>_INS_INVALID.
+	/// -- Only supported by auto-sync archs --
+	uint64_t alias_id;
 
 	/// Address (EIP) of this instruction
 	/// This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
@@ -401,6 +461,15 @@ typedef struct cs_insn {
 	/// Ascii text of instruction operands
 	/// This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
 	char op_str[160];
+
+	/// True: This instruction is an alias.
+	/// False: Otherwise.
+	/// -- Only supported by auto-sync archs --
+	bool is_alias;
+
+	/// True: The operands are the ones of the alias instructions.
+	/// False: The detail operands are from the real instruction.
+	bool usesAliasDetails;
 
 	/// Pointer to cs_detail.
 	/// NOTE: detail pointer is only valid when both requirements below are met:
@@ -459,6 +528,44 @@ typedef enum cs_err {
 CAPSTONE_EXPORT
 unsigned int CAPSTONE_API cs_version(int *major, int *minor);
 
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_arm(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_aarch64(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_mips(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_x86(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_powerpc(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_sparc(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_sysz(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_xcore(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_m68k(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_tms320c64x(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_m680x(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_evm(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_mos65xx(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_wasm(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_bpf(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_riscv(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_sh(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_tricore(void);
+CAPSTONE_EXPORT
+void CAPSTONE_API cs_arch_register_alpha(void);
 
 /**
  This API can be used to either ask for archs supported by this library,

@@ -26,11 +26,12 @@ static struct {
 	{ "armv8be", CS_ARCH_ARM, CS_MODE_ARM | CS_MODE_V8 | CS_MODE_BIG_ENDIAN },
 	{ "thumbv8be", CS_ARCH_ARM, CS_MODE_ARM | CS_MODE_THUMB | CS_MODE_V8 | CS_MODE_BIG_ENDIAN },
 	{ "cortexm", CS_ARCH_ARM, CS_MODE_ARM | CS_MODE_THUMB | CS_MODE_MCLASS },
+	{ "cortexv8m", CS_ARCH_ARM, CS_MODE_ARM | CS_MODE_THUMB | CS_MODE_MCLASS | CS_MODE_V8 },
 	{ "thumb", CS_ARCH_ARM, CS_MODE_ARM | CS_MODE_THUMB },
 	{ "thumbbe", CS_ARCH_ARM, CS_MODE_ARM | CS_MODE_THUMB | CS_MODE_BIG_ENDIAN },
 	{ "thumble", CS_ARCH_ARM, CS_MODE_ARM | CS_MODE_THUMB | CS_MODE_LITTLE_ENDIAN },
-	{ "arm64", CS_ARCH_ARM64, CS_MODE_LITTLE_ENDIAN },
-	{ "arm64be", CS_ARCH_ARM64, CS_MODE_BIG_ENDIAN },
+	{ "aarch64", CS_ARCH_AARCH64, CS_MODE_LITTLE_ENDIAN },
+	{ "aarch64be", CS_ARCH_AARCH64, CS_MODE_BIG_ENDIAN },
 	{ "mips", CS_ARCH_MIPS, CS_MODE_MIPS32 | CS_MODE_LITTLE_ENDIAN },
 	{ "mipsmicro", CS_ARCH_MIPS, CS_MODE_MIPS32 | CS_MODE_MICRO },
 	{ "mipsbemicro", CS_ARCH_MIPS, CS_MODE_MIPS32 | CS_MODE_MICRO | CS_MODE_BIG_ENDIAN },
@@ -113,6 +114,14 @@ static struct {
 	{ "tc160", CS_ARCH_TRICORE, CS_MODE_TRICORE_160 },
 	{ "tc161", CS_ARCH_TRICORE, CS_MODE_TRICORE_161 },
 	{ "tc162", CS_ARCH_TRICORE, CS_MODE_TRICORE_162 },
+	{ "alpha", CS_ARCH_ALPHA, CS_MODE_LITTLE_ENDIAN },
+	{ "alphabe", CS_ARCH_ALPHA, CS_MODE_BIG_ENDIAN },
+	{ "hppa11", CS_ARCH_HPPA, CS_MODE_HPPA_11 | CS_MODE_LITTLE_ENDIAN },
+	{ "hppa11be", CS_ARCH_HPPA, CS_MODE_HPPA_11 | CS_MODE_BIG_ENDIAN },
+	{ "hppa20", CS_ARCH_HPPA, CS_MODE_HPPA_20 | CS_MODE_LITTLE_ENDIAN },
+	{ "hppa20be", CS_ARCH_HPPA, CS_MODE_HPPA_20 | CS_MODE_BIG_ENDIAN },
+	{ "hppa20w", CS_ARCH_HPPA, CS_MODE_HPPA_20W | CS_MODE_LITTLE_ENDIAN },
+	{ "hppa20wbe", CS_ARCH_HPPA, CS_MODE_HPPA_20W | CS_MODE_BIG_ENDIAN },
 	{ NULL }
 };
 
@@ -177,7 +186,7 @@ static uint8_t *preprocess(char *code, size_t *size)
 static void usage(char *prog)
 {
 	printf("Cstool for Capstone Disassembler Engine v%u.%u.%u\n\n", CS_VERSION_MAJOR, CS_VERSION_MINOR, CS_VERSION_EXTRA);
-	printf("Syntax: %s [-d|-s|-u|-v] <arch+mode> <assembly-hexstring> [start-address-in-hex-format]\n", prog);
+	printf("Syntax: %s [-d|-a|-r|-s|-u|-v] <arch+mode> <assembly-hexstring> [start-address-in-hex-format]\n", prog);
 	printf("\nThe following <arch+mode> options are supported:\n");
 
 	if (cs_support(CS_ARCH_X86)) {
@@ -195,15 +204,30 @@ static void usage(char *prog)
 		printf("        thumb       thumb mode\n");
 		printf("        thumbbe     thumb + big endian\n");
 		printf("        cortexm     thumb + cortex-m extensions\n");
+		printf("        cortexv8m   thumb + cortex-m extensions + v8\n");
 		printf("        armv8       arm v8\n");
 		printf("        thumbv8     thumb v8\n");
 		printf("        armv8be     arm v8 + big endian\n");
 		printf("        thumbv8be   thumb v8 + big endian\n");
 	}
 
-	if (cs_support(CS_ARCH_ARM64)) {
-		printf("        arm64       aarch64 mode\n");
-		printf("        arm64be     aarch64 + big endian\n");
+	if (cs_support(CS_ARCH_AARCH64)) {
+		printf("        aarch64       aarch64 mode\n");
+		printf("        aarch64be     aarch64 + big endian\n");
+	}
+
+	if (cs_support(CS_ARCH_ALPHA)) {
+		printf("        alpha       alpha + little endian\n");
+		printf("        alphabe     alpha + big endian\n");
+	}
+
+	if (cs_support(CS_ARCH_HPPA)) {
+		printf("        hppa11        hppa V1.1 + little endian\n");
+		printf("        hppa11be      hppa V1.1 + big endian\n");
+		printf("        hppa20        hppa V2.0 + little endian\n");
+		printf("        hppa20be      hppa V2.0 + big endian\n");
+		printf("        hppa20w        hppa V2.0 wide + little endian\n");
+		printf("        hppa20wbe      hppa V2.0 wide + big endian\n");
 	}
 
 	if (cs_support(CS_ARCH_MIPS)) {
@@ -320,6 +344,8 @@ static void usage(char *prog)
 
 	printf("\nExtra options:\n");
 	printf("        -d show detailed information of the instructions\n");
+	printf("        -r show detailed information of the real instructions (even for alias)\n");
+	printf("        -a Print Capstone register alias (if any). Otherwise LLVM register names are emitted.\n");
 	printf("        -s decode in SKIPDATA mode\n");
 	printf("        -u show immediates as unsigned\n");
 	printf("        -v show version & Capstone core build info\n\n");
@@ -328,6 +354,10 @@ static void usage(char *prog)
 static void print_details(csh handle, cs_arch arch, cs_mode md, cs_insn *ins)
 {
 	printf("\tID: %u (%s)\n", ins->id, cs_insn_name(handle, ins->id));
+	if (ins->is_alias) {
+		printf("\tIs alias: %" PRIu64 " (%s) ", ins->alias_id, cs_insn_name(handle, ins->alias_id));
+		printf("with %s operand set\n", ins->usesAliasDetails ? "ALIAS" : "REAL");
+	}
 
 	switch(arch) {
 		case CS_ARCH_X86:
@@ -336,8 +366,8 @@ static void print_details(csh handle, cs_arch arch, cs_mode md, cs_insn *ins)
 		case CS_ARCH_ARM:
 			print_insn_detail_arm(handle, ins);
 			break;
-		case CS_ARCH_ARM64:
-			print_insn_detail_arm64(handle, ins);
+		case CS_ARCH_AARCH64:
+			print_insn_detail_aarch64(handle, ins);
 			break;
 		case CS_ARCH_MIPS:
 			print_insn_detail_mips(handle, ins);
@@ -384,10 +414,16 @@ static void print_details(csh handle, cs_arch arch, cs_mode md, cs_insn *ins)
 		case CS_ARCH_TRICORE:
 			print_insn_detail_tricore(handle, ins);
 			break;
+		case CS_ARCH_ALPHA:
+			print_insn_detail_alpha(handle, ins);
+			break;
+		case CS_ARCH_HPPA:
+			print_insn_detail_hppa(handle, ins);
+			break;
 		default: break;
 	}
 
-	if (ins->detail->groups_count) {
+	if (ins->detail && ins->detail->groups_count) {
 		int j;
 
 		printf("\tGroups: ");
@@ -415,10 +451,18 @@ int main(int argc, char **argv)
 	bool detail_flag = false;
 	bool unsigned_flag = false;
 	bool skipdata = false;
+	bool custom_reg_alias = false;
+	bool set_real_detail = false;
 	int args_left;
 
-	while ((c = getopt (argc, argv, "sudhv")) != -1) {
+	while ((c = getopt (argc, argv, "rasudhv")) != -1) {
 		switch (c) {
+			case 'a':
+				custom_reg_alias = true;
+				break;
+			case 'r':
+				set_real_detail = true;
+				break;
 			case 's':
 				skipdata = true;
 				break;
@@ -440,8 +484,8 @@ int main(int argc, char **argv)
 					printf("arm=1 ");
 				}
 
-				if (cs_support(CS_ARCH_ARM64)) {
-					printf("arm64=1 ");
+				if (cs_support(CS_ARCH_AARCH64)) {
+					printf("aarch64=1 ");
 				}
 
 				if (cs_support(CS_ARCH_MIPS)) {
@@ -510,6 +554,14 @@ int main(int argc, char **argv)
 
 				if (cs_support(CS_ARCH_TRICORE)) {
 					printf("tricore=1 ");
+				}
+
+				if (cs_support(CS_ARCH_ALPHA)) {
+					printf("alpha=1 ");
+				}
+				
+				if (cs_support(CS_ARCH_HPPA)) {
+					printf("hppa=1 ");
 				}
 
 				printf("\n");
@@ -583,10 +635,16 @@ int main(int argc, char **argv)
 		cs_option(handle, CS_OPT_UNSIGNED, CS_OPT_ON);
 	}
 
+	if (custom_reg_alias) {
+		cs_option(handle, CS_OPT_SYNTAX, CS_OPT_SYNTAX_CS_REG_ALIAS);
+	}
+
+	if (set_real_detail) {
+		cs_option(handle, CS_OPT_DETAIL, CS_OPT_DETAIL_REAL);
+	}
+
 	count = cs_disasm(handle, assembly, size, address, 0, &insn);
 	if (count > 0) {
-		size_t i;
-
 		for (i = 0; i < count; i++) {
 			int j;
 

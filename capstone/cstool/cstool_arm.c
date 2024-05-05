@@ -1,3 +1,4 @@
+#include "capstone/arm.h"
 #include <stdio.h>
 #include <stdlib.h>
 
@@ -29,7 +30,13 @@ void print_insn_detail_arm(csh handle, cs_insn *ins)
 				printf("\t\toperands[%u].type: REG = %s\n", i, cs_reg_name(handle, op->reg));
 				break;
 			case ARM_OP_IMM:
-				printf("\t\toperands[%u].type: IMM = 0x%x\n", i, op->imm);
+				if (op->imm < 0)
+					printf("\t\toperands[%u].type: IMM = -0x%" PRIx64 "\n", i, -(op->imm));
+				else
+					printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "\n", i, op->imm);
+				break;
+			case ARM_OP_PRED:
+				printf("\t\toperands[%u].type: PRED = %d\n", i, op->pred);
 				break;
 			case ARM_OP_FP:
 #if defined(_KERNEL_MODE)
@@ -56,17 +63,45 @@ void print_insn_detail_arm(csh handle, cs_insn *ins)
 
 				break;
 			case ARM_OP_PIMM:
-				printf("\t\toperands[%u].type: P-IMM = %u\n", i, op->imm);
+				printf("\t\toperands[%u].type: P-IMM = %" PRIu64 "\n", i, op->imm);
 				break;
 			case ARM_OP_CIMM:
-				printf("\t\toperands[%u].type: C-IMM = %u\n", i, op->imm);
+				printf("\t\toperands[%u].type: C-IMM = %" PRIu64 "\n", i, op->imm);
 				break;
 			case ARM_OP_SETEND:
 				printf("\t\toperands[%u].type: SETEND = %s\n", i, op->setend == ARM_SETEND_BE? "be" : "le");
 				break;
-			case ARM_OP_SYSREG:
-				printf("\t\toperands[%u].type: SYSREG = %u\n", i, op->reg);
+			case ARM_OP_SYSM:
+				printf("\t\toperands[%u].type: SYSM = 0x%" PRIx16 "\n", i, op->sysop.sysm);
+				printf("\t\toperands[%u].type: MASK = %" PRIu8 "\n", i, op->sysop.msr_mask);
 				break;
+			case ARM_OP_SYSREG:
+				printf("\t\toperands[%u].type: SYSREG = %s\n", i, cs_reg_name(handle, (uint32_t) op->sysop.reg.mclasssysreg));
+				printf("\t\toperands[%u].type: MASK = %" PRIu8 "\n", i, op->sysop.msr_mask);
+				break;
+			case ARM_OP_BANKEDREG:
+				// FIXME: Printing the name is currenliy not supported if the encodings overlap
+				// with system registers.
+				printf("\t\toperands[%u].type: BANKEDREG = %" PRIu32 "\n", i, (uint32_t) op->sysop.reg.bankedreg);
+				if (op->sysop.msr_mask != UINT8_MAX)
+					printf("\t\toperands[%u].type: MASK = %" PRIu8 "\n", i, op->sysop.msr_mask);
+			case ARM_OP_SPSR:
+			case ARM_OP_CPSR: {
+				const char type = op->type == ARM_OP_SPSR ? 'S' : 'C';
+				printf("\t\toperands[%u].type: %cPSR = ", i, type);
+				uint16_t field = op->sysop.psr_bits;
+				if ((field & ARM_FIELD_SPSR_F) || (field & ARM_FIELD_CPSR_F))
+					printf("f");
+				if ((field & ARM_FIELD_SPSR_S) || (field & ARM_FIELD_CPSR_S))
+					printf("s");
+				if ((field & ARM_FIELD_SPSR_X) || (field & ARM_FIELD_CPSR_X))
+					printf("x");
+				if ((field & ARM_FIELD_SPSR_C) || (field & ARM_FIELD_CPSR_C))
+					printf("c");
+				printf("\n");
+				printf("\t\toperands[%u].type: MASK = %" PRIu8 "\n", i, op->sysop.msr_mask);
+				break;
+			}
 		}
 
 		if (op->neon_lane != -1) {
@@ -105,14 +140,19 @@ void print_insn_detail_arm(csh handle, cs_insn *ins)
 			printf("\t\tSubtracted: True\n");
 	}
 
-	if (arm->cc != ARM_CC_AL && arm->cc != ARM_CC_INVALID)
+	if (arm->cc != ARMCC_AL && arm->cc != ARMCC_UNDEF)
 		printf("\tCode condition: %u\n", arm->cc);
+
+	if (arm->vcc != ARMVCC_None)
+		printf("\tVector code condition: %u\n", arm->vcc);
 
 	if (arm->update_flags)
 		printf("\tUpdate-flags: True\n");
 
-	if (arm->writeback)
+	if (ins->detail->writeback) {
 		printf("\tWrite-back: True\n");
+		printf("\tPost index: %s\n", arm->post_index ? "True" : "False");
+	}
 
 	if (arm->cps_mode)
 		printf("\tCPSI-mode: %u\n", arm->cps_mode);
@@ -123,7 +163,7 @@ void print_insn_detail_arm(csh handle, cs_insn *ins)
 	if (arm->vector_data)
 		printf("\tVector-data: %u\n", arm->vector_data);
 
-	if (arm->vector_size)
+	if (arm->vector_size != 0)
 		printf("\tVector-size: %u\n", arm->vector_size);
 
 	if (arm->usermode)
@@ -131,6 +171,9 @@ void print_insn_detail_arm(csh handle, cs_insn *ins)
 
 	if (arm->mem_barrier)
 		printf("\tMemory-barrier: %u\n", arm->mem_barrier);
+
+	if (arm->pred_mask)
+		printf("\tPredicate Mask: 0x%x\n", arm->pred_mask);
 
 	// Print out all registers accessed by this instruction (either implicit or explicit)
 	if (!cs_regs_access(handle, ins,

@@ -28,35 +28,6 @@ static void print_string_hex(const char *comment, unsigned char *str, size_t len
 	printf("\n");
 }
 
-static const char* get_bc_name(int bc)
-{
-	switch(bc) {
-		default:
-		case PPC_BC_INVALID:
-			return ("invalid");
-		case PPC_BC_LT:
-			return ("lt");
-		case PPC_BC_LE:
-			return ("le");
-		case PPC_BC_EQ:
-			return ("eq");
-		case PPC_BC_GE:
-			return ("ge");
-		case PPC_BC_GT:
-			return ("gt");
-		case PPC_BC_NE:
-			return ("ne");
-		case PPC_BC_UN:
-			return ("un");
-		case PPC_BC_NU:
-			return ("nu");
-		case PPC_BC_SO:
-			return ("so");
-		case PPC_BC_NS:
-			return ("ns");
-	}
-}
-
 static void print_insn_detail(cs_insn *ins)
 {
 	cs_ppc *ppc;
@@ -86,24 +57,37 @@ static void print_insn_detail(cs_insn *ins)
 				if (op->mem.base != PPC_REG_INVALID)
 					printf("\t\t\toperands[%u].mem.base: REG = %s\n",
 							i, cs_reg_name(handle, op->mem.base));
+				if (op->mem.offset != 0)
+					printf("\t\t\toperands[%u].mem.offset: REG = %s\n",
+							i, cs_reg_name(handle, op->mem.offset));
 				if (op->mem.disp != 0)
 					printf("\t\t\toperands[%u].mem.disp: 0x%x\n", i, op->mem.disp);
 
 				break;
-			case PPC_OP_CRX:
-				printf("\t\toperands[%u].type: CRX\n", i);
-				printf("\t\t\toperands[%u].crx.scale: %d\n", i, op->crx.scale);
-				printf("\t\t\toperands[%u].crx.reg: %s\n", i, cs_reg_name(handle, op->crx.reg));
-				printf("\t\t\toperands[%u].crx.cond: %s\n", i, get_bc_name(op->crx.cond));
-				break;
 		}
+		if (op->access == CS_AC_READ)
+			printf("\t\t\toperands[%u].access: READ\n", i);
+		else if (op->access == CS_AC_WRITE)
+			printf("\t\t\toperands[%u].access: WRITE\n", i);
+		else if (op->access == (CS_AC_READ | CS_AC_WRITE))
+			printf("\t\t\toperands[%u].access: READ | WRITE\n", i);
 	}
 
-	if (ppc->bc != 0)
-		printf("\tBranch code: %u\n", ppc->bc);
-
-	if (ppc->bh != 0)
-		printf("\tBranch hint: %u\n", ppc->bh);
+	if (ppc->bc.pred_cr != PPC_PRED_INVALID || ppc->bc.pred_ctr != PPC_PRED_INVALID) {
+		printf("\tBranch:\n");
+		printf("\t\tbi: %u\n", ppc->bc.bi);
+		printf("\t\tbo: %u\n", ppc->bc.bo);
+		if (ppc->bc.bh != PPC_BH_INVALID)
+			printf("\t\tbh: %u\n", ppc->bc.bh);
+		if (ppc->bc.pred_cr != PPC_PRED_INVALID) {
+			printf("\t\tcrX: %s\n", cs_reg_name(handle, ppc->bc.crX));
+			printf("\t\tpred CR-bit: %u\n", ppc->bc.pred_cr);
+		}
+		if (ppc->bc.pred_ctr != PPC_PRED_INVALID)
+			printf("\t\tpred CTR: %u\n", ppc->bc.pred_ctr);
+		if (ppc->bc.hint != PPC_BR_NOT_GIVEN)
+			printf("\t\thint: %u\n", ppc->bc.hint);
+	}
 
 	if (ppc->update_cr0)
 		printf("\tUpdate-CR0: True\n");

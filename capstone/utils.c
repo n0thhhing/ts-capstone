@@ -8,6 +8,7 @@
 #include <stdlib.h>
 #endif
 #include <string.h>
+#include <ctype.h>
 
 #include "utils.h"
 
@@ -81,37 +82,6 @@ bool arr_exist(uint16_t *arr, unsigned char max, unsigned int id)
 	return false;
 }
 
-// binary search for encoding in IndexType array
-// return -1 if not found, or index if found
-unsigned int binsearch_IndexTypeEncoding(const struct IndexType *index, size_t size, uint16_t encoding)
-{
-	// binary searching since the index is sorted in encoding order
-	size_t left, right, m;
-
-	right = size - 1;
-
-	if (encoding < index[0].encoding || encoding > index[right].encoding)
-		// not found
-		return -1;
-
-	left = 0;
-
-	while(left <= right) {
-		m = (left + right) / 2;
-		if (encoding == index[m].encoding) {
-			return m;
-		}
-
-		if (encoding < index[m].encoding)
-			right = m - 1;
-		else
-			left = m + 1;
-	}
-
-	// not found
-	return -1;
-}
-
 /// Reads 4 bytes in the endian order specified in MI->cs->mode.
 uint32_t readBytes32(MCInst *MI, const uint8_t *Bytes)
 {
@@ -137,4 +107,22 @@ uint16_t readBytes16(MCInst *MI, const uint8_t *Bytes)
 		Insn = (Bytes[1] << 8) | Bytes[0];
 
 	return Insn;
+}
+
+/// @brief Appends the string @p src to the string @p str. @p src is put to lower case.
+/// @param str The string to append to.
+/// @param str_size The length of @p str
+/// @param src The string to append.
+void append_to_str_lower(char *str, size_t str_size, const char *src) {
+	char *dest = strchr(str, '\0');
+	if (dest - str >= str_size) {
+		assert("str_size does not match actual string length." && 0);
+		return;
+	}
+
+	int i = dest - str;
+	for (int j = 0; (i < str_size) && (j < strlen(src)); ++i, ++j) {
+		str[i] = tolower(src[j]);
+	}
+	str[i] = '\0';
 }
