@@ -181,7 +181,7 @@ disassembler.option(cs.OPT_DETAIL, true);
 // contain the original bytes of the instruction
 // and any associated detail information,
 // respectively. Enabling this option can be
-// useful when needing access * to the raw
+// useful when needing access to the raw
 // binary data of disassembled instructions for
 // further analysis or processing.
 disassembler.option(cs.OPT_BUFFER, true);
