@@ -60,6 +60,7 @@ interface struct_t {
 }
 export declare namespace Memory {
   const allocations: Set<ptr>;
+  const nullptr: ptr;
   function malloc(size: number): ptr;
   function free(mem: ptr | Set<ptr> | Array<ptr>): void;
   function clean(): void;

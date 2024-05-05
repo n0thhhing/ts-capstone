@@ -8,7 +8,7 @@ git clone https://github.com/n0thhhing/capstone-wrapper
 ## Example
 
 ```typescript
-import cs, { cs_arch, cs_mode, cs_insn, ARM64 } from "./path/to/wrapper.js"; // soon this will be a package to import via npm, bun, yarn ect ...
+import cs, { cs_arch, cs_mode, cs_insn, ARM64 } from './path/to/wrapper.js'; // soon this will be a package to import via npm, bun, yarn ect ...
 
 const arch: cs_arch = cs.ARCH_ARM64; // or cs.ARCH_AARCH64.
 const mode: cs_mode = cs.MODE_ARCH;
@@ -25,62 +25,65 @@ const code: Array<number> = [
 
 const disassembler = new cs.Capstone(arch, mode);
 
-const instructions: Array<cs_insn> = disassembler.disasm(code, 0x1000, /* optional length */);
+const instructions: Array<cs_insn> = disassembler.disasm(
+  code,
+  0x1000 /* optional length */,
+);
 
 // An instruction can be found in this basic format
 const example_insn: cs_insn = {
-    id: 664, // Instruction ID (a numeric ID for the instruction mnemonic)
-    address: 4104, // Address (EIP) of this instruction
-    size: 4, // Size of this instruction
-    mnemonic: 'msr', // Ascii text of instruction mnemonic
-    op_str: 'dbgdtrtx_el0, x12', // Ascii text of instruction operands
-    bytes: [12, 5, 19, 213], // Machine bytes of this instruction, with number of bytes indicated by size above
-    // If you have detail enabled you will have
-    // a object called detail, most of it depends on
-    // the chosen architecture or the instruction
-    detail: {
-      regs_write: [], // list of implicit registers modified by this insn
-      groups: [6], // list of group this instruction belong to
-      regs_read: [], // list of implicit registers read by this insn
-      regs_read_count: 0, // number of implicit registers read by this insn
-      regs_write_count: 0, // number of implicit registers modified by this insn
-      groups_count: 1, // number of groups this insn belongs to
-      writeback: false, // Instruction has writeback operands.
-      // The detail object will have information
-      // specific to your chosen architecture, this
-      // contains things like operands, registers,
-      // and other details involving the instruction.
-      // So... Anything in the object is specific
-      // to cs_arch and the instruction itself.
-      arm64: {
-        operands: [
-          {
-            vector_index: -1,
-            vas: 0,
-            shift: { type: 0, value: 0 },
-            ext: 0,
-            access: 2,
-            type: 68, // ARM64.OP_SYS
-            sys: 38952,
-          },
-          {
-            vector_index: -1,
-            vas: 0,
-            shift: { type: 0, value: 0 },
-            ext: 0,
-            access: 1,
-            type: 1, // ARM64.OP_REG
-            reg: 230,
-          },
-        ],
-        cc: 0,
-        update_flags: false,
-        writeback: false,
-        post_index: false,
-        op_count: 2,
-      },
+  id: 664, // Instruction ID (a numeric ID for the instruction mnemonic)
+  address: 4104, // Address (EIP) of this instruction
+  size: 4, // Size of this instruction
+  mnemonic: 'msr', // Ascii text of instruction mnemonic
+  op_str: 'dbgdtrtx_el0, x12', // Ascii text of instruction operands
+  bytes: [12, 5, 19, 213], // Machine bytes of this instruction, with number of bytes indicated by size above
+  // If you have detail enabled you will have
+  // a object called detail, most of it depends on
+  // the chosen architecture or the instruction
+  detail: {
+    regs_write: [], // list of implicit registers modified by this insn
+    groups: [6], // list of group this instruction belong to
+    regs_read: [], // list of implicit registers read by this insn
+    regs_read_count: 0, // number of implicit registers read by this insn
+    regs_write_count: 0, // number of implicit registers modified by this insn
+    groups_count: 1, // number of groups this insn belongs to
+    writeback: false, // Instruction has writeback operands.
+    // The detail object will have information
+    // specific to your chosen architecture, this
+    // contains things like operands, registers,
+    // and other details involving the instruction.
+    // So... Anything in the object is specific
+    // to cs_arch and the instruction itself.
+    arm64: {
+      operands: [
+        {
+          vector_index: -1,
+          vas: 0,
+          shift: { type: 0, value: 0 },
+          ext: 0,
+          access: 2,
+          type: 68, // ARM64.OP_SYS
+          sys: 38952,
+        },
+        {
+          vector_index: -1,
+          vas: 0,
+          shift: { type: 0, value: 0 },
+          ext: 0,
+          access: 1,
+          type: 1, // ARM64.OP_REG
+          reg: 230,
+        },
+      ],
+      cc: 0,
+      update_flags: false,
+      writeback: false,
+      post_index: false,
+      op_count: 2,
     },
-  };
+  },
+};
 
 for (const insn of instructions)
   console.log(
@@ -96,9 +99,9 @@ const data = {
   // because primitive values like booleans,
   // Numbers, strings, ect, are read only
   // (The function copies the value).
-  buffer: armBuffer,
+  buffer: code,
   addr: 0x1000,
-  insn: { ... }, // or null, this will be filled once you call disasm_iter.
+  insn: {}, // or null, this will be filled once you call disasm_iter.
 };
 
 // this returns a boolean, which will become
@@ -132,26 +135,20 @@ while (disassembler.disasm_iter(data)) {
 // id, but with mnemonic set to null(JavaScript null)
 const mnObj = {
   id: 191, // the id returned in the insn object, in this case, its movz, you can also find more in the Typescript file corresponding to your arch (arch/<arch>.ts)
-  mnemonic: "foo", // the new name of the mnemonic, or null
+  mnemonic: 'foo', // the new name of the mnemonic, or null
 };
-disassembler.option(
-  cs.OPT_MNEMONIC,
-  mnObj
-);
+disassembler.option(cs.OPT_MNEMONIC, mnObj);
 
 // OPT_MODE
 
 // after using this, your disassembler mode
 // will be MODE_LITTLE_ENDIAN until the
 // instance is closed or changed again.
-disassembler.option(
-  cs.OPT_MODE,
-  cs.MODE_LITTLE_ENDIAN
-);
+disassembler.option(cs.OPT_MODE, cs.MODE_LITTLE_ENDIAN);
 
 // OPT_SYNTAX
 
-disassembler.option(cs.OPT_SYNTAX, OPT_SYNTAX_INTEL); // Default assembly syntax of all platforms (CS_OPT_SYNTAX).
+disassembler.option(cs.OPT_SYNTAX, cs.OPT_SYNTAX_INTEL); // Default assembly syntax of all platforms (CS_OPT_SYNTAX).
 
 // OPT_SKIPDATA
 
@@ -164,7 +161,7 @@ disassembler.option(cs.OPT_SYNTAX, OPT_SYNTAX_INTEL); // Default assembly syntax
 // and only disassemble the actual instructions.
 disassembler.option(
   cs.OPT_SKIPDATA,
-  true // true/false/cs.OPT_ON/cs.OPT_OFF
+  true, // true/false/cs.OPT_ON/cs.OPT_OFF
 );
 
 // OPT_DETAIL
@@ -174,10 +171,64 @@ disassembler.option(
 // reg_ids, groups, and in this case, a sub
 // arm64 object with detailed info specific
 // to the instruction and architecture.
-disassembler.option(
-  cs.OPT_DETAIL
-  true
-)
+disassembler.option(cs.OPT_DETAIL, true);
+
+// OPT_BUFFER
+
+// When enabled, this option instructs Capstone
+// to include the raw instruction bytes and detail
+// bytes in the disassembled output. These buffers
+// contain the original bytes of the instruction
+// and any associated detail information,
+// respectively. Enabling this option can be
+// useful when needing access * to the raw
+// binary data of disassembled instructions for
+// further analysis or processing.
+disassembler.option(cs.OPT_BUFFER, true);
+
+// To access data from the buffer in JavaScript,
+// use DataView. For types other than `int32`,
+// little-endianness is required due to the nature
+// of the underlying buffer being a Uint8Array.
+// Use DataView to read the buffer as follows:
+
+// For `int32`: Use `getInt32()` method of DataView
+// directly. For other types (e.g., `uint64`),
+// specify `littleEndian` as `true` in DataView
+// constructor to correctly interpret the bytes.
+let buffer = /* Raw buffer received from the insn object */;
+let view = new DataView(buffer.buffer);
+let id = view.getUint32(0); // Read the 32-bit integer id from the buffer
+let address = view.getBigUint64(8, true); // Read a 64-bit integer address with little-endian
+
+// Also for things like strings(cstrings in this case),
+// you can simply use a TextDecoder, each character is
+// stored as a int8 anyways so all you have to do is
+// throw `utf-8` in the TextDecoder constructor
+const mnemonic_bytes =
+  buffer.slice(
+    42, // offset for the mnemonic
+    74 // 74 - 42 = 32 = mnemonic max length
+  )
+
+// TextDecoder doesn't automatically stop at null
+// terminator, this isn't needed if your simply
+// inspecting it, but for comparisons there will
+// be trailing `\u0000`
+const mn_null_index = mn_bytes.indexOf(0);
+const truncated_mn =
+    mn_null_index !== -1 ? mn_bytes.subarray(0, mn_null_index) : mn_bytes; // slice off every trailing null terminator
+
+const mnemonic = new TextDecoder("utf-8").decode(truncated_mn)
+
+// offsets are as follows:
+// id: 0
+// address: 8
+// size: 16
+// bytes: 18
+// mnemonic: 42
+// op_str: 74
+// detail: 0 in the insn.detail.buffer
 
 // NOT IMPLEMENTED
 
@@ -206,7 +257,7 @@ cs.version(); // 5.0
 // These groups can be found in the
 // arch/<arch>.ts file or the detail obj
 // when CS_DETAIL is turned on.
-disassembler.group_name(2) // call
+disassembler.group_name(2); // call
 
 // reg_name
 
@@ -230,7 +281,7 @@ disassembler.insn_name(191); // s28
 // having to manually inspect the operands array.
 // This requires the detail object to be present in
 // the insn, so cs.OPT_DETAIL needs to be turned on
-disassembler.op_index(example_insn, ARM64.OP_REG, 1) // 1
+disassembler.op_index(example_insn, ARM64.OP_REG, 1); // 1
 
 // op_count
 
@@ -240,13 +291,13 @@ disassembler.op_index(example_insn, ARM64.OP_REG, 1) // 1
 // detail object. This requires the detail object to
 // be present in the insn, so cs.OPT_DETAIL needs
 // to be turned on
-disassembler.op_count(example_insn, ARM64.OP_REG) // 1
+disassembler.op_count(example_insn, ARM64.OP_REG); // 1
 
 // regs_access
 
 // Retrieve all the registers accessed by an
 // instruction, either explicitly or implicitly.
-disassembler.regs_access(example_insn) // { regs_read: [], regs_read_count: 0, regs_write: [], regs_write_count: 0 }
+disassembler.regs_access(example_insn); // { regs_read: [], regs_read_count: 0, regs_write: [], regs_write_count: 0 }
 
 // reg_read
 
@@ -254,7 +305,7 @@ disassembler.regs_access(example_insn) // { regs_read: [], regs_read_count: 0, r
 // used a particular register. These registers can
 // be found in the constants file corresponding to
 // your chosen architecture (arch/<arch>.ts)
-disassembler.regs_read(example_insn, ARM64.REG_NZCV) // false
+disassembler.reg_read(example_insn, ARM64.REG_NZCV); // false
 
 // reg_write
 
@@ -262,7 +313,7 @@ disassembler.regs_read(example_insn, ARM64.REG_NZCV) // false
 // modified a particular register. These registers can
 // be found in the constants file corresponding to
 // your chosen architecture (arch/<arch>.ts)
-disassembler.regs_write(example_insn, ARM64.REG_B0) // false
+disassembler.reg_write(example_insn, ARM64.REG_B0); // false
 
 // insn_group
 
@@ -270,7 +321,7 @@ disassembler.regs_write(example_insn, ARM64.REG_B0) // false
 // particular group. You can find these groups
 // in the constants file corresponding to your
 // chosen architecture (arch/<arch>.ts)
-disassembler.insn_group(example_insn, ARM64.GRP_PRIVILEGE) // true
+disassembler.insn_group(example_insn, ARM64.GRP_PRIVILEGE); // true
 
 // close
 
@@ -337,10 +388,10 @@ For detailed documentation on available constants and methods, refer to the sour
 
 ### Prerequisites
 
-1. Clone the capstone 5.0 repo
+1. Initialize the original Capstone submodule:
 
 ```shell
-git clone https://github.com/capstone-engine/capstone
+git submodule update --init
 ```
 
 2. Make sure you have bun and emsdk installed
@@ -364,8 +415,8 @@ The makefile provides some commands for necessary builds, which includes
 ### Initializing
 
 ```typescript
-import Module from './capstone.js'; // capstone.js should be in the src directory after building
-import Memory from './memory.ts' // utilities for working with memory
+import Module from "./capstone.js"; // capstone.js should be in the src directory after building
+import Memory from "./memory.ts"; // utilities for working with memory
 
 const Capstone = new Module();
 // Use as necessary

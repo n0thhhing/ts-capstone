@@ -50,6 +50,7 @@ import {
   type cs_xcore_op,
   XCORE,
   cs_xcore,
+  cs_sysz,
 } from './arch';
 declare const Wrapper: wasm_module;
 type cs_err = number;
@@ -97,6 +98,8 @@ interface wasm_module {
     position: number,
   ) => number;
   _cs_insn_offset: (insns: ptr, post: number) => number;
+  _cs_detail_buffer: (insn: ptr) => ptr;
+  _cs_insn_buffer: (insn: ptr) => ptr;
   _x86_rel_addr: (insn: ptr) => number;
   ccall: (
     ident: string, // name of C function
@@ -130,6 +133,7 @@ interface cs_insn {
   op_str: string;
   bytes: Array<number>;
   detail?: cs_detail;
+  buffer?: Buffer;
 }
 interface cs_detail {
   regs_read: Array<number>;
@@ -139,24 +143,25 @@ interface cs_detail {
   groups: Array<number>;
   groups_count: number;
   writeback: boolean;
-  x86?: any;
-  arm?: any;
-  arm64?: any;
-  m68k?: any;
-  mips?: any;
-  ppc?: any;
-  sparc?: any;
-  sysz?: any;
-  xcore?: any;
-  tms320c64x?: any;
-  m680x?: any;
-  evm?: any;
-  mos65xx?: any;
-  wasm?: any;
-  bpf?: any;
-  riscv?: any;
-  sh?: any;
-  tricore?: any;
+  buffer?: Buffer;
+  x86?: cs_x86;
+  arm?: cs_arm;
+  arm64?: cs_arm64;
+  m68k?: cs_m68k;
+  mips?: cs_mips;
+  ppc?: cs_ppc;
+  sparc?: cs_sparc;
+  sysz?: cs_sysz;
+  xcore?: cs_xcore;
+  tms320c64x?: cs_tms320c64x;
+  m680x?: cs_m680x;
+  evm?: cs_evm;
+  mos65xx?: cs_mos65xx;
+  wasm?: cs_wasm;
+  bpf?: cs_bpf;
+  riscv?: cs_riscv;
+  sh?: cs_sh;
+  tricore?: cs_tricore;
 }
 interface cs_opt_skipdata {
   mnemonic: string | null;
@@ -276,6 +281,7 @@ declare namespace cs {
   const OPT_MNEMONIC: cs_opt_type;
   const OPT_UNSIGNED: cs_opt_type;
   const OPT_NO_BRANCH_OFFSET: cs_opt_type;
+  const OPT_BUFFER: cs_opt_type;
   const OPT_OFF: cs_opt_value;
   const OPT_ON: cs_opt_value;
   const OPT_SYNTAX_DEFAULT: cs_opt_value;
@@ -304,6 +310,7 @@ declare namespace cs {
   const SUPPORT_X86_REDUCE: number;
   const MNEMONIC_SIZE = 32;
   const INSN_SIZE = 240;
+  const DETAIL_SIZE = 1864;
   const MAX_IMPL_W_REGS = 20;
   const MAX_IMPL_R_REGS = 20;
   const MAX_NUM_GROUPS = 8;
@@ -316,6 +323,7 @@ declare namespace cs {
     private mode;
     private handle_ptr;
     private arch_info;
+    private opt_buffer;
     constructor(arch: number, mode: number);
     private init;
     private deref;

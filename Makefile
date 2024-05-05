@@ -20,7 +20,7 @@ bundle: src/wrapper.ts src/capstone.js
 .PHONY: type
 type:
 	-rm src/arch/*.d.ts
-	-tsc src/wrapper.ts src/memory.ts src/structures.ts src/arch/*.ts --downlevelIteration true --declaration --outDir src --emitDeclarationOnly --allowJs true --esModuleInterop true
+	-tsc src/wrapper.ts src/memory.ts src/arch/*.ts --downlevelIteration true --declaration --outDir src --emitDeclarationOnly --allowJs true --esModuleInterop true
 
 .PHONY: compare
 compare:

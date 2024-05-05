@@ -123,7 +123,9 @@ interface wasm_module {
     op_type: number,
     position: number,
   ) => number; // Retrieve the position of operand of given type in <arch>.operands[] array.
-  _cs_insn_offset: (insns: ptr, post: number) => number; // Calculate the offset of a disassembled instruction in its buffer, given its position in its array of disassembled insn
+  _cs_insn_offset: (insns: ptr, post: number) => number; // Calculate the offset of a disassembled instruction in its buffer, given its position in its array of disassembled insn.
+  _cs_detail_buffer: (insn: ptr) => ptr; // Gets the raw buffer of the specified insns cs_detail.
+  _cs_insn_buffer: (insn: ptr) => ptr; // Gets the raw buffer of the cs_insn
   _x86_rel_addr: (insn: ptr) => number; // Calculate relative address for X86-64, given cs_insn structure
   ccall: (
     ident: string, // name of C function
@@ -159,6 +161,7 @@ interface cs_insn {
   op_str: string; // Ascii text of instruction operands This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
   bytes: Array<number>; // Machine bytes of this instruction, with number of bytes indicated by @size above This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
   detail?: cs_detail; // cs_detail object
+  buffer?: Uint8Array; // The raw detail buffer, this will only be present if cs.OPT_BUFFER is on.
 }
 
 // cs_detail object. NOTE: detail object is only valid when both requirements below are met: (1) CS_OP_DETAIL = CS_OPT_ON (2) Engine is not in Skipdata mode (CS_OP_SKIPDATA option set to CS_OPT_ON)
@@ -170,24 +173,25 @@ interface cs_detail {
   groups: Array<number>; // list of group this instruction belong to
   groups_count: number; // number of groups this insn belongs to
   writeback: boolean; // Instruction has writeback operands.
-  x86?: any; // X86 architecture, including 16-bit, 32-bit & 64-bit mode
-  arm?: any; // ARM64 architecture (aka AArch64)
-  arm64?: any; // ARM architecture (including Thumb/Thumb2)
-  m68k?: any; // M68K architecture
-  mips?: any; // MIPS architecture
-  ppc?: any; // PowerPC architecture
-  sparc?: any; // Sparc architecture
-  sysz?: any; // SystemZ architecture
-  xcore?: any; // XCore architecture
-  tms320c64x?: any; // TMS320C64x architecture
-  m680x?: any; // M680X architecture
-  evm?: any; // Ethereum architecture
-  mos65xx?: any; //MOS65XX architecture (including MOS6502)
-  wasm?: any; // Web Assembly architecture
-  bpf?: any; // Berkeley Packet Filter architecture (including eBPF)
-  riscv?: any; // RISCV architecture
-  sh?: any; // SH architecture
-  tricore?: any; // TriCore architecture
+  buffer?: Uint8Array; // The raw detail buffer, this will only be present if cs.OPT_BUFFER is on.
+  x86?: cs_x86; // X86 architecture, including 16-bit, 32-bit & 64-bit mode
+  arm?: cs_arm; // ARM64 architecture (aka AArch64)
+  arm64?: cs_arm64; // ARM architecture (including Thumb/Thumb2)
+  m68k?: cs_m68k; // M68K architecture
+  mips?: cs_mips; // MIPS architecture
+  ppc?: cs_ppc; // PowerPC architecture
+  sparc?: cs_sparc; // Sparc architecture
+  sysz?: cs_sysz; // SystemZ architecture
+  xcore?: cs_xcore; // XCore architecture
+  tms320c64x?: cs_tms320c64x; // TMS320C64x architecture
+  m680x?: cs_m680x; // M680X architecture
+  evm?: cs_evm; // Ethereum architecture
+  mos65xx?: cs_mos65xx; //MOS65XX architecture (including MOS6502)
+  wasm?: cs_wasm; // Web Assembly architecture
+  bpf?: cs_bpf; // Berkeley Packet Filter architecture (including eBPF)
+  riscv?: cs_riscv; // RISCV architecture
+  sh?: cs_sh; // SH architecture
+  tricore?: cs_tricore; // TriCore architecture
 }
 
 // User-customized setup for SKIPDATA option
@@ -322,6 +326,7 @@ namespace cs {
   export const OPT_MNEMONIC: cs_opt_type = 7; // Customize instruction mnemonic
   export const OPT_UNSIGNED: cs_opt_type = 8; // print immediate operands in unsigned form
   export const OPT_NO_BRANCH_OFFSET: cs_opt_type = 9; // ARM, prints branch immediates without offset.
+  export const OPT_BUFFER: cs_opt_type = 10; // Adds the raw buffer to the insn and detail object.
 
   // Capstone option value
   export const OPT_OFF: cs_opt_value = 0; // Turn OFF an option - default option of CS_OPT_DETAIL
@@ -364,6 +369,7 @@ namespace cs {
   // Manifest Constants
   export const MNEMONIC_SIZE = 32;
   export const INSN_SIZE = 240;
+  export const DETAIL_SIZE = 1864;
   export const MAX_IMPL_W_REGS = 20;
   export const MAX_IMPL_R_REGS = 20;
   export const MAX_NUM_GROUPS = 8;
@@ -407,6 +413,7 @@ namespace cs {
     private mode: cs_mode;
     private handle_ptr: ptr;
     private arch_info: { instance: any; entry: string };
+    private opt_buffer: boolean = false;
 
     constructor(arch: number, mode: number) {
       this.arch = arch;
@@ -442,9 +449,9 @@ namespace cs {
     }
 
     private deref(insn_ptr: ptr): cs_insn {
-      const insn_id: number = Memory.read(insn_ptr, 'i32');
-      const insn_addr: number = Memory.read(insn_ptr + 8, 'i64');
-      const insn_size: number = Memory.read(insn_ptr + 16, 'i16');
+      const insn_id: number = Memory.read(insn_ptr, 'u32');
+      const insn_addr: number = Memory.read(insn_ptr + 8, 'u64');
+      const insn_size: number = Memory.read(insn_ptr + 16, 'u16');
       const insn_mn: string = Wrapper.UTF8ToString(insn_ptr + 42);
       const insn_op_str: string = Wrapper.UTF8ToString(insn_ptr + 66 + 8);
       const insn_bytes: Array<number> = [];
@@ -464,12 +471,29 @@ namespace cs {
       };
 
       const detail_ptr: ptr = Memory.read(insn_ptr + 238, '*');
-      if (detail_ptr != 0) insn.detail = this.get_detail(detail_ptr);
+      const has_detail = detail_ptr != Memory.nullptr;
+      if (has_detail) {
+        insn.detail = this.get_detail(detail_ptr);
+      }
+      if (this.opt_buffer) {
+        const heap = Wrapper.HEAPU8.buffer;
+        if (has_detail)
+          insn.detail.buffer = new Uint8Array(
+            heap,
+            Wrapper._cs_detail_buffer(insn_ptr),
+            DETAIL_SIZE,
+          );
+        insn.buffer = new Uint8Array(
+          heap,
+          Wrapper._cs_insn_buffer(insn_ptr),
+          DETAIL_SIZE,
+        );
+      }
       return insn;
     }
 
     private ref(insns: Array<cs_insn>): ptr {
-      const count = insns.length;
+      const count: number = insns.length;
       const insns_ptr: ptr = Memory.malloc(INSN_SIZE * count);
       for (let i = 0; i < count; i++) {
         const insn = insns[i];
@@ -1399,6 +1423,7 @@ namespace cs {
         arch_info_ptr,
         Memory,
       );
+
       return detail;
     }
 
@@ -1454,6 +1479,10 @@ namespace cs {
         opt_val = obj_ptr;
       } else if (option === OPT_SKIPDATA_SETUP) {
         // TODO
+      } else if (option === OPT_BUFFER) {
+        this.opt_buffer =
+          typeof value === 'boolean' ? value : value === OPT_ON ? true : false;
+        return;
       } else {
         opt_val =
           typeof value === 'boolean' ? (value ? OPT_ON : OPT_OFF) : value;

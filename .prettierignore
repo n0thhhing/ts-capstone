@@ -1,3 +1,5 @@
 capstone
 **/capstone*
 build
+# prettier keeps making the buffer ugly :(
+README.md

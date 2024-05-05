@@ -61,6 +61,7 @@ const fn_cache: Map<Function, { offset: number; entry: any }> = new Map();
 
 export namespace Memory {
   export const allocations: Set<ptr> = new Set<ptr>();
+  export const nullptr: ptr = 0;
 
   export function malloc(size: number): ptr {
     const pointer: ptr = Wrapper._malloc(size);
@@ -88,7 +89,7 @@ export namespace Memory {
     pointer: ptr,
     value: any,
     type: native_t | arr_t<native_t>,
-  ) {
+  ): void {
     switch (type) {
       case 'char*':
         const utf8_bytes = [];

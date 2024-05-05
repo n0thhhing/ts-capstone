@@ -187,6 +187,5 @@ replit.nix
 
 res.txt
 offsets.txt
-capstone
 compare
 #src/arch

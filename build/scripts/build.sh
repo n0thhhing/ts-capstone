@@ -1,4 +1,6 @@
 EXPORTED_FUNCTIONS=(
+	cs_insn_buffer
+	cs_detail_buffer
 	cs_insn_offset
 	x86_rel_addr
 	malloc
@@ -59,4 +61,4 @@ EMSCRIPTEN_SETTINGS=(
 	--memory-init-file 0
 )
 
-emcc build/libcapstone.a src/macros.c ${EMSCRIPTEN_SETTINGS[*]} -o ./src/capstone.js
+emcc -lembind build/libcapstone.a src/macros.c src/constants.cpp ${EMSCRIPTEN_SETTINGS[*]} -o ./src/capstone.js
