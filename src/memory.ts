@@ -1,4 +1,4 @@
-import { Wrapper } from './wrapper';
+import { Wrapper } from './capstone';
 
 type native_t =
   | 'i8'

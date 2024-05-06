@@ -1,5 +1,5 @@
 capstone
-**/capstone*
+**/libcapstone*
 build
 # prettier keeps making the buffer ugly :(
 README.md

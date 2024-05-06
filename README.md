@@ -8,7 +8,7 @@ git clone https://github.com/n0thhhing/capstone-wrapper
 ## Example
 
 ```typescript
-import cs, { cs_arch, cs_mode, cs_insn, ARM64 } from './path/to/wrapper.js'; // soon this will be a package to import via npm, bun, yarn ect ...
+import cs, { cs_arch, cs_mode, cs_insn, ARM64 } from './path/to/capstone.ts'; // soon this will be a package to import via npm, bun, yarn ect ...
 
 const arch: cs_arch = cs.ARCH_ARM64; // or cs.ARCH_AARCH64.
 const mode: cs_mode = cs.MODE_ARCH;
@@ -339,7 +339,7 @@ you can also take a look at the [tests](src/tests)
 ## Constants
 
 if you would like to see all the options and capstone
-constants, you can find them in either the [wrapper.ts](src/wrapper.ts)
+constants, you can find them in either the [capstone.ts](src/capstone.ts)
 file or the [typescript file](src/arch) (arch/<arch>.ts) for things like register ids, options,
 error codes, groups, opcodes, manifest constants, insns, ect
 

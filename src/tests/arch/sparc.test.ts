@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import cs from '../../wrapper';
+import cs from '../../capstone';
 
 test('cs.ARCH_SPARC', () => {
   const buffer = new Uint8Array([

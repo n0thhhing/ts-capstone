@@ -1,4 +1,4 @@
-import Module from './capstone';
+import Module from './libcapstone';
 import { Memory } from './memory';
 
 import {
@@ -136,16 +136,9 @@ interface wasm_module {
       async: boolean; // If true, implies that the ccall will perform an async operation. This assumes you are build with asyncify support.
     },
   ) => any; // Call a compiled C function from JavaScript.
-  cwrap: (
-    ident: string, // name of C function
-    returnType: wasm_arg, // return type
-    argTypes: Array<wasm_arg>, // argument types
-  ) => any; // Returns a native JavaScript wrapper for a C function.
-  addFunction: (func: Function, sig: string) => any; // You can use addFunction to return an integer value that represents a function pointer (use Memory.new_callback()).
   setValue: (ptr: number, value: any, type: wasm_t) => void; // Sets a value at a specific memory address at run-time (use Memory.write()).
   getValue: (ptr: number, type: wasm_t) => any; // Gets a value at a specific memory address at run-time (use Memory.read()).
   UTF8ToString: (ptr: number, maxBytesToRead?: number) => string; // Given a pointer ptr to a null-terminated UTF8-encoded string in the Emscripten HEAP, returns a copy of that string as a JavaScript String object.
-  stringToNewUTF8: (str: string, outPtr: ptr, maxBytesToWrite: number) => any; // Copies the given JavaScript String object str to the Emscripten HEAP at address outPtr, null-terminated and encoded in UTF8 form.
   writeArrayToMemory: (
     array: Array<number> | Uint8Array | Buffer,
     buffer: ptr,

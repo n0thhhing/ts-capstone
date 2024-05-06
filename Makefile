@@ -10,17 +10,17 @@ build: build/libcapstone.a
 	sh build/scripts/build.sh
 
 .PHONY: compile
-compile: build/libcapstone.a
+compile:
 	sh build/scripts/compile.sh
 
 .PHONY: bundle
-bundle: src/wrapper.ts src/capstone.js
+bundle: src/capstone.ts src/capstone.js
 	bun build/scripts/bundle.ts
 
 .PHONY: type
 type:
 	-rm src/arch/*.d.ts
-	-tsc src/wrapper.ts src/memory.ts src/arch/*.ts --downlevelIteration true --declaration --outDir src --emitDeclarationOnly --allowJs true --esModuleInterop true
+	-tsc src/capstone.ts src/memory.ts src/arch/*.ts --downlevelIteration true --declaration --outDir src --emitDeclarationOnly --allowJs true --esModuleInterop true
 
 .PHONY: compare
 compare:

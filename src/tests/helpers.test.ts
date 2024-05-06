@@ -1,5 +1,5 @@
 import { expect, test, afterAll } from 'bun:test';
-import cs, { ARM64 } from '../wrapper';
+import cs, { ARM64 } from '../capstone';
 
 const disassembler = new cs.Capstone(cs.ARCH_ARM64, cs.MODE_ARM);
 disassembler.option(cs.OPT_DETAIL, true);

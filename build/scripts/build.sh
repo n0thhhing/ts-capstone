@@ -28,15 +28,11 @@ EXPORTED_FUNCTIONS=(
 )
 
 METHODS=(
-	stringToNewUTF8
-	#POINTER_SIZE
-	addFunction
-	cwrap
+    UTF8ToString
 	ccall
 	getValue
 	setValue
 	writeArrayToMemory
-	UTF8ToString
 )
 
 METHODS=$(echo -n "${METHODS[*]}" | jq -cR 'split(" ")')

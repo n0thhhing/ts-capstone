@@ -1,4 +1,4 @@
-import cs from '../wrapper';
+import cs from '../capstone';
 import { expect, test } from 'bun:test';
 
 test('OPT_BUFFER', () => {

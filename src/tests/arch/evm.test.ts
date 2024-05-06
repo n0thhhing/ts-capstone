@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import cs from '../../wrapper';
+import cs from '../../capstone';
 
 test('cs.ARCH_EVM', () => {
   const buffer = new Uint8Array([0x60, 0x61, 0x50]);

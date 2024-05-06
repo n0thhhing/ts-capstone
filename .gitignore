@@ -189,3 +189,4 @@ res.txt
 offsets.txt
 compare
 #src/arch
+.tokeignore
