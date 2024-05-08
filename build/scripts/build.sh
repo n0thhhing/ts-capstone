@@ -28,7 +28,7 @@ EXPORTED_FUNCTIONS=(
 )
 
 METHODS=(
-    UTF8ToString
+	UTF8ToString
 	ccall
 	getValue
 	setValue

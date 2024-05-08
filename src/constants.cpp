@@ -14,7 +14,7 @@ int INSN_DETAIL_OFFSET = offsetof(cs_insn, detail);
 
 int DETAIL_REGS_READ_OFFSET = offsetof(cs_detail, regs_read);
 
-EMSCRIPTEN_BINDINGS(my_constant_example) {
+EMSCRIPTEN_BINDINGS(constants) {
   constant("INSN_ID_OFFSET", INSN_ID_OFFSET);
   constant("INSN_ADDR_OFFSET", INSN_ADDR_OFFSET);
   constant("INSN_SIZE_OFFSET", INSN_SIZE_OFFSET);

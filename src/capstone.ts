@@ -367,6 +367,10 @@ namespace cs {
   export const MAX_IMPL_R_REGS = 20;
   export const MAX_NUM_GROUPS = 8;
 
+  /**
+   * Return the Capstone library version as a string.
+   * @returns The Capstone library version as a string in the format "major.minor".
+   */
   export function version(): string {
     const major_ptr: number = Memory.malloc(4);
     const minor_ptr: number = Memory.malloc(4);
@@ -383,6 +387,11 @@ namespace cs {
     return `${major}.${minor}`;
   }
 
+  /**
+   * Check if Capstone supports a specific query.
+   * @param query - The query ID to check.
+   * @returns A boolean indicating whether Capstone supports the given query.
+   */
   export function support(query: number): boolean {
     var ret: boolean = Wrapper.ccall(
       'cs_support',
@@ -393,21 +402,36 @@ namespace cs {
     return Boolean(ret);
   }
 
+  /**
+   * Get the error message string for a given error code.
+   * @param code - The error code.
+   * @returns The error message string corresponding to the given error code.
+   */
   export function strerror(code: number): string {
     return Wrapper.ccall('cs_strerror', 'string', ['number'], [code]);
   }
 
+  /**
+   * Get the error code for the most recent Capstone error that occurred with the given handle.
+   * @param handle - The handle for which to get the error code.
+   * @returns The error code for the most recent Capstone error.
+   */
   export function errno(handle: number): cs_err {
     return Wrapper.ccall('cs_errno', 'number', ['pointer'], [handle]);
   }
 
   export class Capstone {
-    private arch: cs_arch;
-    private mode: cs_mode;
-    private handle_ptr: ptr;
-    private arch_info: { instance: any; entry: string };
-    private opt_buffer: boolean = false;
+    private arch: cs_arch; // The chosen architecture for this instance(cannot be changed) 
+    private mode: cs_mode; // The mode associated with the chooses arch(can be changed via cs.OPT_MODE)
+    private handle_ptr: ptr; // The address of the cash handle
+    private arch_info: { instance: any; entry: string }; // Decides what architecture specific info will be present in cs_detail
+    private opt_buffer: boolean = false; // Option toggle for cs.OPT_BUFFER
 
+    /**
+     * Create a new instance of the Capstone disassembly engine.
+     * @param arch - The architecture type.
+     * @param mode - The mode type.
+     */
     constructor(arch: number, mode: number) {
       this.arch = arch;
       this.mode = mode;
@@ -441,6 +465,11 @@ namespace cs {
       return arch_map[arch];
     }
 
+    /**
+     * Dereferences a pointer to a cs_insn strict to retrieve information about a disassembled instruction.
+     * @param insn_ptr - The pointer to the disassembled instruction.
+     * @returns Information about the disassembled instruction.
+     */
     private deref(insn_ptr: ptr): cs_insn {
       const insn_id: number = Memory.read(insn_ptr, 'u32');
       const insn_addr: number = Memory.read(insn_ptr + 8, 'u64');
@@ -485,6 +514,11 @@ namespace cs {
       return insn;
     }
 
+    /**
+     * Converts an array of `cs_insn` objects into a pointer to an array of cs_insn structures.
+     * @param insns Array of `cs_insn` objects to be converted.
+     * @returns Pointer to the array of cs_insn structures.
+     */
     private ref(insns: Array<cs_insn>): ptr {
       const count: number = insns.length;
       const insns_ptr: ptr = Memory.malloc(INSN_SIZE * count);
@@ -1385,6 +1419,11 @@ namespace cs {
       return insns_ptr;
     }
 
+    /**
+     * Retrieves the detail information of a disassembled instruction from the cs_detail struct.
+     * @param pointer - The pointer to the detail information.
+     * @returns The detail information of the disassembled instruction.
+     */
     private get_detail(pointer: ptr): cs_detail {
       const detail: cs_detail = {} as cs_detail;
       const arch_info_ptr: ptr = pointer + 96;
@@ -1420,6 +1459,11 @@ namespace cs {
       return detail;
     }
 
+    /**
+     * Set an option for the Capstone disassembly engine.
+     * @param option - The option type to set.
+     * @param value - The value to set for the option.
+     */
     public option(
       option: cs_opt_type,
       value: cs_opt_value | boolean | cs_opt_mnem | cs_opt_skipdata,
@@ -1539,6 +1583,13 @@ namespace cs {
       if (Memory.allocations.size !== 0) Memory.free(Memory.allocations);
     }
 
+    /**
+     * Disassemble binary data.
+     * @param buffer - The binary data to disassemble, as a Buffer, array, or Uint8Array.
+     * @param addr - The starting address of the binary data.
+     * @param max_len - (Optional) The maximum number of instructions to disassemble.
+     * @returns An array of disassembled instructions.
+     */
     public disasm(
       buffer: Buffer | Array<number> | Uint8Array,
       addr: number,
@@ -1582,6 +1633,11 @@ namespace cs {
       }
     }
 
+    /**
+     * Perform iterative disassembly on binary data.
+     * @param data - An object containing the binary data to disassemble, the starting address, and the current instruction.
+     * @returns A boolean indicating whether another instruction was successfully disassembled.
+     */
     public disasm_iter(data: {
       buffer: Buffer | Array<number> | Uint8Array;
       addr: number;
@@ -1631,6 +1687,11 @@ namespace cs {
       return ret;
     }
 
+    /**
+     * Retrieve information about registers accessed by an instruction.
+     * @param insn - The instruction to analyze.
+     * @returns An object containing arrays of registers read and written by the instruction.
+     */
     public regs_access(insn: cs_insn): {
       regs_read: cs_regs;
       regs_read_count: number;
@@ -1687,6 +1748,12 @@ namespace cs {
       };
     }
 
+    /**
+     * Get the number of operands of a specific type for an instruction.
+     * @param insn - The instruction to analyze.
+     * @param op_type - The type of operand to count.
+     * @returns The number of operands of the specified type for the instruction.
+     */
     public op_count(insn: cs_insn, op_type: number): number {
       if (!insn.detail)
         throw new Error(
@@ -1703,6 +1770,13 @@ namespace cs {
       return operand_count;
     }
 
+    /**
+     * Get the index of a specific operand of a specific type at a given position for an instruction.
+     * @param insn - The instruction to analyze.
+     * @param op_type - The type of operand to search for.
+     * @param position - The position of the operand to find (zero-based).
+     * @returns The index of the operand within the instruction's operand list, or -1 if not found.
+     */
     public op_index(insn: cs_insn, op_type: number, position: number): number {
       if (!insn.detail)
         throw new Error(
@@ -1720,6 +1794,12 @@ namespace cs {
       return index;
     }
 
+    /**
+     * Check if an instruction belongs to a specific group.
+     * @param insn - The instruction to check.
+     * @param group_id - The ID of the group to check against.
+     * @returns A boolean indicating whether the instruction belongs to the specified group.
+     */
     public insn_group(insn: cs_insn, group_id: number): boolean {
       if (!insn.detail)
         throw new Error(
@@ -1735,6 +1815,11 @@ namespace cs {
       return valid_group;
     }
 
+    /**
+     * Retrieves the registers read by an instruction.
+     * @param insn - The instruction to analyze.
+     * @returns An array of registers read by the instruction.
+     */
     public reg_read(insn: cs_insn, reg_id: number): boolean {
       if (!insn.detail)
         throw new Error(
@@ -1750,6 +1835,11 @@ namespace cs {
       return valid_reg;
     }
 
+    /**
+     * Retrieves the registers written to by an instruction.
+     * @param insn - The instruction to analyze.
+     * @returns An array of registers written to by the instruction.
+     */
     public reg_write(insn: cs_insn, reg_id: number): boolean {
       if (!insn.detail)
         throw new Error(
@@ -1765,6 +1855,11 @@ namespace cs {
       return valid_reg;
     }
 
+    /**
+     * Retrieves the name of the instruction group to which an instruction belongs.
+     * @param insn - The instruction to analyze.
+     * @returns The name of the instruction group.
+     */
     public group_name(group_id: number): string {
       const handle: csh = Memory.read(this.handle_ptr, '*');
       const ret: string = Wrapper.ccall(
@@ -1776,6 +1871,12 @@ namespace cs {
       return ret;
     }
 
+    /**
+     * Retrieves the name of a register referenced by an operand in an instruction.
+     * @param insn - The instruction containing the operand.
+     * @param op_index - The index of the operand.
+     * @returns The name of the register referenced by the operand.
+     */
     public reg_name(reg_id: number): string {
       const handle: csh = Memory.read(this.handle_ptr, '*');
       const ret: string = Wrapper.ccall(
@@ -1787,6 +1888,11 @@ namespace cs {
       return ret;
     }
 
+    /**
+     * Retrieves the name of the instruction mnemonic.
+     * @param insn - The instruction to analyze.
+     * @returns The mnemonic of the instruction.
+     */
     public insn_name(insn_id: number): string {
       const handle: csh = Memory.read(this.handle_ptr, '*');
       const ret: string = Wrapper.ccall(
@@ -1798,6 +1904,11 @@ namespace cs {
       return ret;
     }
 
+    /**
+     * Retrieves the offset relative to the start of the buffer where the instruction resides.
+     * @param insn - The instruction to analyze.
+     * @returns The offset of the instruction relative to the buffer.
+     */
     public INSN_OFFSET(insns: Array<cs_insn>, position: number): number {
       const pointer = this.ref(insns);
       const offset = Wrapper._cs_insn_offset(pointer, position);
@@ -1805,6 +1916,11 @@ namespace cs {
       return offset;
     }
 
+    /**
+     * Retrieves the relative address for X86 instructions using RIP-relative addressing mode.
+     * @param insn - The instruction to analyze.
+     * @returns The relative address associated with the X86 instruction.
+     */
     public X86_REL_ADDR(insn: cs_insn): number {
       const pointer = this.ref([insn]);
       const addr = Wrapper._x86_rel_addr(pointer);

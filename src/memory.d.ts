@@ -36,28 +36,7 @@ type native_t =
   | 'char*'
   | 'boolean';
 type arr_t<T extends native_t> = `${T}[${number}]`;
-type depend_t = `${arr_t<native_t>}->${string}`;
 type ptr = number;
-type wasm_t = 'void' | 'int' | 'long' | 'float' | 'double';
-interface js_callback {
-  pointer: ptr;
-  free: () => void;
-}
-interface struct_t {
-  [key: string]:
-    | `padding[${number}]`
-    | native_t
-    | arr_t<native_t>
-    | depend_t
-    | struct_t
-    | ((
-        pointer: number,
-        struct: any,
-      ) => {
-        offset: number;
-        entry: any;
-      });
-}
 export declare namespace Memory {
   const allocations: Set<ptr>;
   const nullptr: ptr;
@@ -70,13 +49,5 @@ export declare namespace Memory {
     type: native_t | arr_t<native_t>,
   ): void;
   function read(pointer: ptr, type: native_t): any;
-  function deref(pointer: ptr, types: struct_t): any;
-  function get_struct_size(struct: struct_t): number;
-  function get_type_size(type: native_t): number;
-  function new_callback(
-    func: Function,
-    ret_t: wasm_t,
-    arg_types: Array<wasm_t>,
-  ): js_callback;
 }
 export {};

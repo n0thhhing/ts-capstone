@@ -110,16 +110,9 @@ interface wasm_module {
       async: boolean;
     },
   ) => any;
-  cwrap: (
-    ident: string, // name of C function
-    returnType: wasm_arg, // return type
-    argTypes: Array<wasm_arg>,
-  ) => any;
-  addFunction: (func: Function, sig: string) => any;
   setValue: (ptr: number, value: any, type: wasm_t) => void;
   getValue: (ptr: number, type: wasm_t) => any;
   UTF8ToString: (ptr: number, maxBytesToRead?: number) => string;
-  stringToNewUTF8: (str: string, outPtr: ptr, maxBytesToWrite: number) => any;
   writeArrayToMemory: (
     array: Array<number> | Uint8Array | Buffer,
     buffer: ptr,
@@ -133,7 +126,7 @@ interface cs_insn {
   op_str: string;
   bytes: Array<number>;
   detail?: cs_detail;
-  buffer?: Buffer;
+  buffer?: Uint8Array;
 }
 interface cs_detail {
   regs_read: Array<number>;
@@ -143,7 +136,7 @@ interface cs_detail {
   groups: Array<number>;
   groups_count: number;
   writeback: boolean;
-  buffer?: Buffer;
+  buffer?: Uint8Array;
   x86?: cs_x86;
   arm?: cs_arm;
   arm64?: cs_arm64;
@@ -314,9 +307,28 @@ declare namespace cs {
   const MAX_IMPL_W_REGS = 20;
   const MAX_IMPL_R_REGS = 20;
   const MAX_NUM_GROUPS = 8;
+  /**
+   * Return the Capstone library version as a string.
+   * @returns The Capstone library version as a string in the format "major.minor".
+   */
   function version(): string;
+  /**
+   * Check if Capstone supports a specific query.
+   * @param query - The query ID to check.
+   * @returns A boolean indicating whether Capstone supports the given query.
+   */
   function support(query: number): boolean;
+  /**
+   * Get the error message string for a given error code.
+   * @param code - The error code.
+   * @returns The error message string corresponding to the given error code.
+   */
   function strerror(code: number): string;
+  /**
+   * Get the error code for the most recent Capstone error that occurred with the given handle.
+   * @param handle - The handle for which to get the error code.
+   * @returns The error code for the most recent Capstone error.
+   */
   function errno(handle: number): cs_err;
   class Capstone {
     private arch;
@@ -324,42 +336,134 @@ declare namespace cs {
     private handle_ptr;
     private arch_info;
     private opt_buffer;
+    /**
+     * Create a new instance of the Capstone disassembly engine.
+     * @param arch - The architecture type.
+     * @param mode - The mode type.
+     */
     constructor(arch: number, mode: number);
     private init;
+    /**
+     * Dereferences a pointer to a cs_insn strict to retrieve information about a disassembled instruction.
+     * @param insn_ptr - The pointer to the disassembled instruction.
+     * @returns Information about the disassembled instruction.
+     */
     private deref;
     private ref;
+    /**
+     * Retrieves the detail information of a disassembled instruction from the cs_detail struct.
+     * @param pointer - The pointer to the detail information.
+     * @returns The detail information of the disassembled instruction.
+     */
     private get_detail;
+    /**
+     * Set an option for the Capstone disassembly engine.
+     * @param option - The option type to set.
+     * @param value - The value to set for the option.
+     */
     option(
       option: cs_opt_type,
       value: cs_opt_value | boolean | cs_opt_mnem | cs_opt_skipdata,
     ): void;
     private open;
     close(): void;
+    /**
+     * Disassemble binary data.
+     * @param buffer - The binary data to disassemble, as a Buffer, array, or Uint8Array.
+     * @param addr - The starting address of the binary data.
+     * @param max_len - (Optional) The maximum number of instructions to disassemble.
+     * @returns An array of disassembled instructions.
+     */
     disasm(
       buffer: Buffer | Array<number> | Uint8Array,
       addr: number,
       max_len?: number,
     ): cs_insn[];
+    /**
+     * Perform iterative disassembly on binary data.
+     * @param data - An object containing the binary data to disassemble, the starting address, and the current instruction.
+     * @returns A boolean indicating whether another instruction was successfully disassembled.
+     */
     disasm_iter(data: {
       buffer: Buffer | Array<number> | Uint8Array;
       addr: number;
       insn: {} | cs_insn | null;
     }): boolean;
+    /**
+     * Retrieve information about registers accessed by an instruction.
+     * @param insn - The instruction to analyze.
+     * @returns An object containing arrays of registers read and written by the instruction.
+     */
     regs_access(insn: cs_insn): {
       regs_read: cs_regs;
       regs_read_count: number;
       regs_write: cs_regs;
       regs_write_count: number;
     };
+    /**
+     * Get the number of operands of a specific type for an instruction.
+     * @param insn - The instruction to analyze.
+     * @param op_type - The type of operand to count.
+     * @returns The number of operands of the specified type for the instruction.
+     */
     op_count(insn: cs_insn, op_type: number): number;
+    /**
+     * Get the index of a specific operand of a specific type at a given position for an instruction.
+     * @param insn - The instruction to analyze.
+     * @param op_type - The type of operand to search for.
+     * @param position - The position of the operand to find (zero-based).
+     * @returns The index of the operand within the instruction's operand list, or -1 if not found.
+     */
     op_index(insn: cs_insn, op_type: number, position: number): number;
+    /**
+     * Check if an instruction belongs to a specific group.
+     * @param insn - The instruction to check.
+     * @param group_id - The ID of the group to check against.
+     * @returns A boolean indicating whether the instruction belongs to the specified group.
+     */
     insn_group(insn: cs_insn, group_id: number): boolean;
+    /**
+     * Retrieves the registers read by an instruction.
+     * @param insn - The instruction to analyze.
+     * @returns An array of registers read by the instruction.
+     */
     reg_read(insn: cs_insn, reg_id: number): boolean;
+    /**
+     * Retrieves the registers written to by an instruction.
+     * @param insn - The instruction to analyze.
+     * @returns An array of registers written to by the instruction.
+     */
     reg_write(insn: cs_insn, reg_id: number): boolean;
+    /**
+     * Retrieves the name of the instruction group to which an instruction belongs.
+     * @param insn - The instruction to analyze.
+     * @returns The name of the instruction group.
+     */
     group_name(group_id: number): string;
+    /**
+     * Retrieves the name of a register referenced by an operand in an instruction.
+     * @param insn - The instruction containing the operand.
+     * @param op_index - The index of the operand.
+     * @returns The name of the register referenced by the operand.
+     */
     reg_name(reg_id: number): string;
+    /**
+     * Retrieves the name of the instruction mnemonic.
+     * @param insn - The instruction to analyze.
+     * @returns The mnemonic of the instruction.
+     */
     insn_name(insn_id: number): string;
+    /**
+     * Retrieves the offset relative to the start of the buffer where the instruction resides.
+     * @param insn - The instruction to analyze.
+     * @returns The offset of the instruction relative to the buffer.
+     */
     INSN_OFFSET(insns: Array<cs_insn>, position: number): number;
+    /**
+     * Retrieves the relative address for X86 instructions using RIP-relative addressing mode.
+     * @param insn - The instruction to analyze.
+     * @returns The relative address associated with the X86 instruction.
+     */
     X86_REL_ADDR(insn: cs_insn): number;
   }
 }
