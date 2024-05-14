@@ -284,7 +284,7 @@ export declare enum TMS320C64X {
 }
 export declare class cs_tms320c64x {
   op_count: number;
-  operands: Array<cs_tms320c64x_op>;
+  operands: cs_tms320c64x_op[];
   condition: {
     reg: number;
     zero: number;

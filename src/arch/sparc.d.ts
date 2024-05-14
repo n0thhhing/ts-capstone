@@ -436,6 +436,6 @@ export declare class cs_sparc {
   cc: SPARC;
   hint: SPARC;
   op_count: number;
-  operands: Array<cs_sparc_op>;
+  operands: cs_sparc_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }

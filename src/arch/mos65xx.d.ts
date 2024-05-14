@@ -156,6 +156,6 @@ export declare class cs_mos65xx {
   am: MOS65XX;
   modifies_flags: boolean;
   op_count: number;
-  operands: Array<cs_mos65xx_op>;
+  operands: cs_mos65xx_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }

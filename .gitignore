@@ -190,3 +190,4 @@ offsets.txt
 compare
 #src/arch
 .tokeignore
+capstone

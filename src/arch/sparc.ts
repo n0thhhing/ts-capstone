@@ -466,7 +466,7 @@ export class cs_sparc {
   public cc: SPARC;
   public hint: SPARC;
   public op_count: number;
-  public operands: Array<cs_sparc_op>;
+  public operands: cs_sparc_op[];
 
   constructor(arch_info_ptr: number, Memory: any) {
     this.operands = [];

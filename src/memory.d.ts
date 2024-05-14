@@ -36,18 +36,20 @@ type native_t =
   | 'char*'
   | 'boolean';
 type arr_t<T extends native_t> = `${T}[${number}]`;
-type ptr = number;
+type pointer_t<T extends any> = number;
 export declare namespace Memory {
-  const allocations: Set<ptr>;
-  const nullptr: ptr;
-  function malloc(size: number): ptr;
-  function free(mem: ptr | Set<ptr> | Array<ptr>): void;
+  const allocations: Set<pointer_t<any>>;
+  const nullptr: pointer_t<0>;
+  function malloc(size: number): pointer_t<any>;
+  function free(
+    mem: pointer_t<any> | Set<pointer_t<any>> | pointer_t<any>[],
+  ): void;
   function clean(): void;
   function write(
-    pointer: ptr,
+    pointer: pointer_t<any>,
     value: any,
     type: native_t | arr_t<native_t>,
   ): void;
-  function read(pointer: ptr, type: native_t): any;
+  function read(pointer: pointer_t<any>, type: native_t): any;
 }
 export {};

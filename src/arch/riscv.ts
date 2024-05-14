@@ -475,7 +475,7 @@ export enum RISCV {
 export class cs_riscv {
   public need_effective_addr: boolean; // Does this instruction need effective address or not.
   public op_count: number; // Number of operands of this instruction, or 0 when instruction has no operand.
-  public operands: Array<cs_riscv_op>; // operands for this instruction.
+  public operands: cs_riscv_op[]; // operands for this instruction.
 
   constructor(arch_info_ptr: number, Memory: any) {
     this.operands = [];

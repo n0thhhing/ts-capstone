@@ -1,6 +1,6 @@
 import { expect, test, afterAll } from 'bun:test';
-import cs, { X86 } from '../capstone';
-const d = new cs.Capstone(cs.ARCH_X86, cs.MODE_16);
+import CS, { X86 } from '../capstone';
+const d = new CS.CAPSTONE(CS.ARCH_X86, CS.MODE_16);
 const insns = [
   {
     id: 332,

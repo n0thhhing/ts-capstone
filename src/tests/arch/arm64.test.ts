@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import cs from '../../capstone';
+import CS from '../../capstone';
 
-test('cs.ARCH_ARM64(AARCH64)', () => {
+test('CS.ARCH_ARM64(AARCH64)', () => {
   const buffer = new Uint8Array([
     0x09, 0x00, 0x38, 0xd5, 0xbf, 0x40, 0x00, 0xd5, 0x0c, 0x05, 0x13, 0xd5,
     0x20, 0x50, 0x02, 0x0e, 0x20, 0xe4, 0x3d, 0x0f, 0x00, 0x18, 0xa0, 0x5f,
@@ -12,8 +12,8 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
     0xfd, 0xc7, 0x43, 0xf8,
   ]);
 
-  const disassembler = new cs.Capstone(cs.ARCH_ARM64, cs.MODE_ARM);
-  disassembler.option(cs.OPT_DETAIL, true);
+  const disassembler = new CS.CAPSTONE(CS.ARCH_ARM64, CS.MODE_ARM);
+  disassembler.option(CS.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
   expect(
@@ -32,7 +32,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'mrs',
       op_str: 'x9, midr_el1',
-      bytes: [9, 0, 56, 213],
+      bytes: new Uint8Array([9, 0, 56, 213]),
     },
     {
       id: 664,
@@ -40,7 +40,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'msr',
       op_str: 'spsel, #0',
-      bytes: [191, 64, 0, 213],
+      bytes: new Uint8Array([191, 64, 0, 213]),
     },
     {
       id: 664,
@@ -48,7 +48,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'msr',
       op_str: 'dbgdtrtx_el0, x12',
-      bytes: [12, 5, 19, 213],
+      bytes: new Uint8Array([12, 5, 19, 213]),
     },
     {
       id: 1120,
@@ -56,7 +56,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'tbx',
       op_str: 'v0.8b, {v1.16b, v2.16b, v3.16b}, v2.8b',
-      bytes: [32, 80, 2, 14],
+      bytes: new Uint8Array([32, 80, 2, 14]),
     },
     {
       id: 785,
@@ -64,7 +64,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'scvtf',
       op_str: 'v0.2s, v1.2s, #3',
-      bytes: [32, 228, 61, 15],
+      bytes: new Uint8Array([32, 228, 61, 15]),
     },
     {
       id: 366,
@@ -72,7 +72,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'fmla',
       op_str: 's0, s0, v0.s[3]',
-      bytes: [0, 24, 160, 95],
+      bytes: new Uint8Array([0, 24, 160, 95]),
     },
     {
       id: 379,
@@ -80,7 +80,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'fmov',
       op_str: 'x2, v5.d[1]',
-      bytes: [162, 0, 174, 158],
+      bytes: new Uint8Array([162, 0, 174, 158]),
     },
     {
       id: 284,
@@ -88,7 +88,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'dsb',
       op_str: 'nsh',
-      bytes: [159, 55, 3, 213],
+      bytes: new Uint8Array([159, 55, 3, 213]),
     },
     {
       id: 282,
@@ -96,7 +96,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'dmb',
       op_str: 'osh',
-      bytes: [191, 51, 3, 213],
+      bytes: new Uint8Array([191, 51, 3, 213]),
     },
     {
       id: 430,
@@ -104,7 +104,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'isb',
       op_str: '',
-      bytes: [223, 63, 3, 213],
+      bytes: new Uint8Array([223, 63, 3, 213]),
     },
     {
       id: 666,
@@ -112,7 +112,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'mul',
       op_str: 'x1, x1, x2',
-      bytes: [33, 124, 2, 155],
+      bytes: new Uint8Array([33, 124, 2, 155]),
     },
     {
       id: 645,
@@ -120,7 +120,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'lsr',
       op_str: 'w1, w1, #0',
-      bytes: [33, 124, 0, 83],
+      bytes: new Uint8Array([33, 124, 0, 83]),
     },
     {
       id: 1082,
@@ -128,7 +128,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'sub',
       op_str: 'w0, w0, w1, uxtw',
-      bytes: [0, 64, 33, 75],
+      bytes: new Uint8Array([0, 64, 33, 75]),
     },
     {
       id: 558,
@@ -136,7 +136,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'ldr',
       op_str: 'w1, [sp, #8]',
-      bytes: [225, 11, 64, 185],
+      bytes: new Uint8Array([225, 11, 64, 185]),
     },
     {
       id: 149,
@@ -144,7 +144,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'cneg',
       op_str: 'x0, x1, ne',
-      bytes: [32, 4, 129, 218],
+      bytes: new Uint8Array([32, 4, 129, 218]),
     },
     {
       id: 6,
@@ -152,7 +152,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'add',
       op_str: 'x0, x1, x2, lsl #2',
-      bytes: [32, 8, 2, 139],
+      bytes: new Uint8Array([32, 8, 2, 139]),
     },
     {
       id: 558,
@@ -160,7 +160,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'ldr',
       op_str: 'q16, [x24, w8, uxtw #4]',
-      bytes: [16, 91, 232, 60],
+      bytes: new Uint8Array([16, 91, 232, 60]),
     },
     {
       id: 1035,
@@ -168,7 +168,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'stp',
       op_str: 'x29, x30, [sp, #-0x60]!',
-      bytes: [253, 123, 186, 169],
+      bytes: new Uint8Array([253, 123, 186, 169]),
     },
     {
       id: 558,
@@ -176,7 +176,7 @@ test('cs.ARCH_ARM64(AARCH64)', () => {
       size: 4,
       mnemonic: 'ldr',
       op_str: 'x29, [sp], #0x3c',
-      bytes: [253, 199, 67, 248],
+      bytes: new Uint8Array([253, 199, 67, 248]),
     },
   ]);
 

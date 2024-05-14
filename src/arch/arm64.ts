@@ -3075,7 +3075,7 @@ export class cs_arm64 {
   public writeback: boolean; // does this insn request writeback? 'True' means 'yes'
   public post_index: boolean; // only set if writeback is 'True', if 'False' pre-index, otherwise post.
   public op_count: number; // Number of operands of this instruction, or 0 when instruction has no operand.
-  public operands: Array<cs_arm64_op>; // operands for this instruction.
+  public operands: cs_arm64_op[]; // operands for this instruction.
 
   constructor(arch_info_ptr: number, Memory: any) {
     this.operands = [];

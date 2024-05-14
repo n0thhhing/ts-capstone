@@ -2531,6 +2531,6 @@ export declare enum SYSZ {
 export declare class cs_sysz {
   cc: SYSZ;
   op_count: number;
-  operands: Array<cs_sysz_op>;
+  operands: cs_sysz_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }

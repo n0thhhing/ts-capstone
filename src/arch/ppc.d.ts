@@ -2027,6 +2027,6 @@ export declare class cs_ppc {
   bh: PPC;
   update_cr0: boolean;
   op_count: number;
-  operands: Array<cs_ppc_op>;
+  operands: cs_ppc_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }

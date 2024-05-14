@@ -506,7 +506,7 @@ export declare enum M68K {
   GRP_ENDING = 8,
 }
 export declare class cs_m68k {
-  operands: Array<cs_m68k_op>;
+  operands: cs_m68k_op[];
   op_size: {
     type: M68K;
     cpu_size?: M68K;

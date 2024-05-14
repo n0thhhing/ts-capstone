@@ -479,7 +479,7 @@ export enum M680X {
 export class cs_m680x {
   public flags: number; // See: M680X instruction flags
   public op_count: number; // number of operands for the instruction or 0
-  public operands: Array<cs_m680x_op>; // operands for this insn.
+  public operands: cs_m680x_op[]; // operands for this insn.
 
   constructor(arch_info_ptr: number, Memory: any) {
     this.operands = [];

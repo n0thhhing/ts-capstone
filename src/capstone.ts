@@ -77,7 +77,7 @@ import {
 
 const Wrapper: wasm_module = Module() as wasm_module;
 
-type cs_err = number; // All type of errors encountered by Capstone API. These are values returned by cs_errno()
+type cs_err = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9 | 10 | 11 | 12 | 13 | 14; // All type of errors encountered by Capstone API. These are values returned by cs_errno()
 type cs_arch = number; // Architecture type
 type cs_mode = number; // Mode type
 type cs_opt_type = number; // Runtime option for the disassembled engine
@@ -85,9 +85,15 @@ type cs_opt_value = number; // Runtime option value (associated with option type
 type cs_group_type = number; // Common instruction groups - to be consistent across all architectures.
 type cs_op_type = number; // Common instruction operand types - to be consistent across all architectures
 type cs_ac_type = number; // Common instruction operand access types - to be consistent across all architectures. It is possible to combine access types, for example: CS_AC_READ | CS_AC_WRITE
-type cs_regs = Array<number>; // Type of array to keep the list of registers
+type cs_regs = number[]; // Type of array to keep the list of registers
 type csh = number; // Handle using with all API
-type ptr = number; // Points to a specific memory address
+type cs_skipdata_cb_t = (
+  code: number,
+  code_size: number,
+  offset: number,
+  user_data: any,
+) => number; // User-defined callback function for SKIPDATA option
+type pointer_t<T extends any> = number; // Points to a specific memory address
 type wasm_arg = 'number' | 'string' | 'array' | 'boolean' | 'pointer' | null; // types of arguments for the C function.
 type wasm_t = 'i8' | 'i16' | 'i32' | 'i64' | 'float' | 'double' | 'i8*' | '*'; // An LLVM IR type as a string
 
@@ -101,47 +107,64 @@ interface wasm_module {
   HEAPU32: Uint32Array; // View for 32-bit unsigned memory.
   HEAPF32: Float32Array; // View for 32-bit float memory.
   HEAPF64: Float64Array; // View for 8-bit float memory.
-  _cs_free: (insn: ptr, count: number) => void; // Free memory allocated by _cs_malloc() or disasm()
-  _cs_malloc: (handle: csh) => ptr; // Allocate memory for 1 instruction to be used by disasm_iter()
-  _malloc: (size: number) => ptr; // Allocates a block of memory on the heap, must be paired with free(), or heap memory will leak! (use Memory.malloc()).
-  _free: (pointer: ptr) => void; // Free allocated memory (use Memory.free()).
-  _cs_reg_write: (handle: csh, insn: ptr, reg_id: number) => number; // Check if a disassembled instruction IMPLICITLY modified a particular register.
-  _cs_reg_read: (handle: csh, insn: ptr, reg_id: number) => number; // Check if a disassembled instruction IMPLICITLY used a particular register.
-  _cs_insn_group: (handle: csh, insn: ptr, group_id: number) => number; // Check if a disassembled instruction belong to a particular group.
+  _cs_free: (insn: pointer_t<cs_insn>, count: number) => void; // Free memory allocated by _cs_malloc() or disasm()
+  _cs_malloc: (handle: csh) => pointer_t<cs_insn>; // Allocate memory for 1 instruction to be used by disasm_iter()
+  _malloc: (size: number) => pointer_t<any>; // Allocates a block of memory on the heap, must be paired with free(), or heap memory will leak! (use Memory.malloc()).
+  _free: (pointer: pointer_t<any>) => void; // Free allocated memory (use Memory.free()).
+  _cs_reg_write: (
+    handle: csh,
+    insn: pointer_t<cs_insn>,
+    reg_id: number,
+  ) => number; // Check if a disassembled instruction IMPLICITLY modified a particular register.
+  _cs_reg_read: (
+    handle: csh,
+    insn: pointer_t<cs_insn>,
+    reg_id: number,
+  ) => number; // Check if a disassembled instruction IMPLICITLY used a particular register.
+  _cs_insn_group: (
+    handle: csh,
+    insn: pointer_t<cs_insn>,
+    group_id: number,
+  ) => number; // Check if a disassembled instruction belong to a particular group.
   _cs_regs_access: (
     handle: csh,
-    insn: ptr,
-    regs_read: ptr,
-    regs_read_count: ptr,
-    regs_write: ptr,
-    regs_write_count: ptr,
-  ) => number; // Retrieve all the registers accessed by an instruction, either explicitly or implicitly.
-  _cs_op_count: (handle: csh, insn: ptr, op_type: number) => number; // Count the number of operands of a given type.
+    insn: pointer_t<cs_insn>,
+    regs_read: pointer_t<cs_regs>,
+    regs_read_count: pointer_t<number>,
+    regs_write: pointer_t<cs_regs>,
+    regs_write_count: pointer_t<number>,
+  ) => cs_err; // Retrieve all the registers accessed by an instruction, either explicitly or implicitly.
+  _cs_op_count: (
+    handle: csh,
+    insn: pointer_t<cs_insn>,
+    op_type: number,
+  ) => number; // Count the number of operands of a given type.
   _cs_op_index: (
     handle: csh,
-    insn: ptr,
+    insn: pointer_t<cs_insn>,
     op_type: number,
     position: number,
   ) => number; // Retrieve the position of operand of given type in <arch>.operands[] array.
-  _cs_insn_offset: (insns: ptr, post: number) => number; // Calculate the offset of a disassembled instruction in its buffer, given its position in its array of disassembled insn.
-  _cs_detail_buffer: (insn: ptr) => ptr; // Gets the raw buffer of the specified insns cs_detail.
-  _cs_insn_buffer: (insn: ptr) => ptr; // Gets the raw buffer of the cs_insn
-  _x86_rel_addr: (insn: ptr) => number; // Calculate relative address for X86-64, given cs_insn structure
+  _cs_insn_offset: (insns: pointer_t<cs_insn[]>, post: number) => number; // Calculate the offset of a disassembled instruction in its buffer, given its position in its array of disassembled insn.
+  _cs_detail_buffer: (insn: pointer_t<cs_insn>) => pointer_t<Uint8Array>; // Gets the raw buffer of the specified insns cs_detail.
+  _cs_insn_buffer: (insn: pointer_t<cs_insn>) => pointer_t<Uint8Array>; // Gets the raw buffer of the cs_insn
+  _x86_rel_addr: (insn: pointer_t<cs_insn>) => number; // Calculate relative address for X86-64, given cs_insn structure
   ccall: (
     ident: string, // name of C function
     returnType: wasm_arg, // return type
-    argTypes: Array<wasm_arg>, // argument types
-    args: Array<any>, // arguments
+    argTypes: wasm_arg[], // argument types
+    args: any[], // arguments
     opts?: {
       async: boolean; // If true, implies that the ccall will perform an async operation. This assumes you are build with asyncify support.
     },
   ) => any; // Call a compiled C function from JavaScript.
-  setValue: (ptr: number, value: any, type: wasm_t) => void; // Sets a value at a specific memory address at run-time (use Memory.write()).
-  getValue: (ptr: number, type: wasm_t) => any; // Gets a value at a specific memory address at run-time (use Memory.read()).
-  UTF8ToString: (ptr: number, maxBytesToRead?: number) => string; // Given a pointer ptr to a null-terminated UTF8-encoded string in the Emscripten HEAP, returns a copy of that string as a JavaScript String object.
+  setValue: (pointer: number, value: any, type: wasm_t) => void; // Sets a value at a specific memory address at run-time (use Memory.write()).
+  getValue: (pointer: number, type: wasm_t) => any; // Gets a value at a specific memory address at run-time (use Memory.read()).
+  UTF8ToString: (pointer: number, maxBytesToRead?: number) => string; // Given a pointer pointer_t to a null-terminated UTF8-encoded string in the Emscripten HEAP, returns a copy of that string as a JavaScript String object.
+  addFunction: (func: Function, sig: string) => any; // You can use addFunction to return an integer value that represents a function pointer
   writeArrayToMemory: (
-    array: Array<number> | Uint8Array | Buffer,
-    buffer: ptr,
+    array: number[] | Uint8Array | Buffer,
+    buffer: pointer_t<number[] | Uint8Array | Buffer>,
   ) => void; // Writes an array to a specified address in the heap. Note that memory should to be allocated for the array before it is written.
 }
 
@@ -152,21 +175,21 @@ interface cs_insn {
   size: number; // Size of this instruction This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
   mnemonic: string; // Ascii text of instruction mnemonic This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
   op_str: string; // Ascii text of instruction operands This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
-  bytes: Array<number>; // Machine bytes of this instruction, with number of bytes indicated by @size above This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
+  bytes: Uint8Array; // Machine bytes of this instruction, with number of bytes indicated by @size above This information is available even when CS_OPT_DETAIL = CS_OPT_OFF
   detail?: cs_detail; // cs_detail object
-  buffer?: Uint8Array; // The raw detail buffer, this will only be present if cs.OPT_BUFFER is on.
+  buffer?: Uint8Array; // The raw detail buffer, this will only be present if CS.OPT_BUFFER is on.
 }
 
 // cs_detail object. NOTE: detail object is only valid when both requirements below are met: (1) CS_OP_DETAIL = CS_OPT_ON (2) Engine is not in Skipdata mode (CS_OP_SKIPDATA option set to CS_OPT_ON)
 interface cs_detail {
-  regs_read: Array<number>; // list of implicit registers read by this insn
+  regs_read: cs_regs; // list of implicit registers read by this insn
   regs_read_count: number; // number of implicit registers read by this insn
-  regs_write: Array<number>; // list of implicit registers modified by this insn
+  regs_write: cs_regs; // list of implicit registers modified by this insn
   regs_write_count: number; // number of implicit registers modified by this insn
-  groups: Array<number>; // list of group this instruction belong to
+  groups: number[]; // list of group this instruction belong to
   groups_count: number; // number of groups this insn belongs to
   writeback: boolean; // Instruction has writeback operands.
-  buffer?: Uint8Array; // The raw detail buffer, this will only be present if cs.OPT_BUFFER is on.
+  buffer?: Uint8Array; // The raw detail buffer, this will only be present if CS.OPT_BUFFER is on.
   x86?: cs_x86; // X86 architecture, including 16-bit, 32-bit & 64-bit mode
   arm?: cs_arm; // ARM64 architecture (aka AArch64)
   arm64?: cs_arm64; // ARM architecture (including Thumb/Thumb2)
@@ -185,24 +208,33 @@ interface cs_detail {
   riscv?: cs_riscv; // RISCV architecture
   sh?: cs_sh; // SH architecture
   tricore?: cs_tricore; // TriCore architecture
+  // alpha?: cs_alpha; // Alpha architecture
+  // hppa?: cs_hppa; // HPPA architecture
 }
 
 // User-customized setup for SKIPDATA option
 interface cs_opt_skipdata {
   mnemonic: string | null; // Capstone considers data to skip as special "instructions", User can specify the string for this instruction's "mnemonic" here (default = ".byte").
-  callback: Function | null; // User-defined callback function to be called when Capstone hits data (default = null).
+  callback: cs_skipdata_cb_t | null; // User-defined callback function to be called when Capstone hits data (default = null).
   user_data: object; // User-defined data to be passed to callback function.
+}
+
+// fmt() options
+interface cs_opt_fmt {
+  bytes: boolean; // Specifies if the formatted string should have the instructions bytes.
+  address: boolean; // Specifies if the formatted string should include the instructions address.
+  ASCII: boolean; // Specifies if the formatted string should include the bytes ASCII representation.
 }
 
 // Customize mnemonic for instructions with alternative name.
 // To reset existing customized instruction to its default mnemonic,
-// call option(cs.OPT_MNEMONIC) again with the same id and null value
+// call option(CS.OPT_MNEMONIC) again with the same id and null value
 interface cs_opt_mnem {
   id: number; // ID of instruction to be customized obtained from the cs_insn object.
   mnemonic: string | null; // Customized instruction mnemonic(or null).
 }
 
-namespace cs {
+namespace CS {
   // Return codes
   export const ERR_OK: cs_err = 0; // No error: everything was fine
   export const ERR_MEM: cs_err = 1; // Out-Of-Memory error: cs_open(), cs_disasm(), cs_disasm_iter()
@@ -232,7 +264,7 @@ namespace cs {
   export const ARCH_XCORE: cs_arch = 7; // XCore architecture
   export const ARCH_M68K: cs_arch = 8; // 68K architecture
   export const ARCH_TMS320C64X: cs_arch = 9; // TMS320C64x architecture
-  export const ARCH_M680X: cs_arch = 10; // 680X architecture;
+  export const ARCH_M680X: cs_arch = 10; // 680X architecture
   export const ARCH_EVM: cs_arch = 11; // Ethereum architecture
   export const ARCH_MOS65XX: cs_arch = 12; // MOS65XX architecture (including MOS6502)
   export const ARCH_WASM: cs_arch = 13; // WebAssembly architecture
@@ -240,6 +272,8 @@ namespace cs {
   export const ARCH_RISCV: cs_arch = 15; // RISCV architecture
   export const ARCH_SH: cs_arch = 16; // SH architecture
   export const ARCH_TRICORE: cs_arch = 17; // TriCore architecture
+  // export const ARCH_ALPHA = 18; // Alpha architecture
+  // export const ARCH_HPPA = 19; // HPPA architecture
   export const ARCH_MAX: cs_arch = 18; // The maximum architecture value.
   export const ARCH_ALL: cs_arch = 0xffff; // Represents a mask that includes all architecture values.
 
@@ -307,6 +341,10 @@ namespace cs {
   export const MODE_TRICORE_160: cs_mode = 1 << 5; // Tricore 1.6
   export const MODE_TRICORE_161: cs_mode = 1 << 6; // Tricore 1.6.1
   export const MODE_TRICORE_162: cs_mode = 1 << 7; // Tricore 1.6.2
+  // export const MODE_TRICORE_162 = 1 << 7; // Tricore 1.6.2
+  // export const MODE_HPPA_11 = 1 << 1; // HPPA 1.1
+  // export const MODE_HPPA_20 = 1 << 2; // HPPA 2.0
+  // export const MODE_HPPA_20W = CS.MODE_HPPA_20 | (1 << 3); // HPPA 2.0 wide
 
   // Runtime option for the disassembled engine
   export const OPT_INVALID: cs_opt_type = 0; // No option specified
@@ -324,6 +362,7 @@ namespace cs {
   // Capstone option value
   export const OPT_OFF: cs_opt_value = 0; // Turn OFF an option - default option of CS_OPT_DETAIL
   export const OPT_ON: cs_opt_value = 3; // Turn ON an option (CS_OPT_DETAIL)
+  // export const OPT_DETAIL_REAL: cs_opt_value = 1 << 1; // If enabled, always sets the real instruction detail. Even if the instruction is an alias.
 
   // Capstone syntax value
   export const OPT_SYNTAX_DEFAULT: cs_opt_value = 0; // Default assembly syntax of all platforms (CS_OPT_SYNTAX)
@@ -332,6 +371,8 @@ namespace cs {
   export const OPT_SYNTAX_NOREGNAME: cs_opt_value = 3; // Asm syntax prints register name with only number - (CS_OPT_SYNTAX, CS_ARCH_PPC, CS_ARCH_ARM)
   export const OPT_SYNTAX_MASM: cs_opt_value = 4; // X86 Intel Masm syntax (CS_OPT_SYNTAX).
   export const OPT_SYNTAX_MOTOROLA: cs_opt_value = 5; // MOS65XX use $ as hex prefix.
+  // export const OPT_SYNTAX_CS_REG_ALIAS = 1 << 7; // Prints common register alias which are not defined in LLVM (ARM: r9 = sb etc.)
+  // export const OPT_SYNTAX_PERCENT = 1 << 8; // Prints the % in front of PPC registers.
 
   // Common instruction groups - to be consistent across all architectures.
   export const GRP_INVALID: cs_group_type = 0; // uninitialized/invalid group.
@@ -347,8 +388,8 @@ namespace cs {
   export const OP_INVALID: cs_op_type = 0; // Uninitialized/invalid operand.
   export const OP_REG: cs_op_type = 1; // Register operand.
   export const OP_IMM: cs_op_type = 2; // Immediate operand.
-  export const OP_MEM: cs_op_type = 3; // Memory operand.
-  export const OP_FP: cs_op_type = 4; // Floating-Point operand.
+  export const OP_MEM: cs_op_type = 0x80; // Memory operand.
+  export const OP_FP: cs_op_type = 3; // Floating-Point operand.
 
   // Common instruction operand access types - to be consistent across all architectures. It is possible to combine access types, for example: CS_AC_READ | CS_AC_WRITE
   export const AC_INVALID: cs_ac_type = 0; // Uninitialized/invalid access type.
@@ -367,72 +408,20 @@ namespace cs {
   export const MAX_IMPL_R_REGS = 20;
   export const MAX_NUM_GROUPS = 8;
 
-  /**
-   * Return the Capstone library version as a string.
-   * @returns The Capstone library version as a string in the format "major.minor".
-   */
-  export function version(): string {
-    const major_ptr: number = Memory.malloc(4);
-    const minor_ptr: number = Memory.malloc(4);
-    Wrapper.ccall(
-      'cs_version',
-      'number',
-      ['pointer', 'pointer'],
-      [major_ptr, minor_ptr],
-    );
-    const major: number = Memory.read(major_ptr, 'i32');
-    const minor: number = Memory.read(minor_ptr, 'i32');
-    Memory.free(major_ptr);
-    Memory.free(minor_ptr);
-    return `${major}.${minor}`;
-  }
-
-  /**
-   * Check if Capstone supports a specific query.
-   * @param query - The query ID to check.
-   * @returns A boolean indicating whether Capstone supports the given query.
-   */
-  export function support(query: number): boolean {
-    var ret: boolean = Wrapper.ccall(
-      'cs_support',
-      'number',
-      ['number'],
-      [query],
-    );
-    return Boolean(ret);
-  }
-
-  /**
-   * Get the error message string for a given error code.
-   * @param code - The error code.
-   * @returns The error message string corresponding to the given error code.
-   */
-  export function strerror(code: number): string {
-    return Wrapper.ccall('cs_strerror', 'string', ['number'], [code]);
-  }
-
-  /**
-   * Get the error code for the most recent Capstone error that occurred with the given handle.
-   * @param handle - The handle for which to get the error code.
-   * @returns The error code for the most recent Capstone error.
-   */
-  export function errno(handle: number): cs_err {
-    return Wrapper.ccall('cs_errno', 'number', ['pointer'], [handle]);
-  }
-
-  export class Capstone {
-    private arch: cs_arch; // The chosen architecture for this instance(cannot be changed) 
-    private mode: cs_mode; // The mode associated with the chooses arch(can be changed via cs.OPT_MODE)
-    private handle_ptr: ptr; // The address of the cash handle
-    private arch_info: { instance: any; entry: string }; // Decides what architecture specific info will be present in cs_detail
-    private opt_buffer: boolean = false; // Option toggle for cs.OPT_BUFFER
+  export class CAPSTONE {
+    private arch: cs_arch; // The chosen architecture for this instance(cannot be changed)
+    private mode: cs_mode; // The mode associated with the chooses arch(can be changed via CS.OPT_MODE)
+    private handle_ptr: pointer_t<csh>; // The address of the cash handle
+    private arch_info: { instance: any; name: string }; // Decides what architecture specific info will be present in cs_detail
+    private opt_buffer: boolean = false; // Option toggle for CS.OPT_BUFFER
 
     /**
      * Create a new instance of the Capstone disassembly engine.
-     * @param arch - The architecture type.
-     * @param mode - The mode type.
+     *
+     * @param {cs_arch} arch - The architecture type.
+     * @param {cs_mode} mode - The mode type.
      */
-    constructor(arch: number, mode: number) {
+    constructor(arch: cs_arch, mode: cs_mode) {
       this.arch = arch;
       this.mode = mode;
       this.handle_ptr = 0;
@@ -440,43 +429,138 @@ namespace cs {
       this.arch_info = this.init(arch);
     }
 
-    private init(arch: cs_arch): { instance: Function; entry: string } {
-      const arch_map: { [key: number]: { instance: any; entry: string } } = {
-        [cs.ARCH_ARM]: { instance: cs_arm, entry: 'arm' },
-        [cs.ARCH_ARM64]: { instance: cs_arm64, entry: 'arm64' },
-        [cs.ARCH_AARCH64]: { instance: cs_arm64, entry: 'arm64' },
-        [cs.ARCH_MIPS]: { instance: cs_mips, entry: 'mips' },
-        [cs.ARCH_X86]: { instance: cs_x86, entry: 'x86' },
-        [cs.ARCH_PPC]: { instance: cs_ppc, entry: 'ppc' },
-        [cs.ARCH_SPARC]: { instance: cs_sparc, entry: 'sparc' },
-        [cs.ARCH_SYSZ]: { instance: cs_sysz, entry: 'sysz' },
-        [cs.ARCH_XCORE]: { instance: cs_xcore, entry: 'xcore' },
-        [cs.ARCH_TMS320C64X]: { instance: cs_tms320c64x, entry: 'tms320c64x' },
-        [cs.ARCH_M680X]: { instance: cs_m680x, entry: 'm680x' },
-        [cs.ARCH_M68K]: { instance: cs_m68k, entry: 'm68k' },
-        [cs.ARCH_EVM]: { instance: cs_evm, entry: 'evm' },
-        [cs.ARCH_MOS65XX]: { instance: cs_mos65xx, entry: 'mos65xx' },
-        [cs.ARCH_WASM]: { instance: cs_wasm, entry: 'wasm' },
-        [cs.ARCH_BPF]: { instance: cs_bpf, entry: 'bpf' },
-        [cs.ARCH_RISCV]: { instance: cs_riscv, entry: 'riscv' },
-        [cs.ARCH_SH]: { instance: cs_sh, entry: 'sh' },
-        [cs.ARCH_TRICORE]: { instance: cs_tricore, entry: 'tricore' },
+    /**
+     * Return the Capstone library version as a string.
+     *
+     * @public
+     * @returns {string} The Capstone library version as a string in the format "major.minor".
+     */
+    public version(): string {
+      const major_ptr: number = Memory.malloc(4);
+      const minor_ptr: number = Memory.malloc(4);
+      Wrapper.ccall(
+        'cs_version',
+        'number',
+        ['pointer', 'pointer'],
+        [major_ptr, minor_ptr],
+      );
+      const major: number = Memory.read(major_ptr, 'i32');
+      const minor: number = Memory.read(minor_ptr, 'i32');
+      Memory.free(major_ptr);
+      Memory.free(minor_ptr);
+      return `${major}.${minor}`;
+    }
+
+    /**
+     * Check if Capstone supports a specific query.
+     *
+     * @public
+     * @param {number} query - The query ID to check.
+     * @returns {boolean} A boolean indicating whether Capstone supports the given query.
+     */
+    public support(query: number): boolean {
+      var ret: boolean = Wrapper.ccall(
+        'cs_support',
+        'number',
+        ['number'],
+        [query],
+      );
+      return Boolean(ret);
+    }
+
+    /**
+     * Get the error message string for a given error code.
+     *
+     * @public
+     * @param {number} code - The error code.
+     * @returns {string} The error message string corresponding to the given error code.
+     */
+    public strerror(code: number): string {
+      return Wrapper.ccall('cs_strerror', 'string', ['number'], [code]);
+    }
+
+    /**
+     * Get the error code for the most recent Capstone error that occurred with the given handle.
+     *
+     * @public
+     * @param {csh} handle - The handle for which to get the error code.
+     * returns {cs_err} The error code for the most recent Capstone error.
+     */
+    public errno(handle: csh): cs_err {
+      return Wrapper.ccall('cs_errno', 'number', ['pointer'], [handle]);
+    }
+
+    private init(arch: cs_arch): { instance: Function; name: string } {
+      const arch_map: { [key: number]: { instance: any; name: string } } = {
+        [CS.ARCH_ARM]: { instance: cs_arm, name: 'arm' },
+        [CS.ARCH_ARM64]: { instance: cs_arm64, name: 'arm64' },
+        [CS.ARCH_AARCH64]: { instance: cs_arm64, name: 'arm64' },
+        [CS.ARCH_MIPS]: { instance: cs_mips, name: 'mips' },
+        [CS.ARCH_X86]: { instance: cs_x86, name: 'x86' },
+        [CS.ARCH_PPC]: { instance: cs_ppc, name: 'ppc' },
+        [CS.ARCH_SPARC]: { instance: cs_sparc, name: 'sparc' },
+        [CS.ARCH_SYSZ]: { instance: cs_sysz, name: 'sysz' },
+        [CS.ARCH_XCORE]: { instance: cs_xcore, name: 'xcore' },
+        [CS.ARCH_TMS320C64X]: { instance: cs_tms320c64x, name: 'tms320c64x' },
+        [CS.ARCH_M680X]: { instance: cs_m680x, name: 'm680x' },
+        [CS.ARCH_M68K]: { instance: cs_m68k, name: 'm68k' },
+        [CS.ARCH_EVM]: { instance: cs_evm, name: 'evm' },
+        [CS.ARCH_MOS65XX]: { instance: cs_mos65xx, name: 'mos65xx' },
+        [CS.ARCH_WASM]: { instance: cs_wasm, name: 'wasm' },
+        [CS.ARCH_BPF]: { instance: cs_bpf, name: 'bpf' },
+        [CS.ARCH_RISCV]: { instance: cs_riscv, name: 'riscv' },
+        [CS.ARCH_SH]: { instance: cs_sh, name: 'sh' },
+        [CS.ARCH_TRICORE]: { instance: cs_tricore, name: 'tricore' },
       };
       return arch_map[arch];
     }
 
     /**
-     * Dereferences a pointer to a cs_insn strict to retrieve information about a disassembled instruction.
-     * @param insn_ptr - The pointer to the disassembled instruction.
-     * @returns Information about the disassembled instruction.
+     * Handler to parse the cs_opt_skipdata obj
+     *
+     * @private
+     * @param {cs_opt_skipdata} skipdata - User-customized setup for SKIPDATA option
+     * @returns {pointer_t<cs_opt_skipdata>} The pointer to the cs_opt_skipdata struct
      */
-    private deref(insn_ptr: ptr): cs_insn {
+    private skipdata_cb(setup: any): number {
+      const { mnemonic, callback, user_data } = setup;
+      const skipdata_struct: pointer_t<cs_opt_skipdata> = Memory.malloc(24);
+      typeof mnemonic === 'string' &&
+        Memory.write(skipdata_struct, mnemonic, 'char*');
+      const callback_ptr: pointer_t<Function> = skipdata_struct + 8;
+      const user_data_ptr: pointer_t<any> = skipdata_struct + 16;
+      if (typeof callback === 'function') {
+        const cb_ptr = Wrapper.addFunction(function (
+          code_ptr: any,
+          code_size: any,
+          offset: any,
+          user_data: any,
+        ): number {
+          const code = [];
+          for (let i = 0; i < code_size; i++)
+            code.push(Memory.read(parseInt(code_ptr), 'u8'));
+          return callback(code, code_size, offset /* TODO: user_data*/);
+        }, 'iiiii');
+        Memory.write(callback_ptr, cb_ptr, '*');
+      }
+
+      return skipdata_struct;
+    }
+
+    /**
+     * Dereferences a pointer to a cs_insn strict to retrieve information about a disassembled instruction.
+     *
+     * @private
+     * @param {pointer_t<cs_insn>} insn_ptr - The pointer to the disassembled instruction.
+     * @returns {cs_insn} Information about the disassembled instruction.
+     */
+    private deref(insn_ptr: pointer_t<cs_insn>): cs_insn {
       const insn_id: number = Memory.read(insn_ptr, 'u32');
       const insn_addr: number = Memory.read(insn_ptr + 8, 'u64');
       const insn_size: number = Memory.read(insn_ptr + 16, 'u16');
       const insn_mn: string = Wrapper.UTF8ToString(insn_ptr + 42);
       const insn_op_str: string = Wrapper.UTF8ToString(insn_ptr + 66 + 8);
-      const insn_bytes: Array<number> = [];
+      const insn_bytes: number[] = [];
 
       for (let j = 0; j < insn_size; j++) {
         const byte = Memory.read(insn_ptr + 18 + j, 'u8');
@@ -489,10 +573,13 @@ namespace cs {
         size: insn_size,
         mnemonic: insn_mn,
         op_str: insn_op_str,
-        bytes: insn_bytes,
+        bytes: new Uint8Array(insn_bytes),
       };
 
-      const detail_ptr: ptr = Memory.read(insn_ptr + 238, '*');
+      const detail_ptr: pointer_t<pointer_t<cs_detail>> = Memory.read(
+        insn_ptr + 238,
+        '*',
+      );
       const has_detail = detail_ptr != Memory.nullptr;
       if (has_detail) {
         insn.detail = this.get_detail(detail_ptr);
@@ -516,12 +603,14 @@ namespace cs {
 
     /**
      * Converts an array of `cs_insn` objects into a pointer to an array of cs_insn structures.
-     * @param insns Array of `cs_insn` objects to be converted.
-     * @returns Pointer to the array of cs_insn structures.
+     *
+     * @private
+     * @param {cs_insn[]} insns Array of `cs_insn` objects to be converted.
+     * @returns {pointer_t<cs_insn[]>} Pointer to the array of cs_insn structures.
      */
-    private ref(insns: Array<cs_insn>): ptr {
+    private ref(insns: cs_insn[]): pointer_t<cs_insn[]> {
       const count: number = insns.length;
-      const insns_ptr: ptr = Memory.malloc(INSN_SIZE * count);
+      const insns_ptr: pointer_t<cs_insn[]> = Memory.malloc(INSN_SIZE * count);
       for (let i = 0; i < count; i++) {
         const insn = insns[i];
         const insn_ptr = insns_ptr + i * INSN_SIZE;
@@ -541,28 +630,28 @@ namespace cs {
           insn.op_str !== null &&
           Memory.write(insn_ptr + 66 + 8, insn.op_str, 'char*');
 
-        for (let j = 0; j < insn.size; j++) {
+        for (let j = 0; j < (insn.size || 0); j++) {
           insn.bytes[j] !== undefined &&
             insn.bytes[j] !== null &&
             Memory.write(insn_ptr + 18 + j, insn.bytes[j], 'u8');
         }
 
         if (insn.detail) {
-          const detail: ptr = insn_ptr + 238;
-          const detail_ptr = Memory.malloc(1864);
-          const arch_info_ptr: ptr = detail_ptr + 96;
+          const detail: pointer_t<pointer_t<cs_detail>> = insn_ptr + 238;
+          const detail_ptr: pointer_t<cs_detail> = Memory.malloc(1864);
+          const arch_info_ptr: pointer_t<any> = detail_ptr + 96;
           let arch;
           let op_ptr;
           let op;
           Memory.write(detail, detail_ptr, '*');
-          for (let i = 0; i < insn.detail.regs_read_count; i++)
+          for (let i = 0; i < (insn.detail.regs_read_count || 0); i++)
             insn.detail.regs_read !== undefined &&
               insn.detail.regs_read !== null &&
               Memory.write(detail_ptr + i, insn.detail.regs_read[i], 'i16');
           insn.detail.regs_read_count !== undefined &&
             insn.detail.regs_read_count !== null &&
             Memory.write(detail_ptr + 40, insn.detail.regs_read_count, 'ubyte');
-          for (let i = 0; i < insn.detail.regs_write_count; i++)
+          for (let i = 0; i < (insn.detail.regs_write_count || 0); i++)
             insn.detail.regs_write[i] !== undefined &&
               insn.detail.regs_write[i] !== null &&
               Memory.write(
@@ -577,7 +666,7 @@ namespace cs {
               insn.detail.regs_write_count,
               'ubyte',
             );
-          for (let i = 0; i < insn.detail.groups_count; i++)
+          for (let i = 0; i < (insn.detail.groups_count || 0); i++)
             insn.detail.groups[i] !== undefined &&
               insn.detail.groups[i] !== null &&
               Memory.write(detail_ptr + 83 + i, insn.detail.groups[i], 'ubyte');
@@ -593,13 +682,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 32, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 40 + i * 48;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr + 12, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case ARM.OP_SYSREG:
                   case ARM.OP_REG:
                     op.reg !== undefined &&
@@ -647,13 +736,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 7, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 8 + i * 56;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr + 20, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case ARM64.OP_REG:
                   case ARM64.OP_REG_MRS:
                   case ARM64.OP_REG_MSR:
@@ -722,13 +811,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 8 + i * 24;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case MIPS.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -758,13 +847,13 @@ namespace cs {
               arch.disp !== undefined &&
                 arch.disp !== null &&
                 Memory.write(arch_info_ptr + 16, arch.disp, 'long');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 72 + i * 48;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case X86.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -797,13 +886,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 9, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 16 + i * 24;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case PPC.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -841,13 +930,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 8, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 16 + i * 16;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case SPARC.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -877,13 +966,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 4, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 8 + i * 32;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case SYSZ.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -916,13 +1005,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 4 + i * 16;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case XCORE.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -955,13 +1044,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 232, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + i * 56;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case M68K.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -1041,13 +1130,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 4 + i * 32;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case TMS320C64X.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -1094,13 +1183,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 1, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 4 + i * 24;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case M680X.OP_IMMEDIATE:
                     op.imm !== undefined &&
                       op.imm !== null &&
@@ -1171,13 +1260,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 5, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 8 + i * 8;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case MOS65XX.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -1201,13 +1290,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 8 + i * 32;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case WASM.OP_INT7:
                     op.int7 !== undefined &&
                       op.int7 !== null &&
@@ -1263,13 +1352,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 8 + i * 24;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case BPF.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -1316,13 +1405,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 1, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 8 + i * 24;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case RISCV.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -1349,13 +1438,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 5, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 8 + i * 58;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case SH.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -1385,13 +1474,13 @@ namespace cs {
               arch.op_count !== undefined &&
                 arch.op_count !== null &&
                 Memory.write(arch_info_ptr + 0, arch.op_count, 'ubyte');
-              for (let i = 0; i < arch.op_count; i++) {
+              for (let i = 0; i < (arch.op_count || 0); i++) {
                 op_ptr = arch_info_ptr + 4 + i * 16;
                 op = arch.operands[i];
                 op.type !== undefined &&
                   op.type !== null &&
                   Memory.write(op_ptr, op.type, 'i32');
-                switch (arch.operands[i].type) {
+                switch (arch.operands[i].type || 0) {
                   case TRICORE.OP_REG:
                     op.reg !== undefined &&
                       op.reg !== null &&
@@ -1421,12 +1510,14 @@ namespace cs {
 
     /**
      * Retrieves the detail information of a disassembled instruction from the cs_detail struct.
-     * @param pointer - The pointer to the detail information.
-     * @returns The detail information of the disassembled instruction.
+     *
+     * @private
+     * @param {pointer_t<cs_detail>} pointer - The pointer to the detail information.
+     * @returns {cs_detail} The detail information of the disassembled instruction.
      */
-    private get_detail(pointer: ptr): cs_detail {
+    private get_detail(pointer: pointer_t<cs_detail>): cs_detail {
       const detail: cs_detail = {} as cs_detail;
-      const arch_info_ptr: ptr = pointer + 96;
+      const arch_info_ptr: pointer_t<any> = pointer + 96;
       const regs_read_count: number = Memory.read(pointer + 40, 'ubyte');
       const regs_write_count: number = Memory.read(pointer + 82, 'ubyte');
       const groups_count: number = Memory.read(pointer + 91, 'ubyte');
@@ -1451,7 +1542,7 @@ namespace cs {
         detail.groups[i] = Memory.read(pointer + 83 + i, 'ubyte');
       }
 
-      detail[this.arch_info.entry] = new this.arch_info.instance(
+      detail[this.arch_info.name] = new this.arch_info.instance(
         arch_info_ptr,
         Memory,
       );
@@ -1461,8 +1552,11 @@ namespace cs {
 
     /**
      * Set an option for the Capstone disassembly engine.
-     * @param option - The option type to set.
-     * @param value - The value to set for the option.
+     *
+     * @public
+     * @param {cs_opt_type} option - The option type to set.
+     * @param {cs_opt_value | boolean | cs_opt_mnem | cs_opt_skipdata} value - The value to set for the option.
+     * @returns {void}
      */
     public option(
       option: cs_opt_type,
@@ -1489,7 +1583,7 @@ namespace cs {
             typeof (value as cs_opt_mnem).mnemonic !== 'string')
         ) {
           throw new Error(
-            'When using cs.OPT_MNEMONIC, the value parameter needs to be an object with the following properties,: { id: number, mnemonic: string | null }',
+            'When using CS.OPT_MNEMONIC, the value parameter needs to be an object with the following properties,: { id: number, mnemonic: string | null }',
           );
         }
 
@@ -1515,7 +1609,12 @@ namespace cs {
 
         opt_val = obj_ptr;
       } else if (option === OPT_SKIPDATA_SETUP) {
-        // TODO
+        if (typeof value != 'object')
+          throw new Error(
+            'When using CS.OPT_SKIPDATA_SETUP, the value parameter needs to be an object with the following properties,: { mnemonic: string | null, callback: cs_skipdata_cb_t | null, user_data: object }',
+          );
+        // TODO opt_val = this.skipdata_cb(value)
+        return;
       } else if (option === OPT_BUFFER) {
         this.opt_buffer =
           typeof value === 'boolean' ? value : value === OPT_ON ? true : false;
@@ -1533,7 +1632,7 @@ namespace cs {
       );
 
       if (ret !== ERR_OK) {
-        const error = `capstone: Function cs_option failed with code ${ret}:\n${strerror(ret)}`;
+        const error = `capstone: Function cs_option failed with code ${ret}:\n${this.strerror(ret)}`;
         throw new Error(error);
       }
 
@@ -1543,6 +1642,12 @@ namespace cs {
       }
     }
 
+    /**
+     * Create the capstone instance handle
+     *
+     * @private
+     * @returns {void}
+     */
     private open(): void {
       this.handle_ptr = Memory.malloc(4);
       const ret: cs_err = Wrapper.ccall(
@@ -1557,11 +1662,17 @@ namespace cs {
           'capstone: Function cs_open failed with code ' +
           ret +
           ':\n' +
-          strerror(ret);
+          this.strerror(ret);
         throw new Error(error);
       }
     }
 
+    /**
+     * Free the capstone instance handle and cleanup resources
+     *
+     * @public
+     * @returns {void}
+     */
     public close(): void {
       const ret: cs_err = Wrapper.ccall(
         'cs_close',
@@ -1574,7 +1685,7 @@ namespace cs {
           'capstone: Function cs_close failed with code ' +
           ret +
           ':\n' +
-          strerror(ret);
+          this.strerror(ret);
         throw new Error(error);
       }
 
@@ -1585,20 +1696,23 @@ namespace cs {
 
     /**
      * Disassemble binary data.
-     * @param buffer - The binary data to disassemble, as a Buffer, array, or Uint8Array.
-     * @param addr - The starting address of the binary data.
-     * @param max_len - (Optional) The maximum number of instructions to disassemble.
-     * @returns An array of disassembled instructions.
+     *
+     * @public
+     * @param {Buffer | number[] | Uint8Array,} buffer - The binary data to disassemble, as a Buffer, array, or Uint8Array.
+     * @param {number} addr - The starting address of the binary data.
+     * @param {number} [max_len] - (Optional) The maximum number of instructions to disassemble.
+     * @returns {cs_insn[]} An array of disassembled instructions.
      */
     public disasm(
-      buffer: Buffer | Array<number> | Uint8Array,
+      buffer: Buffer | number[] | Uint8Array,
       addr: number,
       max_len?: number,
     ): cs_insn[] {
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
       const buffer_len: number = buffer.length;
-      const buffer_ptr: ptr = Memory.malloc(buffer_len);
-      const insn_ptr: ptr = Memory.malloc(4);
+      const buffer_ptr: pointer_t<Buffer | number[] | Uint8Array> =
+        Memory.malloc(buffer_len);
+      const insn_ptr: pointer_t<pointer_t<cs_insn>> = Memory.malloc(4);
 
       Wrapper.writeArrayToMemory(buffer, buffer_ptr);
 
@@ -1610,11 +1724,11 @@ namespace cs {
       );
 
       if (insn_count > 0) {
-        const insn_arr_ptr: ptr = Memory.read(insn_ptr, 'i32');
+        const insn_arr_ptr: pointer_t<cs_insn[]> = Memory.read(insn_ptr, 'i32');
         const instructions: cs_insn[] = [];
 
         for (let i = 0; i < insn_count; i++) {
-          const insnOffset: ptr = insn_arr_ptr + i * INSN_SIZE;
+          const insnOffset: pointer_t<cs_insn> = insn_arr_ptr + i * INSN_SIZE;
           const insn: cs_insn = this.deref(insnOffset);
           instructions.push(insn);
         }
@@ -1623,35 +1737,43 @@ namespace cs {
       } else {
         Memory.free([insn_ptr, buffer_ptr]);
 
-        const code: cs_err = cs.errno(handle);
-        const error =
+        const code: cs_err = this.errno(handle);
+        const error: string =
           'capstone: Function cs_disasm failed with code ' +
           code +
           ':\n' +
-          strerror(code);
+          this.strerror(code);
         throw new Error(error);
       }
     }
 
     /**
      * Perform iterative disassembly on binary data.
-     * @param data - An object containing the binary data to disassemble, the starting address, and the current instruction.
-     * @returns A boolean indicating whether another instruction was successfully disassembled.
+     *
+     * @public
+     * @param {Object} data - An object containing the binary data to disassemble, the starting address, and the previous instruction.
+     * @param {Buffer | number[] | Uint8Array} data.buffer - The binary data to disassemble, as a Buffer, array, or Uint8Array.
+     * @param {number} data.address - the address of the current instruction
+     * @param {{} | cs_insn | null} data.insn - the previous iterations instruct or {} on iteration 0
+     * @returns {boolean} A boolean indicating whether another instruction was successfully disassembled.
      */
     public disasm_iter(data: {
-      buffer: Buffer | Array<number> | Uint8Array;
+      buffer: Buffer | number[] | Uint8Array;
       addr: number;
       insn: {} | cs_insn | null;
     }): boolean {
       const { buffer, addr } = data;
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
       const buffer_len: number = buffer.length;
-      const code_mem: ptr = Memory.malloc(buffer.length);
-      const cast_ptr: ptr = Memory.malloc(24);
-      const code_ptr: ptr = cast_ptr;
-      const size_ptr: ptr = cast_ptr + 8;
-      const addr_ptr: ptr = cast_ptr + 16;
-      const insn_ptr: ptr = Wrapper._cs_malloc(handle);
+      const code_mem: pointer_t<Buffer | number[] | Uint8Array> = Memory.malloc(
+        buffer.length,
+      );
+      const cast_ptr: pointer_t<any> = Memory.malloc(24);
+      const code_ptr: pointer_t<pointer_t<Buffer | number[] | Uint8Array>> =
+        cast_ptr;
+      const size_ptr: pointer_t<number> = cast_ptr + 8;
+      const addr_ptr: pointer_t<number> = cast_ptr + 16;
+      const insn_ptr: pointer_t<cs_insn> = Wrapper._cs_malloc(handle);
 
       Memory.write(addr_ptr, addr, 'i64');
       Memory.write(size_ptr, buffer_len, 'i32');
@@ -1676,7 +1798,7 @@ namespace cs {
 
         const insn: cs_insn = this.deref(insn_ptr);
 
-        data.buffer = Buffer.from(new_bytes);
+        data.buffer = new Uint8Array(new_bytes);
         data.addr = new_addr;
         data.insn = insn;
       }
@@ -1689,8 +1811,10 @@ namespace cs {
 
     /**
      * Retrieve information about registers accessed by an instruction.
-     * @param insn - The instruction to analyze.
-     * @returns An object containing arrays of registers read and written by the instruction.
+     *
+     * @public
+     * @param {cs_insn} insn - The instruction to analyze.
+     * @returns {{regs_read: cs_regs, regs_read_count: number, regs_write: cs_regs, regs_write_count: number}} An object containing arrays of registers read and written by the instruction.
      */
     public regs_access(insn: cs_insn): {
       regs_read: cs_regs;
@@ -1700,16 +1824,16 @@ namespace cs {
     } {
       if (!insn.detail)
         throw new Error(
-          'capstone: In order to use regs_access() you need to have cs.OPT_DETAIL on',
+          'capstone: In order to use regs_access() you need to have CS.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const insn_pointer: ptr = this.ref([insn]);
-      const regs_read_ptr = Memory.malloc(64 * 2);
-      const regs_read_count_ptr = Memory.malloc(1);
-      const regs_write_ptr = Memory.malloc(64 * 2);
-      const regs_write_count_ptr = Memory.malloc(1);
+      const insn_pointer: pointer_t<cs_insn> = this.ref([insn]);
+      const regs_read_ptr: pointer_t<cs_regs> = Memory.malloc(64 * 2);
+      const regs_read_count_ptr: pointer_t<number> = Memory.malloc(1);
+      const regs_write_ptr: pointer_t<cs_regs> = Memory.malloc(64 * 2);
+      const regs_write_count_ptr: pointer_t<number> = Memory.malloc(1);
 
-      const ret = Wrapper._cs_regs_access(
+      const ret: cs_err = Wrapper._cs_regs_access(
         handle,
         insn_pointer,
         regs_read_ptr,
@@ -1719,7 +1843,7 @@ namespace cs {
       );
       if (ret != ERR_OK) {
         Memory.write(this.handle_ptr, 0, '*');
-        const error = `capstone: Function regs_access failed with code ${ret}:\n${strerror(ret)}`;
+        const error = `capstone: Function regs_access failed with code ${ret}:\n${this.strerror(ret)}`;
         throw new Error(error);
       }
       const regs_read: cs_regs = [];
@@ -1750,17 +1874,19 @@ namespace cs {
 
     /**
      * Get the number of operands of a specific type for an instruction.
-     * @param insn - The instruction to analyze.
-     * @param op_type - The type of operand to count.
-     * @returns The number of operands of the specified type for the instruction.
+     *
+     * @public
+     * @param {cs_insn} insn - The instruction to analyze.
+     * @param {number} op_type - The type of operand to count.
+     * @returns {number} The number of operands of the specified type for the instruction.
      */
     public op_count(insn: cs_insn, op_type: number): number {
       if (!insn.detail)
         throw new Error(
-          'capstone: In order to use op_count() you need to have cs.OPT_DETAIL on',
+          'capstone: In order to use op_count() you need to have CS.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: ptr = this.ref([insn]);
+      const pointer: pointer_t<cs_insn> = this.ref([insn]);
       const operand_count: number = Wrapper._cs_op_count(
         handle,
         pointer,
@@ -1772,18 +1898,20 @@ namespace cs {
 
     /**
      * Get the index of a specific operand of a specific type at a given position for an instruction.
-     * @param insn - The instruction to analyze.
-     * @param op_type - The type of operand to search for.
-     * @param position - The position of the operand to find (zero-based).
-     * @returns The index of the operand within the instruction's operand list, or -1 if not found.
+     *
+     * @public
+     * @param {cs_insn} insn - The instruction to analyze.
+     * @param {number} op_type - The type of operand to search for.
+     * @param {number} position - The position of the operand to find (zero-based).
+     * @returns {number} The index of the operand within the instruction's operand list, or -1 if not found.
      */
     public op_index(insn: cs_insn, op_type: number, position: number): number {
       if (!insn.detail)
         throw new Error(
-          'capstone: In order to use op_index() you need to have cs.OPT_DETAIL on',
+          'capstone: In order to use op_index() you need to have CS.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: ptr = this.ref([insn]);
+      const pointer: pointer_t<cs_insn> = this.ref([insn]);
       const index: number = Wrapper._cs_op_index(
         handle,
         pointer,
@@ -1796,17 +1924,19 @@ namespace cs {
 
     /**
      * Check if an instruction belongs to a specific group.
-     * @param insn - The instruction to check.
-     * @param group_id - The ID of the group to check against.
-     * @returns A boolean indicating whether the instruction belongs to the specified group.
+     *
+     * @public
+     * @param {cs_insn} insn - The instruction to check.
+     * @param {number} group_id - The ID of the group to check against.
+     * @returns {boolean} A boolean indicating whether the instruction belongs to the specified group.
      */
     public insn_group(insn: cs_insn, group_id: number): boolean {
       if (!insn.detail)
         throw new Error(
-          'capstone: In order to use insn_group() you need to have cs.OPT_DETAIL on',
+          'capstone: In order to use insn_group() you need to have CS.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: ptr = this.ref([insn]);
+      const pointer: pointer_t<cs_insn> = this.ref([insn]);
 
       const valid_group: boolean = Boolean(
         Wrapper._cs_insn_group(handle, pointer, group_id),
@@ -1817,16 +1947,19 @@ namespace cs {
 
     /**
      * Retrieves the registers read by an instruction.
-     * @param insn - The instruction to analyze.
-     * @returns An array of registers read by the instruction.
+     *
+     * @public
+     * @param {cs_insn} insn - The instruction to analyze.
+     * @param {number} reg_id - The register to look for.
+     * @returns {boolean} A boolean indicating whether the instruction reads a specific register.
      */
     public reg_read(insn: cs_insn, reg_id: number): boolean {
       if (!insn.detail)
         throw new Error(
-          'capstone: In order to use reg_read() you need to have cs.OPT_DETAIL on',
+          'capstone: In order to use reg_read() you need to have CS.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: ptr = this.ref([insn]);
+      const pointer: pointer_t<cs_insn> = this.ref([insn]);
 
       const valid_reg: boolean = Boolean(
         Wrapper._cs_reg_read(handle, pointer, reg_id),
@@ -1837,16 +1970,19 @@ namespace cs {
 
     /**
      * Retrieves the registers written to by an instruction.
-     * @param insn - The instruction to analyze.
-     * @returns An array of registers written to by the instruction.
+     *
+     * @public
+     * @param {cs_insn} insn - The instruction to analyze.
+     * @param {number} reg_id - The register to look for.
+     * @returns {boolean} A boolean indicating whether the instruction writes to a specific register.
      */
     public reg_write(insn: cs_insn, reg_id: number): boolean {
       if (!insn.detail)
         throw new Error(
-          'capstone: In order to use reg_write() you need to have cs.OPT_DETAIL on',
+          'capstone: In order to use reg_write() you need to have CS.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: ptr = this.ref([insn]);
+      const pointer: pointer_t<cs_insn> = this.ref([insn]);
 
       const valid_reg: boolean = Boolean(
         Wrapper._cs_reg_write(handle, pointer, reg_id),
@@ -1857,8 +1993,10 @@ namespace cs {
 
     /**
      * Retrieves the name of the instruction group to which an instruction belongs.
-     * @param insn - The instruction to analyze.
-     * @returns The name of the instruction group.
+     *
+     * @public
+     * @param {number} insn - The instruction to analyze.
+     * @returns {string} The name of the instruction group.
      */
     public group_name(group_id: number): string {
       const handle: csh = Memory.read(this.handle_ptr, '*');
@@ -1873,9 +2011,10 @@ namespace cs {
 
     /**
      * Retrieves the name of a register referenced by an operand in an instruction.
-     * @param insn - The instruction containing the operand.
-     * @param op_index - The index of the operand.
-     * @returns The name of the register referenced by the operand.
+     *
+     * @public
+     * @param {number} reg_id - The register to look for.
+     * @returns {string} The name of the register referenced by the operand.
      */
     public reg_name(reg_id: number): string {
       const handle: csh = Memory.read(this.handle_ptr, '*');
@@ -1890,8 +2029,10 @@ namespace cs {
 
     /**
      * Retrieves the name of the instruction mnemonic.
-     * @param insn - The instruction to analyze.
-     * @returns The mnemonic of the instruction.
+     *
+     * @public
+     * @param {number} insn_id - The instruction id to look for.
+     * @returns {string} The mnemonic of the instruction.
      */
     public insn_name(insn_id: number): string {
       const handle: csh = Memory.read(this.handle_ptr, '*');
@@ -1906,31 +2047,87 @@ namespace cs {
 
     /**
      * Retrieves the offset relative to the start of the buffer where the instruction resides.
-     * @param insn - The instruction to analyze.
-     * @returns The offset of the instruction relative to the buffer.
+     *
+     * @public
+     * @param {cs_insn[]} insns - The instructions to analyze.
+     * @param {number} position - The index of the specific insn.
+     * @returns {number} The offset of the instruction relative to the buffer.
      */
-    public INSN_OFFSET(insns: Array<cs_insn>, position: number): number {
-      const pointer = this.ref(insns);
-      const offset = Wrapper._cs_insn_offset(pointer, position);
+    public INSN_OFFSET(insns: cs_insn[], position: number): number {
+      const pointer: pointer_t<cs_insn[]> = this.ref(insns);
+      const offset: number = Wrapper._cs_insn_offset(pointer, position);
       Memory.free(pointer);
       return offset;
     }
 
     /**
      * Retrieves the relative address for X86 instructions using RIP-relative addressing mode.
-     * @param insn - The instruction to analyze.
-     * @returns The relative address associated with the X86 instruction.
+     *
+     * @public
+     * @param {cs_insn} insn - The instruction to analyze.
+     * @returns {number} The relative address associated with the X86 instruction.
      */
     public X86_REL_ADDR(insn: cs_insn): number {
-      const pointer = this.ref([insn]);
-      const addr = Wrapper._x86_rel_addr(pointer);
+      const pointer: pointer_t<cs_insn> = this.ref([insn]);
+      const addr: number = Wrapper._x86_rel_addr(pointer);
       Memory.free(pointer);
       return addr;
+    }
+
+    /**
+     * Formats the given instructions to a printable string.
+     *
+     * @public
+     * @param {cs_insn | cs_insn[]} instructions - The instruction or array of instructions to format.
+     * @param {cs_opt_fmt} [options={ASCII: false, address: true, bytes: true}] - Formatting options.
+     */
+    public fmt(
+      instructions: cs_insn | cs_insn[],
+      options: cs_opt_fmt = { ASCII: false, address: true, bytes: true },
+    ): string {
+      if (!Array.isArray(instructions)) instructions = [instructions];
+
+      const { ASCII = false, address = true, bytes = true } = options;
+
+      let fmt_output = '';
+
+      for (const insn of instructions) {
+        const {
+          mnemonic = '',
+          op_str: operands = '',
+          address: insnAddress,
+          bytes: insnBytes,
+        } = insn;
+
+        if (address && !isNaN(insnAddress)) {
+          fmt_output += `0x${insnAddress.toString(16)}:\t`;
+        }
+
+        if (bytes && insnBytes instanceof Uint8Array) {
+          const byteStr = Array.from(insnBytes)
+            .map((byte) => byte.toString(16).padStart(2, '0'))
+            .join(' ');
+          fmt_output += `${byteStr.padEnd(24)} `;
+        }
+
+        if (ASCII && insnBytes instanceof Uint8Array) {
+          const asciiStr = Array.from(insnBytes)
+            .map((byte) =>
+              byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.',
+            )
+            .join('');
+          fmt_output += `${asciiStr.padEnd(10)} `;
+        }
+
+        fmt_output += `${mnemonic.padEnd(10)}${operands}\n`;
+      }
+
+      return fmt_output;
     }
   }
 }
 
-export default cs;
+export default CS;
 export {
   Wrapper,
   cs_opt_skipdata,

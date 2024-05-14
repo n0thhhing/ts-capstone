@@ -373,6 +373,6 @@ export declare class cs_sh {
   insn: SH;
   size: number;
   op_count: number;
-  operands: Array<cs_sh_op>;
+  operands: cs_sh_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }

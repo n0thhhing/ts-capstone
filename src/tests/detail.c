@@ -8,6 +8,8 @@
   "\x8b\x84\x91\x23\x01\x00\x00\x41\x8d\x84\x39\x89\x67\x00\x00\x8d\x87\x89"   \
   "\x67\x00\x00\xb4\xc6\x66\xe9\xb8\x00\x00\x00\x67\xff\xa0\x23\x01\x00\x00"   \
   "\x66\xe8\xcb\x00\x00\x00\x74\xfc"
+#define X86_CODE32                                                             \
+  "\x8d\x4c\x32\x08\x01\xd8\x81\xc6\x34\x12\x00\x00\x00\x91\x92"
 #define M68K                                                                   \
   "\x48\x32\x12\x34\x56\x78\xD2\x2A\xAB\xCD\x54\x03\x00\x00\x4C\x38\x00\x01"   \
   "\x4C\x0A\x00\x02\xD0\x2C\x4C\x0C\x00\x04\xD0\x2C\x4C\xFE\x00\x00\x00\x00"   \
@@ -78,7 +80,7 @@
 #define MIPS                                                                   \
   "\x0C\x10\x00\x97\x00\x00\x00\x00\x24\x02\x00\x0c\x8f\xa2\x00\x00\x34\x21"   \
   "\x34\x56"
-#define ARM64                                                                  \
+#define AArch64                                                                \
   "\x09\x00\x38\xd5\xbf\x40\x00\xd5\x0c\x05\x13\xd5\x20\x50\x02\x0e\x20\xe4"   \
   "\x3d\x0f\x00\x18\xa0\x5f\xa2\x00\xae\x9e\x9f\x37\x03\xd5\xbf\x33\x03\xd5"   \
   "\xdf\x3f\x03\xd5\x21\x7c\x02\x9b\x21\x7c\x00\x53\x00\x40\x21\x4b\xe1\x0b"   \
@@ -138,7 +140,8 @@ void test_arch(arch *architecture) {
 
 // TODO: cleanup
 int main(void) {
-
+  printf("fff");
+  printf("shshshs %d", offsetof(cs_opt_skipdata, user_data));
   csh x86handle;
   cs_insn *x86insn;
   size_t x86count;
@@ -337,7 +340,7 @@ int main(void) {
         }
         printf("\n\n");
       }
-    }*/
+    }
 
   csh arm64handle;
   cs_insn *arm64insn;
@@ -345,7 +348,7 @@ int main(void) {
   if (cs_open(1, 0, &arm64handle) != CS_ERR_OK)
     return -1;
   cs_option(arm64handle, CS_OPT_DETAIL, CS_OPT_ON);
-  arm64count = cs_disasm(arm64handle, (uint8_t *)ARM64, sizeof(ARM64) - 1,
+  arm64count = cs_disasm(arm64handle, (uint8_t *)AArch64, sizeof(AArch64) - 1,
                          0x1000, 0, &arm64insn);
   if (arm64count > 0) {
     size_t j;
@@ -354,7 +357,7 @@ int main(void) {
     print_insn(arm64insn, arm64count);
     for (j = 0; j < arm64count; j++) {
       printf("op_index: %d\n",
-             cs_op_index(arm64handle, &arm64insn[j], ARM64_OP_REG, 1));
+             cs_op_index(arm64handle, &arm64insn[j], AArch64_OP_REG, 1));
       cs_detail *detail = arm64insn[j].detail;
       printf("regs_read_count: %d\n", detail->regs_read_count);
       cs_arm64 *arm64 = &(detail->arm64);
@@ -407,15 +410,15 @@ int main(void) {
         switch (op->type) {
         default:
           break;
-        case ARM64_OP_REG:
+        case AArch64_OP_REG:
           printf("\t\toperands[%u].type: REG = %s(%d)\n", i,
                  cs_reg_name(arm64handle, op->reg), op->reg);
           break;
-        case ARM64_OP_IMM:
+        case AArch64_OP_IMM:
           printf("\t\toperands[%u].type: IMM = 0x%" PRIx64 "(%d)\n", i, op->imm,
                  op->imm);
           break;
-        case ARM64_OP_FP:
+        case AArch64_OP_FP:
 #if defined(_KERNEL_MODE)
           // Issue #681: Windows kernel does not support formatting float
           printf("\t\toperands[%u].type: FP = <float_point_unsupported>\n", i);
@@ -423,46 +426,46 @@ int main(void) {
           printf("\t\toperands[%u].type: FP = %f(%d)\n", i, op->fp, op->fp);
 #endif
           break;
-        case ARM64_OP_MEM:
+        case AArch64_OP_MEM:
           printf("base: %d\n", op->mem.base);
           printf("index: %d\n", op->mem.index);
           printf("disp: %d\n", op->mem.disp);
           printf("\t\toperands[%u].type: MEM\n", i);
-          if (op->mem.base != ARM64_REG_INVALID)
+          if (op->mem.base != AArch64_REG_INVALID)
             printf("\t\t\toperands[%u].mem.base: REG = %s\n", i,
                    cs_reg_name(arm64handle, op->mem.base));
-          if (op->mem.index != ARM64_REG_INVALID)
+          if (op->mem.index != AArch64_REG_INVALID)
             printf("\t\t\toperands[%u].mem.index: REG = %s\n", i,
                    cs_reg_name(arm64handle, op->mem.index));
           if (op->mem.disp != 0)
             printf("\t\t\toperands[%u].mem.disp: 0x%x\n", i, op->mem.disp);
 
           break;
-        case ARM64_OP_CIMM:
+        case AArch64_OP_CIMM:
           printf("\t\toperands[%u].type: C-IMM = %u(%d)\n", i, (int)op->imm,
                  op->imm);
           break;
-        case ARM64_OP_REG_MRS:
+        case AArch64_OP_REG_MRS:
           printf("\t\toperands[%u].type: REG_MRS = 0x%x(%d)\n", i, op->reg,
                  op->reg);
           break;
-        case ARM64_OP_REG_MSR:
+        case AArch64_OP_REG_MSR:
           printf("\t\toperands[%u].type: REG_MSR = 0x%x(%d)\n", i, op->reg,
                  op->reg);
           break;
-        case ARM64_OP_PSTATE:
+        case AArch64_OP_PSTATE:
           printf("\t\toperands[%u].type: PSTATE = 0x%x(%d)\n", i, op->pstate,
                  op->pstate);
           break;
-        case ARM64_OP_SYS:
+        case AArch64_OP_SYS:
           printf("\t\toperands[%u].type: SYS = 0x%x(%d)\n", i, op->sys,
                  op->sys);
           break;
-        case ARM64_OP_PREFETCH:
+        case AArch64_OP_PREFETCH:
           printf("\t\toperands[%u].type: PREFETCH = 0x%x(%d)\n", i,
                  op->prefetch, op->prefetch);
           break;
-        case ARM64_OP_BARRIER:
+        case AArch64_OP_BARRIER:
           printf("\t\toperands[%u].type: BARRIER = 0x%x(%d)\n", i, op->barrier,
                  op->barrier);
           break;
@@ -472,7 +475,7 @@ int main(void) {
       printf("\n\n");
     }
   }
-  /*
+
          const char *s_addressing_modes[] = {
              "<invalid mode>",
 

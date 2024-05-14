@@ -486,7 +486,7 @@ export declare enum TRICORE {
 }
 export declare class cs_tricore {
   op_count: number;
-  operands: Array<cs_tricore_op>;
+  operands: cs_tricore_op[];
   update_flags: boolean;
   constructor(arch_info_ptr: number, Memory: any);
 }

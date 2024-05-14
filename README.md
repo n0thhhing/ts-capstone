@@ -8,10 +8,10 @@ git clone https://github.com/n0thhhing/capstone-wrapper
 ## Example
 
 ```typescript
-import cs, { cs_arch, cs_mode, cs_insn, ARM64 } from './path/to/capstone.ts'; // soon this will be a package to import via npm, bun, yarn ect ...
+import CS, { cs_arch, cs_mode, cs_insn, ARM64 } from './path/to/capstone.ts'; // soon this will be a package to import via npm, bun, yarn ect ...
 
-const arch: cs_arch = cs.ARCH_ARM64; // or cs.ARCH_AARCH64.
-const mode: cs_mode = cs.MODE_ARCH;
+const arch: cs_arch = CS.ARCH_ARM64; // or CS.ARCH_AARCH64.
+const mode: cs_mode = CS.MODE_ARCH;
 
 const code: Array<number> = [
   0x00, 0x00, 0x80, 0xd2, // 0x1000: mov x0, #0
@@ -23,9 +23,9 @@ const code: Array<number> = [
   0x20, 0x88, 0x82, 0x4f, // 0x1018: mul v0.4s, v1.4s, v2.s[2]
 ];
 
-const disassembler = new cs.Capstone(arch, mode);
+const cs = new CS.CAPSTONE(arch, mode);
 
-const instructions: Array<cs_insn> = disassembler.disasm(
+const instructions: Array<cs_insn> = cs.disasm(
   code,
   0x1000 /* optional length */,
 );
@@ -107,7 +107,7 @@ const data = {
 // this returns a boolean, which will become
 // false either when it is done iterating,
 // or if it comes upon an invalid instruction.
-while (disassembler.disasm_iter(data)) {
+while (cs.disasm_iter(data)) {
   // every iteration this function goes through,
   // it will edit the data object with the new
   // instruction. also if the current instruction
@@ -129,7 +129,7 @@ while (disassembler.disasm_iter(data)) {
 
 // every time disasm (or disasm_iter) comes across
 // a movz instruction in the span of your
-// disassembler instance, movz will be aliased to
+// cs instance, movz will be aliased to
 // foo, the id will still remain the same as movz.
 // To reset the mnemonic, recall this with the same
 // id, but with mnemonic set to null(JavaScript null)
@@ -137,18 +137,18 @@ const mnObj = {
   id: 191, // the id returned in the insn object, in this case, its movz, you can also find more in the Typescript file corresponding to your arch (arch/<arch>.ts)
   mnemonic: 'foo', // the new name of the mnemonic, or null
 };
-disassembler.option(cs.OPT_MNEMONIC, mnObj);
+cs.option(CS.OPT_MNEMONIC, mnObj);
 
 // OPT_MODE
 
-// after using this, your disassembler mode
+// after using this, your cs mode
 // will be MODE_LITTLE_ENDIAN until the
 // instance is closed or changed again.
-disassembler.option(cs.OPT_MODE, cs.MODE_LITTLE_ENDIAN);
+cs.option(CS.OPT_MODE, CS.MODE_LITTLE_ENDIAN);
 
 // OPT_SYNTAX
 
-disassembler.option(cs.OPT_SYNTAX, cs.OPT_SYNTAX_INTEL); // Default assembly syntax of all platforms (CS_OPT_SYNTAX).
+cs.option(CS.OPT_SYNTAX, CS.OPT_SYNTAX_INTEL); // Default assembly syntax of all platforms (CS_OPT_SYNTAX).
 
 // OPT_SKIPDATA
 
@@ -156,12 +156,12 @@ disassembler.option(cs.OPT_SYNTAX, cs.OPT_SYNTAX_INTEL); // Default assembly syn
 // often sections that contain non-executable
 // data, such as ASCII strings, data structures,
 // or other non-instruction bytes. By using
-// cs.OPT_SKIPDATA, you can instruct Capstone
+// CS.OPT_SKIPDATA, you can instruct Capstone
 // to skip over these non-instruction bytes
 // and only disassemble the actual instructions.
-disassembler.option(
-  cs.OPT_SKIPDATA,
-  true, // true/false/cs.OPT_ON/cs.OPT_OFF
+cs.option(
+  CS.OPT_SKIPDATA,
+  true, // true/false/CS.OPT_ON/CS.OPT_OFF
 );
 
 // OPT_DETAIL
@@ -171,7 +171,7 @@ disassembler.option(
 // reg_ids, groups, and in this case, a sub
 // arm64 object with detailed info specific
 // to the instruction and architecture.
-disassembler.option(cs.OPT_DETAIL, true);
+cs.option(CS.OPT_DETAIL, true);
 
 // OPT_BUFFER
 
@@ -184,7 +184,7 @@ disassembler.option(cs.OPT_DETAIL, true);
 // useful when needing access to the raw
 // binary data of disassembled instructions for
 // further analysis or processing.
-disassembler.option(cs.OPT_BUFFER, true);
+cs.option(CS.OPT_BUFFER, true);
 
 // To access data from the buffer in JavaScript,
 // use DataView. For types other than `int32`,
@@ -240,10 +240,10 @@ const mnemonic = new TextDecoder("utf-8").decode(truncated_mn)
 
 // this will return a boolean, true if valid
 // and false if not, To verify if this library
-// supports all the archs, use cs.ARCH_ALL(true),
+// supports all the archs, use CS.ARCH_ALL(true),
 // To check if this library is in 'diet' mode,
-// set query to cs.SUPPORT_DIET(false).
-cs.support(cs.MODE_LITTLE_ENDIAN); // true
+// set query to CS.SUPPORT_DIET(false).
+cs..support(CS.MODE_LITTLE_ENDIAN); // true
 
 // version
 
@@ -257,14 +257,14 @@ cs.version(); // 5.0
 // These groups can be found in the
 // arch/<arch>.ts file or the detail obj
 // when CS_DETAIL is turned on.
-disassembler.group_name(2); // call
+cs.group_name(2); // call
 
 // reg_name
 
 // These register IDs can be found either in
 // the arch/<arch>.ts file or the detail object
-// when cs.DETAIL is on, like regs_read/regs_write.
-disassembler.reg_name(183); // w15
+// when CS.DETAIL is on, like regs_read/regs_write.
+cs.reg_name(183); // w15
 
 // insn_name
 
@@ -272,7 +272,7 @@ disassembler.reg_name(183); // w15
 // corresponding to the id. The id can be
 // found either from the (arch/<arch>.ts)
 // file or from disassembly results.
-disassembler.insn_name(191); // s28
+cs.insn_name(191); // s28
 
 // op_index
 
@@ -280,8 +280,8 @@ disassembler.insn_name(191); // s28
 // This can be used to determine operands without
 // having to manually inspect the operands array.
 // This requires the detail object to be present in
-// the insn, so cs.OPT_DETAIL needs to be turned on
-disassembler.op_index(example_insn, ARM64.OP_REG, 1); // 1
+// the insn, so CS.OPT_DETAIL needs to be turned on
+cs.op_index(example_insn, ARM64.OP_REG, 1); // 1
 
 // op_count
 
@@ -289,15 +289,15 @@ disassembler.op_index(example_insn, ARM64.OP_REG, 1); // 1
 // type provided an insn, which allows you to easily
 // tell how many of a certain type is present in the // object while not having to manually inspect the
 // detail object. This requires the detail object to
-// be present in the insn, so cs.OPT_DETAIL needs
+// be present in the insn, so CS.OPT_DETAIL needs
 // to be turned on
-disassembler.op_count(example_insn, ARM64.OP_REG); // 1
+cs.op_count(example_insn, ARM64.OP_REG); // 1
 
 // regs_access
 
 // Retrieve all the registers accessed by an
 // instruction, either explicitly or implicitly.
-disassembler.regs_access(example_insn); // { regs_read: [], regs_read_count: 0, regs_write: [], regs_write_count: 0 }
+cs.regs_access(example_insn); // { regs_read: [], regs_read_count: 0, regs_write: [], regs_write_count: 0 }
 
 // reg_read
 
@@ -305,7 +305,7 @@ disassembler.regs_access(example_insn); // { regs_read: [], regs_read_count: 0, 
 // used a particular register. These registers can
 // be found in the constants file corresponding to
 // your chosen architecture (arch/<arch>.ts)
-disassembler.reg_read(example_insn, ARM64.REG_NZCV); // false
+cs.reg_read(example_insn, ARM64.REG_NZCV); // false
 
 // reg_write
 
@@ -313,7 +313,7 @@ disassembler.reg_read(example_insn, ARM64.REG_NZCV); // false
 // modified a particular register. These registers can
 // be found in the constants file corresponding to
 // your chosen architecture (arch/<arch>.ts)
-disassembler.reg_write(example_insn, ARM64.REG_B0); // false
+cs.reg_write(example_insn, ARM64.REG_B0); // false
 
 // insn_group
 
@@ -321,7 +321,25 @@ disassembler.reg_write(example_insn, ARM64.REG_B0); // false
 // particular group. You can find these groups
 // in the constants file corresponding to your
 // chosen architecture (arch/<arch>.ts)
-disassembler.insn_group(example_insn, ARM64.GRP_PRIVILEGE); // true
+cs.insn_group(example_insn, ARM64.GRP_PRIVILEGE); // true
+
+
+// fmt
+
+// This method is used to format the instruction
+// (or instructions) to be printable, this also
+// includes an option param that goes as follows:
+const options = {
+  bytes: true, // Specifies if the formatted string should have the instructions bytes(default is true).
+  address: true, // Specifies if the formatted string should include the instructions address(default is true).
+  ASCII: true, // Specifies if the formatted string should include the bytes ASCII representation(default is false).
+}
+const formatted_insn = cs.fmt(example_insn, options)
+console.log(formatted_insn)
+/*
+output:
+0x1008 0c 05 13 d5 .... msr dbgdtrtx_el0, x12
+*/
 
 // close
 
@@ -329,9 +347,9 @@ disassembler.insn_group(example_insn, ARM64.GRP_PRIVILEGE); // true
 // are binding c to JS we now have to free unused
 // values, JS usually has garbage collection
 // but C does not, so we have to free the
-// disassembler instance from memory manually
+// cs instance from memory manually
 // after it's no longer in use.
-disassembler.close();
+cs.close();
 ```
 
 you can also take a look at the [tests](src/tests)

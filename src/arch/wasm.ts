@@ -6,7 +6,7 @@ export interface cs_wasm_op {
   varuint64?: number;
   uint32?: number;
   uint64?: number;
-  immediate?: Array<number>;
+  immediate?: number[];
   brtable?: {
     length: number;
     address: number;
@@ -212,7 +212,7 @@ export enum WASM {
 
 export class cs_wasm {
   public op_count: number;
-  public operands: Array<cs_wasm_op>;
+  public operands: cs_wasm_op[];
   constructor(arch_info_ptr: number, Memory: any) {
     this.operands = [];
     this.op_count = Memory.read(arch_info_ptr + 0, 'ubyte');

@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import cs from '../../capstone';
+import CS from '../../capstone';
 
-test('cs.ARCH_M68K', () => {
+test('CS.ARCH_M68K', () => {
   const buffer = new Uint8Array([
     0x48, 0x32, 0x12, 0x34, 0x56, 0x78, 0xd2, 0x2a, 0xab, 0xcd, 0x54, 0x03,
     0x00, 0x00, 0x4c, 0x38, 0x00, 0x01, 0x4c, 0x0a, 0x00, 0x02, 0xd0, 0x2c,
@@ -15,8 +15,8 @@ test('cs.ARCH_M68K', () => {
     0x46, 0x02, 0x46, 0x03, 0x4e, 0x71, 0x46, 0x04, 0x4e, 0x71, 0x46, 0x05,
     0x4e, 0x71, 0x46, 0x06, 0x4e, 0x71,
   ]);
-  const disassembler = new cs.Capstone(cs.ARCH_M68K, cs.MODE_M68K_020);
-  disassembler.option(cs.OPT_DETAIL, true);
+  const disassembler = new CS.CAPSTONE(CS.ARCH_M68K, CS.MODE_M68K_020);
+  disassembler.option(CS.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
   expect(
@@ -35,7 +35,7 @@ test('cs.ARCH_M68K', () => {
       size: 4,
       mnemonic: 'nbcd.b',
       op_str: '$34(a2, d1.w)',
-      bytes: [72, 50, 18, 52],
+      bytes: new Uint8Array([72, 50, 18, 52]),
     },
     {
       id: 5,
@@ -43,7 +43,7 @@ test('cs.ARCH_M68K', () => {
       size: 4,
       mnemonic: 'addq.w',
       op_str: '#$3, $d22a.w',
-      bytes: [86, 120, 210, 42],
+      bytes: new Uint8Array([86, 120, 210, 42]),
     },
     {
       id: 0,
@@ -51,7 +51,7 @@ test('cs.ARCH_M68K', () => {
       size: 2,
       mnemonic: 'dc.w',
       op_str: '$abcd',
-      bytes: [171, 205],
+      bytes: new Uint8Array([171, 205]),
     },
     {
       id: 5,
@@ -59,7 +59,7 @@ test('cs.ARCH_M68K', () => {
       size: 2,
       mnemonic: 'addq.b',
       op_str: '#$2, d3',
-      bytes: [84, 3],
+      bytes: new Uint8Array([84, 3]),
     },
     {
       id: 297,
@@ -67,7 +67,7 @@ test('cs.ARCH_M68K', () => {
       size: 4,
       mnemonic: 'ori.b',
       op_str: '#$38, d0',
-      bytes: [0, 0, 76, 56],
+      bytes: new Uint8Array([0, 0, 76, 56]),
     },
     {
       id: 297,
@@ -75,7 +75,7 @@ test('cs.ARCH_M68K', () => {
       size: 4,
       mnemonic: 'ori.b',
       op_str: '#$a, d1',
-      bytes: [0, 1, 76, 10],
+      bytes: new Uint8Array([0, 1, 76, 10]),
     },
     {
       id: 297,
@@ -83,7 +83,7 @@ test('cs.ARCH_M68K', () => {
       size: 4,
       mnemonic: 'ori.b',
       op_str: '#$2c, d2',
-      bytes: [0, 2, 208, 44],
+      bytes: new Uint8Array([0, 2, 208, 44]),
     },
   ]);
 

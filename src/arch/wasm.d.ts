@@ -6,7 +6,7 @@ export interface cs_wasm_op {
   varuint64?: number;
   uint32?: number;
   uint64?: number;
-  immediate?: Array<number>;
+  immediate?: number[];
   brtable?: {
     length: number;
     address: number;
@@ -205,6 +205,6 @@ export declare enum WASM {
 }
 export declare class cs_wasm {
   op_count: number;
-  operands: Array<cs_wasm_op>;
+  operands: cs_wasm_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }

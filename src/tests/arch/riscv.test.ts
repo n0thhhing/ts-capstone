@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import cs from '../../capstone';
+import CS from '../../capstone';
 
-test('cs.ARCH_RISCV', () => {
+test('CS.ARCH_RISCV', () => {
   const buffer = new Uint8Array([
     0x37, 0x34, 0x00, 0x00, 0x97, 0x82, 0x00, 0x00, 0xef, 0x00, 0x80, 0x00,
     0xef, 0xf0, 0x1f, 0xff, 0xe7, 0x00, 0x45, 0x00, 0xe7, 0x00, 0xc0, 0xff,
@@ -19,8 +19,8 @@ test('cs.ARCH_RISCV', () => {
     0x33, 0x9f, 0x0f, 0x00,
   ]);
 
-  const disassembler = new cs.Capstone(cs.ARCH_RISCV, cs.MODE_RISCV32);
-  disassembler.option(cs.OPT_DETAIL, true);
+  const disassembler = new CS.CAPSTONE(CS.ARCH_RISCV, CS.MODE_RISCV32);
+  disassembler.option(CS.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
   expect(
@@ -39,7 +39,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'lui',
       op_str: 's0, 3',
-      bytes: [55, 52, 0, 0],
+      bytes: new Uint8Array([55, 52, 0, 0]),
     },
     {
       id: 79,
@@ -47,7 +47,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'auipc',
       op_str: 't0, 8',
-      bytes: [151, 130, 0, 0],
+      bytes: new Uint8Array([151, 130, 0, 0]),
     },
     {
       id: 206,
@@ -55,7 +55,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'jal',
       op_str: '8',
-      bytes: [239, 0, 128, 0],
+      bytes: new Uint8Array([239, 0, 128, 0]),
     },
     {
       id: 206,
@@ -63,7 +63,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'jal',
       op_str: '-0x10',
-      bytes: [239, 240, 31, 255],
+      bytes: new Uint8Array([239, 240, 31, 255]),
     },
     {
       id: 207,
@@ -71,7 +71,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'jalr',
       op_str: 'ra, a0, 4',
-      bytes: [231, 0, 69, 0],
+      bytes: new Uint8Array([231, 0, 69, 0]),
     },
     {
       id: 207,
@@ -79,7 +79,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'jalr',
       op_str: 'ra, zero, -4',
-      bytes: [231, 0, 192, 255],
+      bytes: new Uint8Array([231, 0, 192, 255]),
     },
     {
       id: 80,
@@ -87,7 +87,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'beq',
       op_str: 'sp, tp, 0xa',
-      bytes: [99, 5, 65, 0],
+      bytes: new Uint8Array([99, 5, 65, 0]),
     },
     {
       id: 85,
@@ -95,7 +95,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'bne',
       op_str: 'gp, t1, -6',
-      bytes: [227, 157, 97, 254],
+      bytes: new Uint8Array([227, 157, 97, 254]),
     },
     {
       id: 83,
@@ -103,7 +103,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'blt',
       op_str: 't2, s1, 0x14',
-      bytes: [99, 202, 147, 0],
+      bytes: new Uint8Array([99, 202, 147, 0]),
     },
     {
       id: 81,
@@ -111,7 +111,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'bge',
       op_str: 'a0, a1, 6',
-      bytes: [99, 83, 181, 0],
+      bytes: new Uint8Array([99, 83, 181, 0]),
     },
     {
       id: 84,
@@ -119,7 +119,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'bltu',
       op_str: 'a2, a3, 0xa',
-      bytes: [99, 101, 214, 0],
+      bytes: new Uint8Array([99, 101, 214, 0]),
     },
     {
       id: 82,
@@ -127,7 +127,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'bgeu',
       op_str: 'a4, a5, 0xc',
-      bytes: [99, 118, 247, 0],
+      bytes: new Uint8Array([99, 118, 247, 0]),
     },
     {
       id: 208,
@@ -135,7 +135,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'lb',
       op_str: 'a6, 1(a7)',
-      bytes: [3, 136, 24, 0],
+      bytes: new Uint8Array([3, 136, 24, 0]),
     },
     {
       id: 211,
@@ -143,7 +143,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'lh',
       op_str: 's2, 4(s3)',
-      bytes: [3, 153, 73, 0],
+      bytes: new Uint8Array([3, 153, 73, 0]),
     },
     {
       id: 222,
@@ -151,7 +151,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'lw',
       op_str: 's4, 6(s5)',
-      bytes: [3, 170, 106, 0],
+      bytes: new Uint8Array([3, 170, 106, 0]),
     },
     {
       id: 209,
@@ -159,7 +159,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'lbu',
       op_str: 's6, 0x12(s7)',
-      bytes: [3, 203, 43, 1],
+      bytes: new Uint8Array([3, 203, 43, 1]),
     },
     {
       id: 212,
@@ -167,7 +167,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'lhu',
       op_str: 's8, 0x18(s9)',
-      bytes: [3, 220, 140, 1],
+      bytes: new Uint8Array([3, 220, 140, 1]),
     },
     {
       id: 236,
@@ -175,7 +175,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'sb',
       op_str: 's10, 0x2c(s11)',
-      bytes: [35, 134, 173, 3],
+      bytes: new Uint8Array([35, 134, 173, 3]),
     },
     {
       id: 247,
@@ -183,7 +183,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'sh',
       op_str: 't3, 0x34(t4)',
-      bytes: [35, 154, 206, 3],
+      bytes: new Uint8Array([35, 154, 206, 3]),
     },
     {
       id: 236,
@@ -191,7 +191,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'sb',
       op_str: 't5, 0x1e(t6)',
-      bytes: [35, 143, 239, 1],
+      bytes: new Uint8Array([35, 143, 239, 1]),
     },
     {
       id: 2,
@@ -199,7 +199,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'addi',
       op_str: 'ra, zero, 0xe',
-      bytes: [147, 0, 224, 0],
+      bytes: new Uint8Array([147, 0, 224, 0]),
     },
     {
       id: 253,
@@ -207,7 +207,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'slti',
       op_str: 'sp, gp, 0x10',
-      bytes: [19, 161, 1, 1],
+      bytes: new Uint8Array([19, 161, 1, 1]),
     },
     {
       id: 254,
@@ -215,7 +215,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'sltiu',
       op_str: 'tp, t0, 0x7d0',
-      bytes: [19, 178, 2, 125],
+      bytes: new Uint8Array([19, 178, 2, 125]),
     },
     {
       id: 272,
@@ -223,7 +223,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'xori',
       op_str: 't1, t2, -0x230',
-      bytes: [19, 195, 3, 221],
+      bytes: new Uint8Array([19, 195, 3, 221]),
     },
     {
       id: 231,
@@ -231,7 +231,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'ori',
       op_str: 's0, s1, 0x12c',
-      bytes: [19, 228, 196, 18],
+      bytes: new Uint8Array([19, 228, 196, 18]),
     },
     {
       id: 78,
@@ -239,7 +239,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'andi',
       op_str: 'a0, a1, 0xc8',
-      bytes: [19, 245, 133, 12],
+      bytes: new Uint8Array([19, 245, 133, 12]),
     },
     {
       id: 249,
@@ -247,7 +247,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'slli',
       op_str: 'a2, a3, 0x1e',
-      bytes: [19, 150, 230, 1],
+      bytes: new Uint8Array([19, 150, 230, 1]),
     },
     {
       id: 262,
@@ -255,7 +255,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'srli',
       op_str: 'a4, a5, 0x19',
-      bytes: [19, 215, 151, 1],
+      bytes: new Uint8Array([19, 215, 151, 1]),
     },
     {
       id: 257,
@@ -263,7 +263,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'srai',
       op_str: 'a6, a7, 0xf',
-      bytes: [19, 216, 248, 64],
+      bytes: new Uint8Array([19, 216, 248, 64]),
     },
     {
       id: 1,
@@ -271,7 +271,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'add',
       op_str: 's2, s3, s4',
-      bytes: [51, 137, 73, 1],
+      bytes: new Uint8Array([51, 137, 73, 1]),
     },
     {
       id: 265,
@@ -279,7 +279,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'sub',
       op_str: 's5, s6, s7',
-      bytes: [179, 10, 123, 65],
+      bytes: new Uint8Array([179, 10, 123, 65]),
     },
     {
       id: 252,
@@ -287,7 +287,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'slt',
       op_str: 's8, s9, s10',
-      bytes: [51, 172, 172, 1],
+      bytes: new Uint8Array([51, 172, 172, 1]),
     },
     {
       id: 255,
@@ -295,7 +295,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'sltu',
       op_str: 's11, t3, t4',
-      bytes: [179, 61, 222, 1],
+      bytes: new Uint8Array([179, 61, 222, 1]),
     },
     {
       id: 256,
@@ -303,7 +303,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'sra',
       op_str: 'tp, t0, t1',
-      bytes: [51, 210, 98, 64],
+      bytes: new Uint8Array([51, 210, 98, 64]),
     },
     {
       id: 271,
@@ -311,7 +311,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'xor',
       op_str: 't2, s0, s1',
-      bytes: [179, 67, 148, 0],
+      bytes: new Uint8Array([179, 67, 148, 0]),
     },
     {
       id: 230,
@@ -319,7 +319,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'or',
       op_str: 'a0, a1, a2',
-      bytes: [51, 229, 197, 0],
+      bytes: new Uint8Array([51, 229, 197, 0]),
     },
     {
       id: 77,
@@ -327,7 +327,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'and',
       op_str: 'a3, a4, a5',
-      bytes: [179, 118, 247, 0],
+      bytes: new Uint8Array([179, 118, 247, 0]),
     },
     {
       id: 261,
@@ -335,7 +335,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'srl',
       op_str: 's1, s2, s3',
-      bytes: [179, 84, 57, 1],
+      bytes: new Uint8Array([179, 84, 57, 1]),
     },
     {
       id: 261,
@@ -343,7 +343,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'srl',
       op_str: 'ra, sp, gp',
-      bytes: [179, 80, 49, 0],
+      bytes: new Uint8Array([179, 80, 49, 0]),
     },
     {
       id: 248,
@@ -351,7 +351,7 @@ test('cs.ARCH_RISCV', () => {
       size: 4,
       mnemonic: 'sll',
       op_str: 't5, t6, zero',
-      bytes: [51, 159, 15, 0],
+      bytes: new Uint8Array([51, 159, 15, 0]),
     },
   ]);
 

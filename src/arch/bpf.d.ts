@@ -124,6 +124,6 @@ export declare enum BPF {
 }
 export declare class cs_bpf {
   op_count: number;
-  operands: Array<cs_bpf_op>;
+  operands: cs_bpf_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }

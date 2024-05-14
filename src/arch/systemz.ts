@@ -2547,7 +2547,7 @@ export enum SYSZ {
 export class cs_sysz {
   public cc: SYSZ; // Code condition
   public op_count: number; // Number of operands of this instruction, or 0 when instruction has no operand.
-  public operands: Array<cs_sysz_op>; // operands for this instruction.
+  public operands: cs_sysz_op[]; // operands for this instruction.
 
   constructor(arch_info_ptr: number, Memory: any) {
     this.cc = Memory.read(arch_info_ptr + 0, 'i32');

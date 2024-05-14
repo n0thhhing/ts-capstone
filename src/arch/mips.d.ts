@@ -863,6 +863,6 @@ export declare enum MIPS {
 }
 export declare class cs_mips {
   op_count: number;
-  operands: Array<cs_mips_op>;
+  operands: cs_mips_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }

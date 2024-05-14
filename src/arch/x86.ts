@@ -2040,8 +2040,8 @@ export class cs_x86 {
   // See X86.PREFIX_CS/SS/DS/ES/FS/GS above.
   // prefix[2] indicates operand-size override (X86.PREFIX_OPSIZE)
   // prefix[3] indicates address-size override (X86.PREFIX_ADDRSIZE)
-  public prefix: Array<number>;
-  public opcode: Array<number>; // Instruction opcode, which can be from 1 to 4 bytes in size. This contains VEX opcode as well. An trailing opcode byte gets value 0 when irrelevant.
+  public prefix: number[];
+  public opcode: number[]; // Instruction opcode, which can be from 1 to 4 bytes in size. This contains VEX opcode as well. An trailing opcode byte gets value 0 when irrelevant.
   public rex: number; // REX prefix: only a non-zero value is relevant for x86_64
   public addr_size: number; // Address size, which can be overridden with above prefix[5].
   public modrm: number; // ModR/M byte
@@ -2058,7 +2058,7 @@ export class cs_x86 {
   public eflags: number; // EFLAGS updated by this instruction. This can be formed from OR combination of X86.EFLAGS_* symbols above
   public fpu_flags: number; // FPU_FLAGS updated by this instruction. This can be formed from OR combination of X86.FPU_FLAGS_* symbols above
   public op_count: number; // Number of operands of this instruction, or 0 when instruction has no operand.
-  public operands: Array<cs_x86_op>; // operands for this instruction.
+  public operands: cs_x86_op[]; // operands for this instruction.
   public encoding: {
     // encoding information
     modrm_offset: number; // ModR/M offset, or 0 when irrelevant

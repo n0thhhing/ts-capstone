@@ -160,7 +160,7 @@ export enum BPF {
 
 export class cs_bpf {
   public op_count: number;
-  public operands: Array<cs_bpf_op>;
+  public operands: cs_bpf_op[];
 
   constructor(arch_info_ptr: number, Memory: any) {
     this.operands = [];

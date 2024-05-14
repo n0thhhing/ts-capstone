@@ -499,7 +499,7 @@ export enum TRICORE {
 
 export class cs_tricore {
   public op_count: number; // number of operands of this instruction.
-  public operands: Array<cs_tricore_op>; // operands for this instruction.
+  public operands: cs_tricore_op[]; // operands for this instruction.
   public update_flags: boolean; // whether the flags register is updated.
 
   constructor(arch_info_ptr: number, Memory: any) {

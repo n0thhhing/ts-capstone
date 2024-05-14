@@ -1,10 +1,10 @@
 EXPORTED_FUNCTIONS=(
+	malloc
+	free
 	cs_insn_buffer
 	cs_detail_buffer
 	cs_insn_offset
 	x86_rel_addr
-	malloc
-	free
 	cs_close
 	cs_open
 	cs_option
@@ -28,6 +28,8 @@ EXPORTED_FUNCTIONS=(
 )
 
 METHODS=(
+	addFunction
+	removeFunction
 	UTF8ToString
 	ccall
 	getValue
@@ -46,7 +48,9 @@ EMSCRIPTEN_SETTINGS=(
 	-s ALLOW_MEMORY_GROWTH=1
 	-s MODULARIZE=1
 	-s WASM_ASYNC_COMPILATION=0
-	-s ASSERTIONS=0
+	-s ASSERTIONS=1
+	-s ALLOW_TABLE_GROWTH=1
+	-s RESERVED_FUNCTION_POINTERS=300
 	#	-s MALLOC='emmalloc-memvalidate-verbose'
 	#	-s ALLOW_TABLE_GROWTH
 	#	--profiling
@@ -57,4 +61,4 @@ EMSCRIPTEN_SETTINGS=(
 	--memory-init-file 0
 )
 
-emcc -lembind build/libcapstone.a src/macros.c src/constants.cpp ${EMSCRIPTEN_SETTINGS[*]} -o ./src/capstone.js
+emcc -lembind build/libcapstone.a src/macros.c src/constants.cpp ${EMSCRIPTEN_SETTINGS[*]} -o ./src/libcapstone.js

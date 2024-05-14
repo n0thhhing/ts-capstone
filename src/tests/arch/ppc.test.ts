@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import cs from '../../capstone';
+import CS from '../../capstone';
 
-test('cs.ARCH_PPC', () => {
+test('CS.ARCH_PPC', () => {
   const buffer = new Uint8Array([
     0x10, 0x00, 0x1f, 0xec, 0xe0, 0x6d, 0x80, 0x04, 0xe4, 0x6d, 0x80, 0x04,
     0x10, 0x60, 0x1c, 0x4c, 0x10, 0x60, 0x1c, 0x0c, 0xf0, 0x6d, 0x80, 0x04,
@@ -26,11 +26,11 @@ test('cs.ARCH_PPC', () => {
     0x10, 0x63, 0x29, 0x15, 0x10, 0x63, 0x29, 0x16, 0x10, 0x63, 0x29, 0x17,
   ]);
 
-  const disassembler = new cs.Capstone(
-    cs.ARCH_PPC,
-    cs.MODE_BIG_ENDIAN + cs.MODE_PS,
+  const disassembler = new CS.CAPSTONE(
+    CS.ARCH_PPC,
+    CS.MODE_BIG_ENDIAN + CS.MODE_PS,
   );
-  disassembler.option(cs.OPT_DETAIL, true);
+  disassembler.option(CS.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
   expect(
@@ -49,7 +49,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'dcbz_l',
       op_str: 'r0, r3',
-      bytes: [16, 0, 31, 236],
+      bytes: new Uint8Array([16, 0, 31, 236]),
     },
     {
       id: 1690,
@@ -57,7 +57,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'psq_l',
       op_str: 'f3, 4(r13), 1, 0',
-      bytes: [224, 109, 128, 4],
+      bytes: new Uint8Array([224, 109, 128, 4]),
     },
     {
       id: 1691,
@@ -65,7 +65,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'psq_lu',
       op_str: 'f3, 4(r13), 1, 0',
-      bytes: [228, 109, 128, 4],
+      bytes: new Uint8Array([228, 109, 128, 4]),
     },
     {
       id: 1692,
@@ -73,7 +73,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'psq_lux',
       op_str: 'f3, r0, r3, 1, 0',
-      bytes: [16, 96, 28, 76],
+      bytes: new Uint8Array([16, 96, 28, 76]),
     },
     {
       id: 1693,
@@ -81,7 +81,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'psq_lx',
       op_str: 'f3, r0, r3, 1, 0',
-      bytes: [16, 96, 28, 12],
+      bytes: new Uint8Array([16, 96, 28, 12]),
     },
     {
       id: 1694,
@@ -89,7 +89,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'psq_st',
       op_str: 'f3, 4(r13), 1, 0',
-      bytes: [240, 109, 128, 4],
+      bytes: new Uint8Array([240, 109, 128, 4]),
     },
     {
       id: 1695,
@@ -97,7 +97,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'psq_stu',
       op_str: 'f3, 4(r13), 1, 0',
-      bytes: [244, 109, 128, 4],
+      bytes: new Uint8Array([244, 109, 128, 4]),
     },
     {
       id: 1696,
@@ -105,7 +105,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'psq_stux',
       op_str: 'f3, r0, r3, 1, 0',
-      bytes: [16, 96, 28, 78],
+      bytes: new Uint8Array([16, 96, 28, 78]),
     },
     {
       id: 1697,
@@ -113,7 +113,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'psq_stx',
       op_str: 'f3, r0, r3, 1, 0',
-      bytes: [16, 96, 28, 14],
+      bytes: new Uint8Array([16, 96, 28, 14]),
     },
     {
       id: 1698,
@@ -121,7 +121,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_abs',
       op_str: 'f3, f3',
-      bytes: [16, 96, 26, 16],
+      bytes: new Uint8Array([16, 96, 26, 16]),
     },
     {
       id: 1698,
@@ -129,7 +129,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_abs.',
       op_str: 'f3, f3',
-      bytes: [16, 96, 26, 17],
+      bytes: new Uint8Array([16, 96, 26, 17]),
     },
     {
       id: 1699,
@@ -137,7 +137,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_add',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 32, 42],
+      bytes: new Uint8Array([16, 99, 32, 42]),
     },
     {
       id: 1699,
@@ -145,7 +145,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_add.',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 32, 43],
+      bytes: new Uint8Array([16, 99, 32, 43]),
     },
     {
       id: 1700,
@@ -153,7 +153,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_cmpo0',
       op_str: 'cr1, f3, f4',
-      bytes: [16, 131, 32, 64],
+      bytes: new Uint8Array([16, 131, 32, 64]),
     },
     {
       id: 1701,
@@ -161,7 +161,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_cmpo1',
       op_str: 'cr1, f3, f4',
-      bytes: [16, 131, 32, 192],
+      bytes: new Uint8Array([16, 131, 32, 192]),
     },
     {
       id: 1702,
@@ -169,7 +169,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_cmpu0',
       op_str: 'cr1, f3, f4',
-      bytes: [16, 131, 32, 0],
+      bytes: new Uint8Array([16, 131, 32, 0]),
     },
     {
       id: 1703,
@@ -177,7 +177,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_cmpu1',
       op_str: 'cr1, f3, f4',
-      bytes: [16, 131, 32, 128],
+      bytes: new Uint8Array([16, 131, 32, 128]),
     },
     {
       id: 1704,
@@ -185,7 +185,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_div',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 32, 36],
+      bytes: new Uint8Array([16, 99, 32, 36]),
     },
     {
       id: 1704,
@@ -193,7 +193,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_div.',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 32, 37],
+      bytes: new Uint8Array([16, 99, 32, 37]),
     },
     {
       id: 1705,
@@ -201,7 +201,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_madd',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 58],
+      bytes: new Uint8Array([16, 99, 41, 58]),
     },
     {
       id: 1705,
@@ -209,7 +209,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_madd.',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 59],
+      bytes: new Uint8Array([16, 99, 41, 59]),
     },
     {
       id: 1706,
@@ -217,7 +217,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_madds0',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 28],
+      bytes: new Uint8Array([16, 99, 41, 28]),
     },
     {
       id: 1706,
@@ -225,7 +225,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_madds0.',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 29],
+      bytes: new Uint8Array([16, 99, 41, 29]),
     },
     {
       id: 1707,
@@ -233,7 +233,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_madds1',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 30],
+      bytes: new Uint8Array([16, 99, 41, 30]),
     },
     {
       id: 1707,
@@ -241,7 +241,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_madds1.',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 31],
+      bytes: new Uint8Array([16, 99, 41, 31]),
     },
     {
       id: 1708,
@@ -249,7 +249,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_merge00',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 36, 32],
+      bytes: new Uint8Array([16, 99, 36, 32]),
     },
     {
       id: 1708,
@@ -257,7 +257,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_merge00.',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 36, 33],
+      bytes: new Uint8Array([16, 99, 36, 33]),
     },
     {
       id: 1709,
@@ -265,7 +265,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_merge01',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 36, 96],
+      bytes: new Uint8Array([16, 99, 36, 96]),
     },
     {
       id: 1709,
@@ -273,7 +273,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_merge01.',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 36, 97],
+      bytes: new Uint8Array([16, 99, 36, 97]),
     },
     {
       id: 1710,
@@ -281,7 +281,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_merge10',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 36, 160],
+      bytes: new Uint8Array([16, 99, 36, 160]),
     },
     {
       id: 1710,
@@ -289,7 +289,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_merge10.',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 36, 161],
+      bytes: new Uint8Array([16, 99, 36, 161]),
     },
     {
       id: 1711,
@@ -297,7 +297,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_merge11',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 36, 224],
+      bytes: new Uint8Array([16, 99, 36, 224]),
     },
     {
       id: 1711,
@@ -305,7 +305,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_merge11.',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 36, 225],
+      bytes: new Uint8Array([16, 99, 36, 225]),
     },
     {
       id: 1712,
@@ -313,7 +313,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_mr',
       op_str: 'f3, f4',
-      bytes: [16, 96, 32, 144],
+      bytes: new Uint8Array([16, 96, 32, 144]),
     },
     {
       id: 1712,
@@ -321,7 +321,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_mr.',
       op_str: 'f3, f4',
-      bytes: [16, 96, 32, 145],
+      bytes: new Uint8Array([16, 96, 32, 145]),
     },
     {
       id: 1713,
@@ -329,7 +329,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_msub',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 56],
+      bytes: new Uint8Array([16, 99, 41, 56]),
     },
     {
       id: 1713,
@@ -337,7 +337,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_msub.',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 57],
+      bytes: new Uint8Array([16, 99, 41, 57]),
     },
     {
       id: 1714,
@@ -345,7 +345,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_mul',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 1, 50],
+      bytes: new Uint8Array([16, 99, 1, 50]),
     },
     {
       id: 1714,
@@ -353,7 +353,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_mul.',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 1, 51],
+      bytes: new Uint8Array([16, 99, 1, 51]),
     },
     {
       id: 1715,
@@ -361,7 +361,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_muls0',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 1, 24],
+      bytes: new Uint8Array([16, 99, 1, 24]),
     },
     {
       id: 1715,
@@ -369,7 +369,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_muls0.',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 1, 25],
+      bytes: new Uint8Array([16, 99, 1, 25]),
     },
     {
       id: 1716,
@@ -377,7 +377,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_muls1',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 1, 26],
+      bytes: new Uint8Array([16, 99, 1, 26]),
     },
     {
       id: 1716,
@@ -385,7 +385,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_muls1.',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 1, 27],
+      bytes: new Uint8Array([16, 99, 1, 27]),
     },
     {
       id: 1717,
@@ -393,7 +393,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_nabs',
       op_str: 'f3, f3',
-      bytes: [16, 96, 25, 16],
+      bytes: new Uint8Array([16, 96, 25, 16]),
     },
     {
       id: 1717,
@@ -401,7 +401,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_nabs.',
       op_str: 'f3, f3',
-      bytes: [16, 96, 25, 17],
+      bytes: new Uint8Array([16, 96, 25, 17]),
     },
     {
       id: 1718,
@@ -409,7 +409,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_neg',
       op_str: 'f3, f3',
-      bytes: [16, 96, 24, 80],
+      bytes: new Uint8Array([16, 96, 24, 80]),
     },
     {
       id: 1718,
@@ -417,7 +417,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_neg.',
       op_str: 'f3, f3',
-      bytes: [16, 96, 24, 81],
+      bytes: new Uint8Array([16, 96, 24, 81]),
     },
     {
       id: 1719,
@@ -425,7 +425,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_nmadd',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 62],
+      bytes: new Uint8Array([16, 99, 41, 62]),
     },
     {
       id: 1719,
@@ -433,7 +433,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_nmadd.',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 63],
+      bytes: new Uint8Array([16, 99, 41, 63]),
     },
     {
       id: 1720,
@@ -441,7 +441,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_nmsub',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 60],
+      bytes: new Uint8Array([16, 99, 41, 60]),
     },
     {
       id: 1720,
@@ -449,7 +449,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_nmsub.',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 61],
+      bytes: new Uint8Array([16, 99, 41, 61]),
     },
     {
       id: 1721,
@@ -457,7 +457,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_res',
       op_str: 'f3, f3',
-      bytes: [16, 96, 24, 48],
+      bytes: new Uint8Array([16, 96, 24, 48]),
     },
     {
       id: 1721,
@@ -465,7 +465,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_res.',
       op_str: 'f3, f3',
-      bytes: [16, 96, 24, 49],
+      bytes: new Uint8Array([16, 96, 24, 49]),
     },
     {
       id: 1722,
@@ -473,7 +473,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_rsqrte',
       op_str: 'f3, f3',
-      bytes: [16, 96, 24, 52],
+      bytes: new Uint8Array([16, 96, 24, 52]),
     },
     {
       id: 1722,
@@ -481,7 +481,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_rsqrte.',
       op_str: 'f3, f3',
-      bytes: [16, 96, 24, 53],
+      bytes: new Uint8Array([16, 96, 24, 53]),
     },
     {
       id: 1723,
@@ -489,7 +489,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_sel',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 46],
+      bytes: new Uint8Array([16, 99, 41, 46]),
     },
     {
       id: 1723,
@@ -497,7 +497,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_sel.',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 47],
+      bytes: new Uint8Array([16, 99, 41, 47]),
     },
     {
       id: 1724,
@@ -505,7 +505,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_sub',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 32, 40],
+      bytes: new Uint8Array([16, 99, 32, 40]),
     },
     {
       id: 1724,
@@ -513,7 +513,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_sub.',
       op_str: 'f3, f3, f4',
-      bytes: [16, 99, 32, 41],
+      bytes: new Uint8Array([16, 99, 32, 41]),
     },
     {
       id: 1725,
@@ -521,7 +521,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_sum0',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 20],
+      bytes: new Uint8Array([16, 99, 41, 20]),
     },
     {
       id: 1725,
@@ -529,7 +529,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_sum0.',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 21],
+      bytes: new Uint8Array([16, 99, 41, 21]),
     },
     {
       id: 1726,
@@ -537,7 +537,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_sum1',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 22],
+      bytes: new Uint8Array([16, 99, 41, 22]),
     },
     {
       id: 1726,
@@ -545,7 +545,7 @@ test('cs.ARCH_PPC', () => {
       size: 4,
       mnemonic: 'ps_sum1.',
       op_str: 'f3, f3, f4, f5',
-      bytes: [16, 99, 41, 23],
+      bytes: new Uint8Array([16, 99, 41, 23]),
     },
   ]);
 

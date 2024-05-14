@@ -438,6 +438,6 @@ export declare enum M680X {
 export declare class cs_m680x {
   flags: number;
   op_count: number;
-  operands: Array<cs_m680x_op>;
+  operands: cs_m680x_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }

@@ -1,4 +1,4 @@
-import cs from '../capstone';
+import CS from '../capstone';
 import { expect, test } from 'bun:test';
 
 test('OPT_MNEMONIC', () => {
@@ -9,8 +9,8 @@ test('OPT_MNEMONIC', () => {
     0xb9, // 0x1008: ldr w8, [x20]
   ]);
 
-  const disassembler = new cs.Capstone(cs.ARCH_ARM64, cs.MODE_ARM);
-  disassembler.option(cs.OPT_MNEMONIC, { id: 558, mnemonic: 'load_register' });
+  const disassembler = new CS.CAPSTONE(CS.ARCH_ARM64, CS.MODE_ARM);
+  disassembler.option(CS.OPT_MNEMONIC, { id: 558, mnemonic: 'load_register' });
   const insns = disassembler.disasm(buffer, 0x1000);
 
   expect(insns[0]).not.toBe(undefined);

@@ -38,19 +38,21 @@ type native_t =
   | 'char*'
   | 'boolean';
 type arr_t<T extends native_t> = `${T}[${number}]`;
-type ptr = number;
+type pointer_t<T extends any> = number;
 
 export namespace Memory {
-  export const allocations: Set<ptr> = new Set<ptr>();
-  export const nullptr: ptr = 0;
+  export const allocations: Set<pointer_t<any>> = new Set<pointer_t<any>>();
+  export const nullptr: pointer_t<0> = 0;
 
-  export function malloc(size: number): ptr {
-    const pointer: ptr = Wrapper._malloc(size);
+  export function malloc(size: number): pointer_t<any> {
+    const pointer: pointer_t<any> = Wrapper._malloc(size);
     allocations.add(pointer);
     return pointer;
   }
 
-  export function free(mem: ptr | Set<ptr> | Array<ptr>): void {
+  export function free(
+    mem: pointer_t<any> | Set<pointer_t<any>> | pointer_t<any>[],
+  ): void {
     if (mem instanceof Set || Array.isArray(mem)) {
       for (const pointer of mem) {
         allocations.delete(pointer);
@@ -67,7 +69,7 @@ export namespace Memory {
   }
 
   export function write(
-    pointer: ptr,
+    pointer: pointer_t<any>,
     value: any,
     type: native_t | arr_t<native_t>,
   ): void {
@@ -161,7 +163,7 @@ export namespace Memory {
     }
   }
 
-  export function read(pointer: ptr, type: native_t): any {
+  export function read(pointer: pointer_t<any>, type: native_t): any {
     let value;
     switch (type) {
       case 'char':

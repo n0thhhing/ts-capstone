@@ -1996,8 +1996,8 @@ export declare enum X86 {
   GRP_ENDING = 170,
 }
 export declare class cs_x86 {
-  prefix: Array<number>;
-  opcode: Array<number>;
+  prefix: number[];
+  opcode: number[];
   rex: number;
   addr_size: number;
   modrm: number;
@@ -2014,7 +2014,7 @@ export declare class cs_x86 {
   eflags: number;
   fpu_flags: number;
   op_count: number;
-  operands: Array<cs_x86_op>;
+  operands: cs_x86_op[];
   encoding: {
     modrm_offset: number;
     disp_offset: number;

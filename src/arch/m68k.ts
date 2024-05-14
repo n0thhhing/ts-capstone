@@ -538,7 +538,7 @@ export enum M68K {
 }
 
 export class cs_m68k {
-  public operands: Array<cs_m68k_op>; // operands for this instruction.
+  public operands: cs_m68k_op[]; // operands for this instruction.
   public op_size: {
     // size of data operand works on in bytes (.b, .w, .l, etc)
     type: M68K;

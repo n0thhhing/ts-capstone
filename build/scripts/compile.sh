@@ -7,6 +7,7 @@ CAPSTONE_DIR=capstone
 
 ARCHS=(
 	ARM
+	ARCH64
 	ARM64
 	MIPS
 	PPC

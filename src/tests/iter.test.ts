@@ -1,8 +1,8 @@
-import cs from '../capstone';
+import CS from '../capstone';
 import { expect, test } from 'bun:test';
 
 test('disasm_iter ARM', () => {
-  const arm = new cs.Capstone(cs.ARCH_ARM, cs.MODE_THUMB);
+  const arm = new CS.CAPSTONE(CS.ARCH_ARM, CS.MODE_THUMB);
   // prettier-ignore
   const armBuffer = [
     0x4f, 0xf0, 0x00, 0x01, // 0x1000 mov.w r1, #0
@@ -28,51 +28,61 @@ test('disasm_iter ARM', () => {
       address: 0x1000,
       mnemonic: 'mov.w',
       op_str: 'r1, #0',
-      bytes: [0x4f, 0xf0, 0x00, 0x01],
+      bytes: new Uint8Array([0x4f, 0xf0, 0x00, 0x01]),
     },
     {
       address: 0x1004,
       mnemonic: 'pop.w',
       op_str: '{fp, pc}',
-      bytes: [0xbd, 0xe8, 0x00, 0x88],
+      bytes: new Uint8Array([0xbd, 0xe8, 0x00, 0x88]),
     },
     {
       address: 0x1008,
       mnemonic: 'tbb',
       op_str: '[r1, r0]',
-      bytes: [0xd1, 0xe8, 0x00, 0xf0],
+      bytes: new Uint8Array([0xd1, 0xe8, 0x00, 0xf0]),
     },
-    { address: 0x100c, mnemonic: 'it', op_str: 'ne', bytes: [0x18, 0xbf] },
-    { address: 0x100e, mnemonic: 'iteet', op_str: 'ge', bytes: [0xad, 0xbf] },
+    {
+      address: 0x100c,
+      mnemonic: 'it',
+      op_str: 'ne',
+      bytes: new Uint8Array([0x18, 0xbf]),
+    },
+    {
+      address: 0x100e,
+      mnemonic: 'iteet',
+      op_str: 'ge',
+      bytes: new Uint8Array([0xad, 0xbf]),
+    },
     {
       address: 0x1010,
       mnemonic: 'vdupne.8',
       op_str: 'd16, d11[1]',
-      bytes: [0xf3, 0xff, 0x0b, 0x0c],
+      bytes: new Uint8Array([0xf3, 0xff, 0x0b, 0x0c]),
     },
     {
       address: 0x1014,
       mnemonic: 'msr',
       op_str: 'cpsr_fc, r6',
-      bytes: [0x86, 0xf3, 0x00, 0x89],
+      bytes: new Uint8Array([0x86, 0xf3, 0x00, 0x89]),
     },
     {
       address: 0x1018,
       mnemonic: 'msr',
       op_str: 'apsr_nzcvqg, r0',
-      bytes: [0x80, 0xf3, 0x00, 0x8c],
+      bytes: new Uint8Array([0x80, 0xf3, 0x00, 0x8c]),
     },
     {
       address: 0x101c,
       mnemonic: 'sxtb.w',
       op_str: 'r6, sb, ror #8',
-      bytes: [0x4f, 0xfa, 0x99, 0xf6],
+      bytes: new Uint8Array([0x4f, 0xfa, 0x99, 0xf6]),
     },
     {
       address: 0x1020,
       mnemonic: 'vaddw.u16',
       op_str: 'q8, q8, d18',
-      bytes: [0xd0, 0xff, 0xa2, 0x01],
+      bytes: new Uint8Array([0xd0, 0xff, 0xa2, 0x01]),
     },
   ];
 
@@ -89,7 +99,7 @@ test('disasm_iter ARM', () => {
 });
 
 test('disasm_iter ARM64', () => {
-  const arm64 = new cs.Capstone(1, 0);
+  const arm64 = new CS.CAPSTONE(1, 0);
   // prettier-ignore
   const arm64Buffer = [  
     0xf5, 0x53, 0xbe, 0xa9, // 0x4db43dc stp x21, x20, [sp, #-0x20]!
@@ -121,97 +131,97 @@ test('disasm_iter ARM64', () => {
       address: 0x4db43dc,
       mnemonic: 'stp',
       op_str: 'x21, x20, [sp, #-0x20]!',
-      bytes: [0xf5, 0x53, 0xbe, 0xa9],
+      bytes: new Uint8Array([0xf5, 0x53, 0xbe, 0xa9]),
     },
     {
       address: 0x4db43e0,
       mnemonic: 'stp',
       op_str: 'x19, x30, [sp, #0x10]',
-      bytes: [0xf3, 0x7b, 0x01, 0xa9],
+      bytes: new Uint8Array([0xf3, 0x7b, 0x01, 0xa9]),
     },
     {
       address: 0x4db43e4,
       mnemonic: 'adrp',
       op_str: 'x21, #0x8339000',
-      bytes: [0x35, 0xac, 0x01, 0xb0],
+      bytes: new Uint8Array([0x35, 0xac, 0x01, 0xb0]),
     },
     {
       address: 0x4db43e8,
       mnemonic: 'ldrb',
       op_str: 'w8, [x21, #0x606]',
-      bytes: [0xa8, 0x1a, 0x58, 0x39],
+      bytes: new Uint8Array([0xa8, 0x1a, 0x58, 0x39]),
     },
     {
       address: 0x4db43ec,
       mnemonic: 'mov',
       op_str: 'w19, w1',
-      bytes: [0xf3, 0x03, 0x01, 0x2a],
+      bytes: new Uint8Array([0xf3, 0x03, 0x01, 0x2a]),
     },
     {
       address: 0x4db43f0,
       mnemonic: 'mov',
       op_str: 'x20, x0',
-      bytes: [0xf4, 0x03, 0x00, 0xaa],
+      bytes: new Uint8Array([0xf4, 0x03, 0x00, 0xaa]),
     },
     {
       address: 0x4db43f4,
       mnemonic: 'tbnz',
       op_str: 'w8, #0, #0x4db4418',
-      bytes: [0x28, 0x01, 0x00, 0x37],
+      bytes: new Uint8Array([0x28, 0x01, 0x00, 0x37]),
     },
     {
       address: 0x4db43f8,
       mnemonic: 'adrp',
       op_str: 'x0, #0x7dbd000',
-      bytes: [0x40, 0x80, 0x01, 0xb0],
+      bytes: new Uint8Array([0x40, 0x80, 0x01, 0xb0]),
     },
     {
       address: 0x4db43fc,
       mnemonic: 'ldr',
       op_str: 'x0, [x0, #0x240]',
-      bytes: [0x00, 0x20, 0x41, 0xf9],
+      bytes: new Uint8Array([0x00, 0x20, 0x41, 0xf9]),
     },
     {
       address: 0x4db4400,
       mnemonic: 'bl',
       op_str: '#0x178667c',
-      bytes: [0x9f, 0x48, 0x27, 0x97],
+      bytes: new Uint8Array([0x9f, 0x48, 0x27, 0x97]),
     },
     {
       address: 0x4db4404,
       mnemonic: 'adrp',
       op_str: 'x0, #0x7dbe000',
-      bytes: [0x40, 0x80, 0x01, 0xd0],
+      bytes: new Uint8Array([0x40, 0x80, 0x01, 0xd0]),
     },
     {
       address: 0x4db4408,
       mnemonic: 'ldr',
       op_str: 'x0, [x0, #0xab0]',
-      bytes: [0x00, 0x58, 0x45, 0xf9],
+      bytes: new Uint8Array([0x00, 0x58, 0x45, 0xf9]),
     },
     {
       address: 0x4db440c,
       mnemonic: 'bl',
       op_str: '#0x178667c',
-      bytes: [0x9c, 0x48, 0x27, 0x97],
+      bytes: new Uint8Array([0x9c, 0x48, 0x27, 0x97]),
     },
     {
       address: 0x4db4410,
       mnemonic: 'mov',
       op_str: 'w8, #1',
-      bytes: [0x28, 0x00, 0x80, 0x52],
+      bytes: new Uint8Array([0x28, 0x00, 0x80, 0x52]),
     },
     {
       address: 0x4db4414,
       mnemonic: 'strb',
       op_str: 'w8, [x21, #0x606]',
-      bytes: [0xa8, 0x1a, 0x18, 0x39],
+      bytes: new Uint8Array([0xa8, 0x1a, 0x18, 0x39]),
     },
     {
       address: 0x4db4418,
       mnemonic: 'mov',
       op_str: 'x0, x20',
-      bytes: [0xe0, 0x03, 0x14, 0xaa],
+      bytes: new Uint8Array([0xe0, 0x03, 0x14, 0xaa]),
     },
   ];
 

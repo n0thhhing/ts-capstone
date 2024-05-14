@@ -851,6 +851,6 @@ export declare class cs_arm {
   post_index: boolean;
   mem_barrier: ARM;
   op_count: number;
-  operands: Array<cs_arm_op>;
+  operands: cs_arm_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }

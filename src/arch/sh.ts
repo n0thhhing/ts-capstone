@@ -402,7 +402,7 @@ export class cs_sh {
   public insn: SH;
   public size: number;
   public op_count: number;
-  public operands: Array<cs_sh_op>;
+  public operands: cs_sh_op[];
 
   constructor(arch_info_ptr: number, Memory: any) {
     this.operands = [];

@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import cs from '../../capstone';
+import CS from '../../capstone';
 
-test('cs.ARCH_ARM', () => {
+test('CS.ARCH_ARM', () => {
   const buffer = new Uint8Array([
     0x86, 0x48, 0x60, 0xf4, 0x4d, 0x0f, 0xe2, 0xf4, 0xed, 0xff, 0xff, 0xeb,
     0x04, 0xe0, 0x2d, 0xe5, 0x00, 0x00, 0x00, 0x00, 0xe0, 0x83, 0x22, 0xe5,
@@ -10,10 +10,10 @@ test('cs.ARCH_ARM', () => {
     0xf4, 0x80, 0x00, 0x00,
   ]);
 
-  const disassembler = new cs.Capstone(cs.ARCH_ARM, 0);
-  disassembler.option(cs.OPT_DETAIL, true);
-  const insns = disassembler.disasm(buffer, 0x1000);
+  const disassembler = new CS.CAPSTONE(CS.ARCH_ARM, 0);
+  disassembler.option(CS.OPT_DETAIL, true);
 
+  const insns = disassembler.disasm(buffer, 0x1000);
   expect(
     insns.map(({ id, address, size, mnemonic, op_str, bytes }) => ({
       id,
@@ -30,7 +30,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'vld2.32',
       op_str: '{d20, d21}, [r0], r6',
-      bytes: [134, 72, 96, 244],
+      bytes: new Uint8Array([134, 72, 96, 244]),
     },
     {
       id: 360,
@@ -38,7 +38,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'vld4.16',
       op_str: '{d16[], d17[], d18[], d19[]}, [r2]!',
-      bytes: [77, 15, 226, 244],
+      bytes: new Uint8Array([77, 15, 226, 244]),
     },
     {
       id: 16,
@@ -46,7 +46,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'bl',
       op_str: '#0xfc4',
-      bytes: [237, 255, 255, 235],
+      bytes: new Uint8Array([237, 255, 255, 235]),
     },
     {
       id: 240,
@@ -54,7 +54,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'str',
       op_str: 'lr, [sp, #-4]!',
-      bytes: [4, 224, 45, 229],
+      bytes: new Uint8Array([4, 224, 45, 229]),
     },
     {
       id: 9,
@@ -62,7 +62,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'andeq',
       op_str: 'r0, r0, r0',
-      bytes: [0, 0, 0, 0],
+      bytes: new Uint8Array([0, 0, 0, 0]),
     },
     {
       id: 240,
@@ -70,7 +70,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'str',
       op_str: 'r8, [r2, #-0x3e0]!',
-      bytes: [224, 131, 34, 229],
+      bytes: new Uint8Array([224, 131, 34, 229]),
     },
     {
       id: 100,
@@ -78,7 +78,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'mcreq',
       op_str: 'p2, #0, r0, c3, c1, #7',
-      bytes: [241, 2, 3, 14],
+      bytes: new Uint8Array([241, 2, 3, 14]),
     },
     {
       id: 106,
@@ -86,7 +86,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'mov',
       op_str: 'r0, #0',
-      bytes: [0, 0, 160, 227],
+      bytes: new Uint8Array([0, 0, 160, 227]),
     },
     {
       id: 241,
@@ -94,7 +94,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'strb',
       op_str: 'r3, [r1, r2]',
-      bytes: [2, 48, 193, 231],
+      bytes: new Uint8Array([2, 48, 193, 231]),
     },
     {
       id: 29,
@@ -102,7 +102,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'cmp',
       op_str: 'r3, #0',
-      bytes: [0, 0, 83, 227],
+      bytes: new Uint8Array([0, 0, 83, 227]),
     },
     {
       id: 158,
@@ -110,7 +110,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'setend',
       op_str: 'be',
-      bytes: [0, 2, 1, 241],
+      bytes: new Uint8Array([0, 2, 1, 241]),
     },
     {
       id: 79,
@@ -118,7 +118,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'ldm',
       op_str: 'r0, {r0, r2, lr} ^',
-      bytes: [5, 64, 208, 232],
+      bytes: new Uint8Array([5, 64, 208, 232]),
     },
     {
       id: 243,
@@ -126,7 +126,7 @@ test('cs.ARCH_ARM', () => {
       size: 4,
       mnemonic: 'strdeq',
       op_str: 'r8, sb, [r0], -r4',
-      bytes: [244, 128, 0, 0],
+      bytes: new Uint8Array([244, 128, 0, 0]),
     },
   ]);
 

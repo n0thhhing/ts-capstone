@@ -3027,6 +3027,6 @@ export declare class cs_arm64 {
   writeback: boolean;
   post_index: boolean;
   op_count: number;
-  operands: Array<cs_arm64_op>;
+  operands: cs_arm64_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }

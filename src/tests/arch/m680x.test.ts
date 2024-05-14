@@ -1,7 +1,7 @@
 import { expect, test } from 'bun:test';
-import cs from '../../capstone';
+import CS from '../../capstone';
 
-test('cs.ARCH_M680X', () => {
+test('CS.ARCH_M680X', () => {
   const buffer = new Uint8Array([
     0x00, 0x04, 0x01, 0x00, 0x0c, 0x00, 0x80, 0x0e, 0x00, 0x80, 0x00, 0x11,
     0x1e, 0x10, 0x00, 0x80, 0x00, 0x3b, 0x4a, 0x10, 0x00, 0x04, 0x4b, 0x01,
@@ -11,8 +11,8 @@ test('cs.ARCH_M680X', () => {
     0x10, 0x00, 0x18, 0x19, 0x00, 0x18, 0x1e, 0x00, 0x18, 0x3e, 0x18, 0x3f,
     0x00,
   ]);
-  const disassembler = new cs.Capstone(cs.ARCH_M680X, cs.MODE_M680X_CPU12);
-  disassembler.option(cs.OPT_DETAIL, true);
+  const disassembler = new CS.CAPSTONE(CS.ARCH_M680X, CS.MODE_M680X_CPU12);
+  disassembler.option(CS.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
   expect(
@@ -31,7 +31,7 @@ test('cs.ARCH_M680X', () => {
       size: 1,
       mnemonic: 'bgnd',
       op_str: '',
-      bytes: [0],
+      bytes: new Uint8Array([0]),
     },
     {
       id: 118,
@@ -39,7 +39,7 @@ test('cs.ARCH_M680X', () => {
       size: 3,
       mnemonic: 'dbeq',
       op_str: 'b, $1004',
-      bytes: [4, 1, 0],
+      bytes: new Uint8Array([4, 1, 0]),
     },
     {
       id: 70,
@@ -47,7 +47,7 @@ test('cs.ARCH_M680X', () => {
       size: 3,
       mnemonic: 'bset',
       op_str: '0, x; #-128',
-      bytes: [12, 0, 128],
+      bytes: new Uint8Array([12, 0, 128]),
     },
     {
       id: 67,
@@ -55,7 +55,7 @@ test('cs.ARCH_M680X', () => {
       size: 4,
       mnemonic: 'brset',
       op_str: '0, x; #-128; $100b',
-      bytes: [14, 0, 128, 0],
+      bytes: new Uint8Array([14, 0, 128, 0]),
     },
     {
       id: 137,
@@ -63,7 +63,7 @@ test('cs.ARCH_M680X', () => {
       size: 1,
       mnemonic: 'ediv',
       op_str: '',
-      bytes: [17],
+      bytes: new Uint8Array([17]),
     },
     {
       id: 67,
@@ -71,7 +71,7 @@ test('cs.ARCH_M680X', () => {
       size: 5,
       mnemonic: 'brset',
       op_str: '$1000, #-128, $1011',
-      bytes: [30, 16, 0, 128, 0],
+      bytes: new Uint8Array([30, 16, 0, 128, 0]),
     },
     {
       id: 249,
@@ -79,7 +79,7 @@ test('cs.ARCH_M680X', () => {
       size: 1,
       mnemonic: 'pshd',
       op_str: '',
-      bytes: [59],
+      bytes: new Uint8Array([59]),
     },
     {
       id: 74,
@@ -87,7 +87,7 @@ test('cs.ARCH_M680X', () => {
       size: 4,
       mnemonic: 'call',
       op_str: '$1000, 4',
-      bytes: [74, 16, 0, 4],
+      bytes: new Uint8Array([74, 16, 0, 4]),
     },
     {
       id: 74,
@@ -95,7 +95,7 @@ test('cs.ARCH_M680X', () => {
       size: 3,
       mnemonic: 'call',
       op_str: '1, x; 4',
-      bytes: [75, 1, 4],
+      bytes: new Uint8Array([75, 1, 4]),
     },
     {
       id: 66,
@@ -103,7 +103,7 @@ test('cs.ARCH_M680X', () => {
       size: 4,
       mnemonic: 'brclr',
       op_str: '$7f, #-128, $101d',
-      bytes: [79, 127, 128, 0],
+      bytes: new Uint8Array([79, 127, 128, 0]),
     },
     {
       id: 113,
@@ -111,7 +111,7 @@ test('cs.ARCH_M680X', () => {
       size: 3,
       mnemonic: 'cps',
       op_str: '#4096',
-      bytes: [143, 16, 0],
+      bytes: new Uint8Array([143, 16, 0]),
     },
     {
       id: 335,
@@ -119,7 +119,7 @@ test('cs.ARCH_M680X', () => {
       size: 2,
       mnemonic: 'tfr',
       op_str: 'x, cc',
-      bytes: [183, 82],
+      bytes: new Uint8Array([183, 82]),
     },
     {
       id: 335,
@@ -127,7 +127,7 @@ test('cs.ARCH_M680X', () => {
       size: 2,
       mnemonic: 'exg',
       op_str: 'tmp3, b',
-      bytes: [183, 177],
+      bytes: new Uint8Array([183, 177]),
     },
     {
       id: 191,
@@ -135,7 +135,7 @@ test('cs.ARCH_M680X', () => {
       size: 2,
       mnemonic: 'ldaa',
       op_str: '8, +y',
-      bytes: [166, 103],
+      bytes: new Uint8Array([166, 103]),
     },
     {
       id: 191,
@@ -143,7 +143,7 @@ test('cs.ARCH_M680X', () => {
       size: 2,
       mnemonic: 'ldaa',
       op_str: 'd, pc',
-      bytes: [166, 254],
+      bytes: new Uint8Array([166, 254]),
     },
     {
       id: 191,
@@ -151,7 +151,7 @@ test('cs.ARCH_M680X', () => {
       size: 2,
       mnemonic: 'ldaa',
       op_str: '[d, s]',
-      bytes: [166, 247],
+      bytes: new Uint8Array([166, 247]),
     },
     {
       id: 228,
@@ -159,7 +159,7 @@ test('cs.ARCH_M680X', () => {
       size: 8,
       mnemonic: 'movw',
       op_str: '12345, x; 4096, x',
-      bytes: [24, 2, 226, 48, 57, 226, 16, 0],
+      bytes: new Uint8Array([24, 2, 226, 48, 57, 226, 16, 0]),
     },
     {
       id: 227,
@@ -167,7 +167,7 @@ test('cs.ARCH_M680X', () => {
       size: 6,
       mnemonic: 'movb',
       op_str: '$3039, $1000',
-      bytes: [24, 12, 48, 57, 16, 0],
+      bytes: new Uint8Array([24, 12, 48, 57, 16, 0]),
     },
     {
       id: 154,
@@ -175,7 +175,7 @@ test('cs.ARCH_M680X', () => {
       size: 2,
       mnemonic: 'fdiv',
       op_str: '',
-      bytes: [24, 17],
+      bytes: new Uint8Array([24, 17]),
     },
     {
       id: 140,
@@ -183,7 +183,7 @@ test('cs.ARCH_M680X', () => {
       size: 4,
       mnemonic: 'emacs',
       op_str: '$1000',
-      bytes: [24, 18, 16, 0],
+      bytes: new Uint8Array([24, 18, 16, 0]),
     },
     {
       id: 224,
@@ -191,7 +191,7 @@ test('cs.ARCH_M680X', () => {
       size: 3,
       mnemonic: 'mina',
       op_str: '0, x',
-      bytes: [24, 25, 0],
+      bytes: new Uint8Array([24, 25, 0]),
     },
     {
       id: 142,
@@ -199,7 +199,7 @@ test('cs.ARCH_M680X', () => {
       size: 3,
       mnemonic: 'emaxm',
       op_str: '0, x',
-      bytes: [24, 30, 0],
+      bytes: new Uint8Array([24, 30, 0]),
     },
     {
       id: 306,
@@ -207,7 +207,7 @@ test('cs.ARCH_M680X', () => {
       size: 2,
       mnemonic: 'stop',
       op_str: '',
-      bytes: [24, 62],
+      bytes: new Uint8Array([24, 62]),
     },
     {
       id: 152,
@@ -215,7 +215,7 @@ test('cs.ARCH_M680X', () => {
       size: 3,
       mnemonic: 'etbl',
       op_str: '0, x',
-      bytes: [24, 63, 0],
+      bytes: new Uint8Array([24, 63, 0]),
     },
   ]);
 

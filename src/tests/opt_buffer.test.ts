@@ -1,4 +1,4 @@
-import cs from '../capstone';
+import CS from '../capstone';
 import { expect, test } from 'bun:test';
 
 test('OPT_BUFFER', () => {
@@ -9,8 +9,8 @@ test('OPT_BUFFER', () => {
     0xb9, // 0x1008: ldr w8, [x20]
   ]);
 
-  const disassembler = new cs.Capstone(cs.ARCH_ARM64, cs.MODE_ARM);
-  disassembler.option(cs.OPT_BUFFER, true);
+  const disassembler = new CS.CAPSTONE(CS.ARCH_ARM64, CS.MODE_ARM);
+  disassembler.option(CS.OPT_BUFFER, true);
 
   const insn = disassembler.disasm(buffer, 0x1000)[0];
   const decoder = new TextDecoder('utf-8');
@@ -41,7 +41,7 @@ test('OPT_BUFFER', () => {
   expect(size).toBe(insn.size);
   expect(mnemonic).toBe(insn.mnemonic);
   expect(op_str).toBe(insn.op_str);
-  expect(bytes).toEqual(insn.bytes);
+  expect(new Uint8Array(bytes)).toEqual(insn.bytes);
 
   disassembler.close();
 });

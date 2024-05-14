@@ -417,6 +417,6 @@ export declare enum RISCV {
 export declare class cs_riscv {
   need_effective_addr: boolean;
   op_count: number;
-  operands: Array<cs_riscv_op>;
+  operands: cs_riscv_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }

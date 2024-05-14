@@ -1,11 +1,11 @@
 import { expect, test } from 'bun:test';
-import cs from '../../capstone';
+import CS from '../../capstone';
 
-test('cs.ARCH_EVM', () => {
+test('CS.ARCH_EVM', () => {
   const buffer = new Uint8Array([0x60, 0x61, 0x50]);
 
-  const disassembler = new cs.Capstone(cs.ARCH_EVM, 0);
-  disassembler.option(cs.OPT_DETAIL, true);
+  const disassembler = new CS.CAPSTONE(CS.ARCH_EVM, 0);
+  disassembler.option(CS.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
   expect(
@@ -24,7 +24,7 @@ test('cs.ARCH_EVM', () => {
       size: 2,
       mnemonic: 'push1',
       op_str: '61',
-      bytes: [96, 97],
+      bytes: new Uint8Array([96, 97]),
     },
     {
       id: 80,
@@ -32,7 +32,7 @@ test('cs.ARCH_EVM', () => {
       size: 1,
       mnemonic: 'pop',
       op_str: '',
-      bytes: [80],
+      bytes: new Uint8Array([80]),
     },
   ]);
 

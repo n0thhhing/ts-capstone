@@ -296,7 +296,7 @@ export enum TMS320C64X {
 
 export class cs_tms320c64x {
   public op_count: number;
-  public operands: Array<cs_tms320c64x_op>; // operands for this instruction.
+  public operands: cs_tms320c64x_op[]; // operands for this instruction.
   public condition: {
     reg: number;
     zero: number;

@@ -1,8 +1,8 @@
 import { expect, test, afterAll } from 'bun:test';
-import cs, { ARM64 } from '../capstone';
+import CS, { ARM64 } from '../capstone';
 
-const disassembler = new cs.Capstone(cs.ARCH_ARM64, cs.MODE_ARM);
-disassembler.option(cs.OPT_DETAIL, true);
+const disassembler = new CS.CAPSTONE(CS.ARCH_ARM64, CS.MODE_ARM);
+disassembler.option(CS.OPT_DETAIL, true);
 
 test('reg_write', () => {
   const insn = {

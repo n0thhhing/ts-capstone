@@ -169,6 +169,6 @@ export declare enum XCORE {
 }
 export declare class cs_xcore {
   op_count: number;
-  operands: Array<cs_xcore_op>;
+  operands: cs_xcore_op[];
   constructor(arch_info_ptr: number, Memory: any);
 }
