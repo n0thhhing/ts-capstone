@@ -148,7 +148,7 @@ cs.option(CS.OPT_MODE, CS.MODE_LITTLE_ENDIAN);
 
 // OPT_SYNTAX
 
-cs.option(CS.OPT_SYNTAX, CS.OPT_SYNTAX_INTEL); // Default assembly syntax of all platforms (CS_OPT_SYNTAX).
+cs.option(CS.OPT_SYNTAX, CS.OPT_SYNTAX_INTEL); // Default assembly syntax of all platforms (CS.OPT_SYNTAX).
 
 // OPT_SKIPDATA
 
@@ -198,8 +198,8 @@ cs.option(CS.OPT_BUFFER, true);
 // constructor to correctly interpret the bytes.
 let buffer = /* Raw buffer received from the insn object */;
 let view = new DataView(buffer.buffer);
-let id = view.getUint32(0); // Read the 32-bit integer id from the buffer
-let address = view.getBigUint64(8, true); // Read a 64-bit integer address with little-endian
+let id = view.getUint32(0, true); // Read the 32-bit integer id from the buffer with little-endian.
+let address = view.getBigUint64(8, true); // Read a 64-bit integer address with little-endian.
 
 // Also for things like strings(cstrings in this case),
 // you can simply use a TextDecoder, each character is
@@ -208,7 +208,7 @@ let address = view.getBigUint64(8, true); // Read a 64-bit integer address with 
 const mnemonic_bytes =
   buffer.slice(
     42, // offset for the mnemonic
-    74 // 74 - 42 = 32 = mnemonic max length
+    74 // 74 - 42 = 32 = CS.MNEMONIC_SIZE
   )
 
 // TextDecoder doesn't automatically stop at null
@@ -287,7 +287,8 @@ cs.op_index(example_insn, ARM64.OP_REG, 1); // 1
 
 // This retrieves the operand count for the input
 // type provided an insn, which allows you to easily
-// tell how many of a certain type is present in the // object while not having to manually inspect the
+// tell how many of a certain type is present in the
+// object while not having to manually inspect the
 // detail object. This requires the detail object to
 // be present in the insn, so CS.OPT_DETAIL needs
 // to be turned on
@@ -358,7 +359,7 @@ you can also take a look at the [tests](src/tests)
 
 if you would like to see all the options and capstone
 constants, you can find them in either the [capstone.ts](src/capstone.ts)
-file or the [typescript file](src/arch) (arch/<arch>.ts) for things like register ids, options,
+file or the [typescript file](src/arch) (arch/\<arch>.ts) for things like register ids, options,
 error codes, groups, opcodes, manifest constants, insns, ect
 
 ## Compatibility
