@@ -221,6 +221,8 @@ interface cs_opt_skipdata {
 
 // fmt() options
 interface cs_opt_fmt {
+  hex_comment: boolean; // Specifies if the output should include decimal comments for hexadecimal imm
+  colors: boolean; // Specifies if the output should include coloring
   bytes: boolean; // Specifies if the formatted string should have the instructions bytes.
   address: boolean; // Specifies if the formatted string should include the instructions address.
   ASCII: boolean; // Specifies if the formatted string should include the bytes ASCII representation.
@@ -408,6 +410,20 @@ namespace CS {
   export const MAX_IMPL_R_REGS = 20;
   export const MAX_NUM_GROUPS = 8;
 
+  /**
+   * Retrieves the offset relative to the start of the buffer where the instruction resides.
+   *
+   * NOTE: this assumes position is (>=1)
+   * @param insns - The instructions to analyze.
+   * @param position - The index of the specific insn.
+   * @returns The offset of the instruction relative to the buffer.
+   */
+  export function INSN_OFFSET(insns: cs_insn[], position: number): number {
+    const base: number = insns[0].address;
+    const positional: number = insns[position - 1].address;
+    return positional - base;
+  }
+
   export class CAPSTONE {
     private arch: cs_arch; // The chosen architecture for this instance(cannot be changed)
     private mode: cs_mode; // The mode associated with the chooses arch(can be changed via CS.OPT_MODE)
@@ -418,8 +434,8 @@ namespace CS {
     /**
      * Create a new instance of the Capstone disassembly engine.
      *
-     * @param {cs_arch} arch - The architecture type.
-     * @param {cs_mode} mode - The mode type.
+     * @param arch - The architecture type.
+     * @param mode - The mode type.
      */
     constructor(arch: cs_arch, mode: cs_mode) {
       this.arch = arch;
@@ -433,7 +449,7 @@ namespace CS {
      * Return the Capstone library version as a string.
      *
      * @public
-     * @returns {string} The Capstone library version as a string in the format "major.minor".
+     * @returns The Capstone library version as a string in the format "major.minor".
      */
     public version(): string {
       const major_ptr: number = Memory.malloc(4);
@@ -455,8 +471,8 @@ namespace CS {
      * Check if Capstone supports a specific query.
      *
      * @public
-     * @param {number} query - The query ID to check.
-     * @returns {boolean} A boolean indicating whether Capstone supports the given query.
+     * @param query - The query ID to check.
+     * @returns A boolean indicating whether Capstone supports the given query.
      */
     public support(query: number): boolean {
       var ret: boolean = Wrapper.ccall(
@@ -472,8 +488,8 @@ namespace CS {
      * Get the error message string for a given error code.
      *
      * @public
-     * @param {number} code - The error code.
-     * @returns {string} The error message string corresponding to the given error code.
+     * @param code - The error code.
+     * @returns The error message string corresponding to the given error code.
      */
     public strerror(code: number): string {
       return Wrapper.ccall('cs_strerror', 'string', ['number'], [code]);
@@ -483,8 +499,8 @@ namespace CS {
      * Get the error code for the most recent Capstone error that occurred with the given handle.
      *
      * @public
-     * @param {csh} handle - The handle for which to get the error code.
-     * returns {cs_err} The error code for the most recent Capstone error.
+     * @param handle - The handle for which to get the error code.
+     * @returns The error code for the most recent Capstone error.
      */
     public errno(handle: csh): cs_err {
       return Wrapper.ccall('cs_errno', 'number', ['pointer'], [handle]);
@@ -519,8 +535,8 @@ namespace CS {
      * Handler to parse the cs_opt_skipdata obj
      *
      * @private
-     * @param {cs_opt_skipdata} skipdata - User-customized setup for SKIPDATA option
-     * @returns {pointer_t<cs_opt_skipdata>} The pointer to the cs_opt_skipdata struct
+     * @param skipdata - User-customized setup for SKIPDATA option
+     * @returns The pointer to the cs_opt_skipdata struct
      */
     private skipdata_cb(setup: any): number {
       const { mnemonic, callback, user_data } = setup;
@@ -551,8 +567,8 @@ namespace CS {
      * Dereferences a pointer to a cs_insn strict to retrieve information about a disassembled instruction.
      *
      * @private
-     * @param {pointer_t<cs_insn>} insn_ptr - The pointer to the disassembled instruction.
-     * @returns {cs_insn} Information about the disassembled instruction.
+     * @param insn_ptr - The pointer to the disassembled instruction.
+     * @returns Information about the disassembled instruction.
      */
     private deref(insn_ptr: pointer_t<cs_insn>): cs_insn {
       const insn_id: number = Memory.read(insn_ptr, 'u32');
@@ -605,10 +621,11 @@ namespace CS {
      * Converts an array of `cs_insn` objects into a pointer to an array of cs_insn structures.
      *
      * @private
-     * @param {cs_insn[]} insns Array of `cs_insn` objects to be converted.
-     * @returns {pointer_t<cs_insn[]>} Pointer to the array of cs_insn structures.
+     * @param insns - Array of `cs_insn` objects to be converted.
+     * @returns A pointer to the array of cs_insn structures.
      */
-    private ref(insns: cs_insn[]): pointer_t<cs_insn[]> {
+    private ref(insns: cs_insn[] | cs_insn): pointer_t<cs_insn[] | cs_insn> {
+      if (!Array.isArray(insns)) insns = [insns];
       const count: number = insns.length;
       const insns_ptr: pointer_t<cs_insn[]> = Memory.malloc(INSN_SIZE * count);
       for (let i = 0; i < count; i++) {
@@ -1512,8 +1529,8 @@ namespace CS {
      * Retrieves the detail information of a disassembled instruction from the cs_detail struct.
      *
      * @private
-     * @param {pointer_t<cs_detail>} pointer - The pointer to the detail information.
-     * @returns {cs_detail} The detail information of the disassembled instruction.
+     * @param pointer - The pointer to the detail information.
+     * @returns The detail information of the disassembled instruction.
      */
     private get_detail(pointer: pointer_t<cs_detail>): cs_detail {
       const detail: cs_detail = {} as cs_detail;
@@ -1554,9 +1571,8 @@ namespace CS {
      * Set an option for the Capstone disassembly engine.
      *
      * @public
-     * @param {cs_opt_type} option - The option type to set.
-     * @param {cs_opt_value | boolean | cs_opt_mnem | cs_opt_skipdata} value - The value to set for the option.
-     * @returns {void}
+     * @param option - The option type to set.
+     * @param value - The value to set for the option.
      */
     public option(
       option: cs_opt_type,
@@ -1646,7 +1662,6 @@ namespace CS {
      * Create the capstone instance handle
      *
      * @private
-     * @returns {void}
      */
     private open(): void {
       this.handle_ptr = Memory.malloc(4);
@@ -1671,7 +1686,6 @@ namespace CS {
      * Free the capstone instance handle and cleanup resources
      *
      * @public
-     * @returns {void}
      */
     public close(): void {
       const ret: cs_err = Wrapper.ccall(
@@ -1698,10 +1712,10 @@ namespace CS {
      * Disassemble binary data.
      *
      * @public
-     * @param {Buffer | number[] | Uint8Array,} buffer - The binary data to disassemble, as a Buffer, array, or Uint8Array.
-     * @param {number} addr - The starting address of the binary data.
-     * @param {number} [max_len] - (Optional) The maximum number of instructions to disassemble.
-     * @returns {cs_insn[]} An array of disassembled instructions.
+     * @param buffer - The binary data to disassemble, as a Buffer, array, or Uint8Array.
+     * @param addr - The starting address of the binary data.
+     * @param [max_len] - (Optional) The maximum number of instructions to disassemble.
+     * @returns An array of disassembled instructions.
      */
     public disasm(
       buffer: Buffer | number[] | Uint8Array,
@@ -1751,11 +1765,11 @@ namespace CS {
      * Perform iterative disassembly on binary data.
      *
      * @public
-     * @param {Object} data - An object containing the binary data to disassemble, the starting address, and the previous instruction.
-     * @param {Buffer | number[] | Uint8Array} data.buffer - The binary data to disassemble, as a Buffer, array, or Uint8Array.
-     * @param {number} data.address - the address of the current instruction
-     * @param {{} | cs_insn | null} data.insn - the previous iterations instruct or {} on iteration 0
-     * @returns {boolean} A boolean indicating whether another instruction was successfully disassembled.
+     * @param data - An object containing the binary data to disassemble, the starting address, and the previous instruction.
+     * @param data.buffer - The binary data to disassemble, as a Buffer, array, or Uint8Array.
+     * @param data.address - the address of the current instruction
+     * @param data.insn - the previous iterations instructions or {} on iteration 0
+     * @returns A boolean indicating whether another instruction was successfully disassembled.
      */
     public disasm_iter(data: {
       buffer: Buffer | number[] | Uint8Array;
@@ -1813,8 +1827,8 @@ namespace CS {
      * Retrieve information about registers accessed by an instruction.
      *
      * @public
-     * @param {cs_insn} insn - The instruction to analyze.
-     * @returns {{regs_read: cs_regs, regs_read_count: number, regs_write: cs_regs, regs_write_count: number}} An object containing arrays of registers read and written by the instruction.
+     * @param insn - The instruction to analyze.
+     * @returns An object containing arrays of registers read and written by the instruction.
      */
     public regs_access(insn: cs_insn): {
       regs_read: cs_regs;
@@ -1827,7 +1841,7 @@ namespace CS {
           'capstone: In order to use regs_access() you need to have CS.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const insn_pointer: pointer_t<cs_insn> = this.ref([insn]);
+      const insn_pointer: pointer_t<cs_insn> = this.ref(insn);
       const regs_read_ptr: pointer_t<cs_regs> = Memory.malloc(64 * 2);
       const regs_read_count_ptr: pointer_t<number> = Memory.malloc(1);
       const regs_write_ptr: pointer_t<cs_regs> = Memory.malloc(64 * 2);
@@ -1876,9 +1890,9 @@ namespace CS {
      * Get the number of operands of a specific type for an instruction.
      *
      * @public
-     * @param {cs_insn} insn - The instruction to analyze.
-     * @param {number} op_type - The type of operand to count.
-     * @returns {number} The number of operands of the specified type for the instruction.
+     * @param insn - The instruction to analyze.
+     * @param op_type - The type of operand to count.
+     * @returns The number of operands of the specified type for the instruction.
      */
     public op_count(insn: cs_insn, op_type: number): number {
       if (!insn.detail)
@@ -1886,7 +1900,7 @@ namespace CS {
           'capstone: In order to use op_count() you need to have CS.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: pointer_t<cs_insn> = this.ref([insn]);
+      const pointer: pointer_t<cs_insn> = this.ref(insn);
       const operand_count: number = Wrapper._cs_op_count(
         handle,
         pointer,
@@ -1900,10 +1914,10 @@ namespace CS {
      * Get the index of a specific operand of a specific type at a given position for an instruction.
      *
      * @public
-     * @param {cs_insn} insn - The instruction to analyze.
-     * @param {number} op_type - The type of operand to search for.
-     * @param {number} position - The position of the operand to find (zero-based).
-     * @returns {number} The index of the operand within the instruction's operand list, or -1 if not found.
+     * @param insn - The instruction to analyze.
+     * @param op_type - The type of operand to search for.
+     * @param position - The position of the operand to find (zero-based).
+     * @returns The index of the operand within the instruction's operand list, or -1 if not found.
      */
     public op_index(insn: cs_insn, op_type: number, position: number): number {
       if (!insn.detail)
@@ -1911,7 +1925,7 @@ namespace CS {
           'capstone: In order to use op_index() you need to have CS.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: pointer_t<cs_insn> = this.ref([insn]);
+      const pointer: pointer_t<cs_insn> = this.ref(insn);
       const index: number = Wrapper._cs_op_index(
         handle,
         pointer,
@@ -1926,9 +1940,9 @@ namespace CS {
      * Check if an instruction belongs to a specific group.
      *
      * @public
-     * @param {cs_insn} insn - The instruction to check.
-     * @param {number} group_id - The ID of the group to check against.
-     * @returns {boolean} A boolean indicating whether the instruction belongs to the specified group.
+     * @param insn - The instruction to check.
+     * @param group_id - The ID of the group to check against.
+     * @returns A boolean indicating whether the instruction belongs to the specified group.
      */
     public insn_group(insn: cs_insn, group_id: number): boolean {
       if (!insn.detail)
@@ -1936,7 +1950,7 @@ namespace CS {
           'capstone: In order to use insn_group() you need to have CS.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: pointer_t<cs_insn> = this.ref([insn]);
+      const pointer: pointer_t<cs_insn> = this.ref(insn);
 
       const valid_group: boolean = Boolean(
         Wrapper._cs_insn_group(handle, pointer, group_id),
@@ -1949,9 +1963,9 @@ namespace CS {
      * Retrieves the registers read by an instruction.
      *
      * @public
-     * @param {cs_insn} insn - The instruction to analyze.
-     * @param {number} reg_id - The register to look for.
-     * @returns {boolean} A boolean indicating whether the instruction reads a specific register.
+     * @param insn - The instruction to analyze.
+     * @param reg_id - The register to look for.
+     * @returns A boolean indicating whether the instruction reads a specific register.
      */
     public reg_read(insn: cs_insn, reg_id: number): boolean {
       if (!insn.detail)
@@ -1959,7 +1973,7 @@ namespace CS {
           'capstone: In order to use reg_read() you need to have CS.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: pointer_t<cs_insn> = this.ref([insn]);
+      const pointer: pointer_t<cs_insn> = this.ref(insn);
 
       const valid_reg: boolean = Boolean(
         Wrapper._cs_reg_read(handle, pointer, reg_id),
@@ -1972,9 +1986,9 @@ namespace CS {
      * Retrieves the registers written to by an instruction.
      *
      * @public
-     * @param {cs_insn} insn - The instruction to analyze.
-     * @param {number} reg_id - The register to look for.
-     * @returns {boolean} A boolean indicating whether the instruction writes to a specific register.
+     * @param insn - The instruction to analyze.
+     * @param reg_id - The register to look for.
+     * @returns A boolean indicating whether the instruction writes to a specific register.
      */
     public reg_write(insn: cs_insn, reg_id: number): boolean {
       if (!insn.detail)
@@ -1982,7 +1996,7 @@ namespace CS {
           'capstone: In order to use reg_write() you need to have CS.OPT_DETAIL on',
         );
       const handle: csh = Memory.read(this.handle_ptr, 'i32');
-      const pointer: pointer_t<cs_insn> = this.ref([insn]);
+      const pointer: pointer_t<cs_insn> = this.ref(insn);
 
       const valid_reg: boolean = Boolean(
         Wrapper._cs_reg_write(handle, pointer, reg_id),
@@ -1995,8 +2009,8 @@ namespace CS {
      * Retrieves the name of the instruction group to which an instruction belongs.
      *
      * @public
-     * @param {number} insn - The instruction to analyze.
-     * @returns {string} The name of the instruction group.
+     * @param insn - The instruction to analyze.
+     * @returns The name of the instruction group.
      */
     public group_name(group_id: number): string {
       const handle: csh = Memory.read(this.handle_ptr, '*');
@@ -2013,8 +2027,8 @@ namespace CS {
      * Retrieves the name of a register referenced by an operand in an instruction.
      *
      * @public
-     * @param {number} reg_id - The register to look for.
-     * @returns {string} The name of the register referenced by the operand.
+     * @param reg_id - The register to look for.
+     * @returns The name of the register referenced by the operand.
      */
     public reg_name(reg_id: number): string {
       const handle: csh = Memory.read(this.handle_ptr, '*');
@@ -2031,8 +2045,8 @@ namespace CS {
      * Retrieves the name of the instruction mnemonic.
      *
      * @public
-     * @param {number} insn_id - The instruction id to look for.
-     * @returns {string} The mnemonic of the instruction.
+     * @param insn_id - The instruction id to look for.
+     * @returns The mnemonic of the instruction.
      */
     public insn_name(insn_id: number): string {
       const handle: csh = Memory.read(this.handle_ptr, '*');
@@ -2046,83 +2060,168 @@ namespace CS {
     }
 
     /**
-     * Retrieves the offset relative to the start of the buffer where the instruction resides.
-     *
-     * @public
-     * @param {cs_insn[]} insns - The instructions to analyze.
-     * @param {number} position - The index of the specific insn.
-     * @returns {number} The offset of the instruction relative to the buffer.
-     */
-    public INSN_OFFSET(insns: cs_insn[], position: number): number {
-      const pointer: pointer_t<cs_insn[]> = this.ref(insns);
-      const offset: number = Wrapper._cs_insn_offset(pointer, position);
-      Memory.free(pointer);
-      return offset;
-    }
-
-    /**
-     * Retrieves the relative address for X86 instructions using RIP-relative addressing mode.
-     *
-     * @public
-     * @param {cs_insn} insn - The instruction to analyze.
-     * @returns {number} The relative address associated with the X86 instruction.
-     */
-    public X86_REL_ADDR(insn: cs_insn): number {
-      const pointer: pointer_t<cs_insn> = this.ref([insn]);
-      const addr: number = Wrapper._x86_rel_addr(pointer);
-      Memory.free(pointer);
-      return addr;
-    }
-
-    /**
      * Formats the given instructions to a printable string.
      *
      * @public
-     * @param {cs_insn | cs_insn[]} instructions - The instruction or array of instructions to format.
-     * @param {cs_opt_fmt} [options={ASCII: false, address: true, bytes: true}] - Formatting options.
+     * @param instructions - The instruction or array of instructions to format.
+     * @param [options={hex_comment: true, colors: false, ASCII: false, address: true, bytes: true}] - Formatting options.
+     * @returns The formatted string
      */
     public fmt(
       instructions: cs_insn | cs_insn[],
-      options: cs_opt_fmt = { ASCII: false, address: true, bytes: true },
+      options: cs_opt_fmt = { hex_comment: true, colors: false, ASCII: false, address: true, bytes: true },
     ): string {
       if (!Array.isArray(instructions)) instructions = [instructions];
 
-      const { ASCII = false, address = true, bytes = true } = options;
+      const { hex_comment = true, colors = false, ASCII = false, address = true, bytes = true } = options;
+      const insn_count = instructions.length;
+
+      const format_bytes = (insn_bytes: Uint8Array | number[]): string => {
+        if (!bytes) return '';
+        const byte_str = []
+        for (let j = 0; j < insn_bytes.length; j++) {
+          byte_str.push(
+            ((insn_bytes[j] >> 4) & 0xf).toString(16) + // upper nibble
+            (insn_bytes[j] & 0xf).toString(16), // lower nibble
+          );
+        }
+        return byte_str.join(' ').padEnd(24);
+      };
+
+      const format_ascii = (insn_bytes: Uint8Array | number[]): string => {
+        if (!ASCII) return '';
+        const ascii_str = [];
+        for (let j = 0; j < insn_bytes.length; j++) {
+          const byte = insn_bytes[j];
+          ascii_str.push(
+            (byte - 32) >>> 31 === 0 && (126 - byte) >>> 31 === 0
+              ? String.fromCharCode(byte)
+              : '.',
+          );
+        }
+        return ascii_str.join('').padEnd(10);
+      };
+      
+      const format_operands = (op_str: string): string => {
+        const match = /#(0x(?:-)?\d+)/.exec(op_str)
+        if (match && match[1]) {
+          op_str += `${colors ? "\033[90m" : ""}\t// ${parseInt(match[1])}${colors ? "\033[0m" : ""}`;
+        }
+
+        if (!colors) return op_str
+        op_str.replace(/#(?:0x(?:-)?[a-fA-f0-9]+|\d+)/g, function(match: string): string {
+          return "\033[34m" + match + "\033[0m";
+        });
+        return op_str
+      }
 
       let fmt_output = '';
 
-      for (const insn of instructions) {
+      for (let i = 0; i < insn_count; i++) {
+        const insn = instructions[i];
         const {
           mnemonic = '',
           op_str: operands = '',
-          address: insnAddress,
-          bytes: insnBytes,
+          address: insn_address,
+          bytes: insn_bytes,
         } = insn;
 
-        if (address && !isNaN(insnAddress)) {
-          fmt_output += `0x${insnAddress.toString(16)}:\t`;
+        if (address && !isNaN(insn_address)) {
+          fmt_output += `0x${insn_address.toString(16)}:\t`;
         }
 
-        if (bytes && insnBytes instanceof Uint8Array) {
-          const byteStr = Array.from(insnBytes)
-            .map((byte) => byte.toString(16).padStart(2, '0'))
-            .join(' ');
-          fmt_output += `${byteStr.padEnd(24)} `;
-        }
-
-        if (ASCII && insnBytes instanceof Uint8Array) {
-          const asciiStr = Array.from(insnBytes)
-            .map((byte) =>
-              byte >= 32 && byte <= 126 ? String.fromCharCode(byte) : '.',
-            )
-            .join('');
-          fmt_output += `${asciiStr.padEnd(10)} `;
-        }
-
-        fmt_output += `${mnemonic.padEnd(10)}${operands}\n`;
+        fmt_output += `${format_bytes(insn_bytes)}${format_ascii(insn_bytes)}${colors ? "\033[33m" : ""}${mnemonic.padEnd(10)}${colors ? "\033[0m" : ""}${format_operands(operands).padEnd(10)}${i + 1 < insn_count ? '\n' : ''}`;
       }
 
       return fmt_output;
+    }
+
+    /**
+     * Disassembles a binary file and prints the instructions.
+     *
+     * @public
+     * @param file_path - The path to the binary file to disassemble.
+     * @param skip_invalid - Specifies if invalid bytes will be printed or ignored.
+     * @param offset - Used for skipping dead code inside the binary (i.e. first 5 bytes being 0x7f 0x45 0x4c 0x46 0x02 for .ELF).
+     */
+    public dump(
+      file_path: string,
+      skip_invalid: boolean = true,
+      from: number = 0,
+      to?: number,
+    ): void {
+      const file_buf: Buffer = require('fs').readFileSync(file_path);
+      const buf_len: number = to || file_buf.length;
+      const data: { buffer: Buffer; addr: number; insn: cs_insn } = {
+        buffer: file_buf.slice(from, buf_len),
+        addr: from,
+        insn: {} as cs_insn,
+      };
+      const fmt_options = { ASCII: true, address: true, bytes: true };
+      const invalid_bytes = [];
+
+      let invalid_count = 0;
+
+      // Loop until the end of the file
+      while (data.addr < buf_len) {
+        // If disassembly succeeds, print the instruction and continue
+        if (this.disasm_iter(data)) {
+          if (invalid_count > 0) {
+            const remainder = invalid_count % 4;
+            const batches = [];
+            const first_byte = invalid_bytes[0];
+
+            batches[0] = {
+              id: 0,
+              address: first_byte.address,
+              bytes: [first_byte.byte],
+              size: 1,
+              mnemonic: '',
+              op_str: '',
+            };
+
+            for (let i = 1; i < invalid_count; i++) {
+              const byte_info = invalid_bytes[i];
+              if (i < 4) {
+                batches[0].bytes.push(byte_info.byte);
+                batches[0].size += 1;
+              } else {
+                const batch_index = Math.floor(i / 4);
+                if (!batches[batch_index]) {
+                  batches[batch_index] = {
+                    id: batch_index,
+                    address: byte_info.address,
+                    bytes: [byte_info.byte],
+                    size: 1,
+                    mnemonic: '',
+                    op_str: '',
+                  };
+                } else {
+                  batches[batch_index].bytes.push(byte_info.byte);
+                  batches[batch_index].size += 1;
+                }
+              }
+            }
+
+            console.log(this.fmt(batches, fmt_options));
+            invalid_bytes.length = 0;
+            invalid_count = 0;
+          }
+          console.log(this.fmt(data.insn, fmt_options));
+          continue;
+        }
+
+        const next_addr: number = data.addr + 1;
+
+        invalid_bytes.push({
+          byte: file_buf.readUInt8(data.addr),
+          address: data.addr,
+        });
+        invalid_count += 1;
+
+        data.buffer = file_buf.slice(next_addr, buf_len);
+        data.addr += 1;
+      }
     }
   }
 }
@@ -2130,67 +2229,50 @@ namespace CS {
 export default CS;
 export {
   Wrapper,
-  cs_opt_skipdata,
-  cs_opt_mnem,
-  cs_insn,
-  cs_detail,
-  cs_arch,
-  cs_mode,
-  cs_err,
-  cs_opt_type,
-  cs_opt_value,
-  cs_group_type,
-  cs_op_type,
-  cs_ac_type,
-  cs_regs,
-  type cs_arm64_op,
   ARM64,
-  cs_arm64,
-  type cs_arm_op,
   ARM,
-  cs_arm,
-  type cs_bpf_op,
   BPF,
-  cs_bpf,
   EVM,
-  cs_evm,
-  type cs_m680x_op,
   M680X,
-  cs_m680x,
-  type cs_m68k_op,
   M68K,
-  cs_m68k,
-  type cs_mips_op,
   MIPS,
-  cs_mips,
-  type cs_mos65xx_op,
   MOS65XX,
-  cs_mos65xx,
-  type cs_ppc_op,
   PPC,
-  cs_ppc,
-  type cs_riscv_op,
   RISCV,
-  cs_riscv,
-  type cs_sh_op,
   SH,
-  cs_sh,
-  type cs_sparc_op,
   SPARC,
-  cs_sparc,
-  type cs_tms320c64x_op,
   TMS320C64X,
-  cs_tms320c64x,
-  type cs_tricore_op,
   TRICORE,
-  cs_tricore,
-  type cs_wasm_op,
   WASM,
-  cs_wasm,
-  type cs_x86_op,
   X86,
-  cs_x86,
-  type cs_xcore_op,
   XCORE,
-  cs_xcore,
+  type cs_opt_skipdata,
+  type cs_opt_mnem,
+  type cs_insn,
+  type cs_detail,
+  type cs_arch,
+  type cs_mode,
+  type cs_err,
+  type cs_opt_type,
+  type cs_opt_value,
+  type cs_group_type,
+  type cs_op_type,
+  type cs_ac_type,
+  type cs_regs,
+  type cs_arm64_op,
+  type cs_arm_op,
+  type cs_bpf_op,
+  type cs_m680x_op,
+  type cs_m68k_op,
+  type cs_mips_op,
+  type cs_mos65xx_op,
+  type cs_ppc_op,
+  type cs_riscv_op,
+  type cs_sh_op,
+  type cs_sparc_op,
+  type cs_tms320c64x_op,
+  type cs_tricore_op,
+  type cs_wasm_op,
+  type cs_x86_op,
+  type cs_xcore_op,
 };

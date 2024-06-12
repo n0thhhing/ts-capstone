@@ -26,14 +26,6 @@ uint8_t* cs_detail_buffer(cs_insn *insn) {
     return buf;
 }
 
-unsigned long long cs_insn_offset(const cs_insn *insns, size_t post) {
-    return CS_INSN_OFFSET(insns, post);
-}
-
-unsigned long long x86_rel_addr(cs_insn *insn) {
-    return X86_REL_ADDR(*insn);
-}
-
 #ifdef __cplusplus
 }
 #endif

@@ -1,6 +1,6 @@
 import { expect, test, afterAll } from 'bun:test';
 import CS, { X86 } from '../capstone';
-const d = new CS.CAPSTONE(CS.ARCH_X86, CS.MODE_16);
+const cs = new CS.CAPSTONE(CS.ARCH_X86, CS.MODE_16);
 const insns = [
   {
     id: 332,
@@ -182,20 +182,20 @@ const insns = [
   },
 ];
 
-test('X86_REL_ADDR', () => {
-  const addr_4149 = d.X86_REL_ADDR(insns[0]);
-  const addr_4101 = d.X86_REL_ADDR(insns[1]);
+test('X86.REL_ADDR', () => {
+  const addr_4149 = X86.REL_ADDR(insns[0]);
+  const addr_4101 = X86.REL_ADDR(insns[1]);
   expect(addr_4149).toBe(4149);
   expect(addr_4101).toBe(4101);
 });
 
-test('INSN_OFFSET', () => {
-  const idx_1 = d.INSN_OFFSET(insns, 1);
-  const idx_2 = d.INSN_OFFSET(insns, 2);
+test('CS.INSN_OFFSET', () => {
+  const idx_1 = CS.INSN_OFFSET(insns, 1);
+  const idx_2 = CS.INSN_OFFSET(insns, 2);
   expect(idx_1).toBe(0);
   expect(idx_2).toBe(3);
 });
 
 afterAll(() => {
-  d.close();
+  cs.close();
 });

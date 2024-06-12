@@ -342,25 +342,37 @@ output:
 0x1008 0c 05 13 d5 .... msr dbgdtrtx_el0, x12
 */
 
+// dump
+
+// The `dump` function disassembles a binary file
+// provided as input, printing the instructions
+// it contains to the console. It iterates through
+// the file, printing each instruction while
+// optionally skipping invalid bytes. Note this
+// is notreally that fast and i recommend
+// not doing this for large files.
+cs.dump("path/to/bin", true /* default */)
+
 // close
 
 // this closes the Capstone instance, because we
 // are binding c to JS we now have to free unused
 // values, JS usually has garbage collection
 // but C does not, so we have to free the
-// cs instance from memory manually
+// capstone instance from memory manually
 // after it's no longer in use.
 cs.close();
 ```
 
-you can also take a look at the [tests](src/tests)
+you can also take a look at the [tests](src/tests) for more specific examples.
 
 ## Constants
 
 if you would like to see all the options and capstone
 constants, you can find them in either the [capstone.ts](src/capstone.ts)
-file or the [typescript file](src/arch) (arch/\<arch>.ts) for things like register ids, options,
-error codes, groups, opcodes, manifest constants, insns, ect
+file or the [typescript file](src/arch) (arch/\<arch>.ts) for things like
+register ids, options, error codes, groups, opcodes,
+manifest constants, insns, ect
 
 ## Compatibility
 
@@ -407,12 +419,7 @@ For detailed documentation on available constants and methods, refer to the sour
 
 ### Prerequisites
 
-1. Initialize the original Capstone submodule:
-
-```shell
-git submodule update --init
-```
-
+1. download the [capstone library](https://github.com/capstone-engine/capstone/releases/tag/5.0.1):
 2. Make sure you have bun and emsdk installed
 3. Install dependancies
 
@@ -422,7 +429,7 @@ npm i -D
 
 ### Makefile
 
-The makefile provides some commands for necessary builds, which includes
+The makefile provides some commands for necessary builds, which includes...
 
 - `compile`: Compiles capstone into a static library via emcmake
 - `build`: Transpiles the static library file into js via emcc(requires make compile first)

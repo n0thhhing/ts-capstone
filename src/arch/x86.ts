@@ -2032,6 +2032,21 @@ export enum X86 {
   GRP_ENDING = 170,
 }
 
+export namespace X86 {
+  /**
+   * Retrieves the relative address for X86 instructions using RIP-relative addressing mode.
+   *
+   * NOTE: This assumes CS.OPT_DETAIL and present operands in the insn object.
+   * @param insn - The instruction to analyze.
+   * @returns The relative address associated with the X86 instruction.
+   */
+  export function REL_ADDR(insn: any): number {
+    return insn.detail.x86.operands[0].type == X86.OP_IMM
+      ? insn.detail.x86.operands[0].imm
+      : insn.address + insn.size + insn.detail.x86.disp;
+  }
+}
+
 export class cs_x86 {
   // Instruction prefix, which can be up to 4 bytes.
   // A prefix byte gets value 0 when irrelevant.

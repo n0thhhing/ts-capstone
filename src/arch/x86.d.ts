@@ -1995,6 +1995,16 @@ export declare enum X86 {
   GRP_FPU = 169,
   GRP_ENDING = 170,
 }
+export declare namespace X86 {
+  /**
+   * Retrieves the relative address for X86 instructions using RIP-relative addressing mode.
+   *
+   * NOTE: This assumes CS.OPT_DETAIL and present operands in the insn object.
+   * @param insn - The instruction to analyze.
+   * @returns The relative address associated with the X86 instruction.
+   */
+  function REL_ADDR(insn: any): number;
+}
 export declare class cs_x86 {
   prefix: number[];
   opcode: number[];
