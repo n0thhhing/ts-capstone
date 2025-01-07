@@ -4,7 +4,10 @@ This module provides bindings for the Capstone disassembly framework.
 ## Quick Start
 ```bash
 npm i ts-capstone
-# or if your using bun...
+# note that if your using bun, you need
+# to be on version 1.1.42 canary, otherwise
+# you will get a Segmentation fault.
+# see https://github.com/oven-sh/bun/issues/15527
 bun i ts-capstone
 ```
 
