@@ -1,5 +1,5 @@
 import { expect, test } from 'bun:test';
-import CS from '../capstone';
+import CS, { type cs_opt_fmt } from '../capstone';
 
 test('fmt', () => {
   const buffer = new Uint8Array([
@@ -14,9 +14,12 @@ test('fmt', () => {
   disassembler.option(CS.OPT_DETAIL, true);
   const insns = disassembler.disasm(buffer, 0x1000);
 
-  const options = {
+  const options: cs_opt_fmt = {
     ASCII: true,
     colors: true,
+    hex_comment: null,
+    bytes: null,
+    address: null
   };
 
   console.log(disassembler.fmt(insns, options));

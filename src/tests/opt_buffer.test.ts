@@ -14,11 +14,11 @@ test('OPT_BUFFER', () => {
 
   const insn = disassembler.disasm(buffer, 0x1000)[0];
   const decoder = new TextDecoder('utf-8');
-  const buf = new Int8Array(insn.buffer);
+  const buf = new Int8Array(insn.buffer || []);
   const dv = new DataView(buf.buffer);
 
   const id = dv.getUint32(0, true);
-  const addr = parseInt(dv.getBigUint64(8, true));
+  const addr = parseInt(dv.getBigUint64(8, true).toString());
   const size = dv.getUint16(16, true);
 
   let mn_bytes = buf.slice(42, 42 + 32);
@@ -41,7 +41,7 @@ test('OPT_BUFFER', () => {
   expect(size).toBe(insn.size);
   expect(mnemonic).toBe(insn.mnemonic);
   expect(op_str).toBe(insn.op_str);
-  expect(new Uint8Array(bytes)).toEqual(insn.bytes);
+  expect(new Uint8Array(bytes)).toEqual(insn.bytes as Uint8Array<ArrayBuffer>);
 
   disassembler.close();
 });

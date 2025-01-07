@@ -1,17 +1,17 @@
 import { expect, test, afterAll } from 'bun:test';
-import CS, { ARM64 } from '../capstone';
+import CS, { ARM64, type cs_insn } from '../capstone';
 
 const disassembler = new CS.CAPSTONE(CS.ARCH_ARM64, CS.MODE_ARM);
 disassembler.option(CS.OPT_DETAIL, true);
 
 test('reg_write', () => {
-  const insn = {
+  const insn: cs_insn = {
     id: 664,
     address: 4100,
     size: 4,
     mnemonic: 'msr',
     op_str: 'spsel, #0',
-    bytes: [191, 64, 0, 213],
+    bytes: new Uint8Array([191, 64, 0, 213]),
     detail: {
       regs_write: [4],
       groups: [6],
@@ -57,13 +57,13 @@ test('reg_write', () => {
 });
 
 test('reg_read', () => {
-  const insn = {
+  const insn: cs_insn = {
     id: 149,
     address: 4152,
     size: 4,
     mnemonic: 'cneg',
     op_str: 'x0, x1, ne',
-    bytes: [32, 4, 129, 218],
+    bytes: new Uint8Array([32, 4, 129, 218]),
     detail: {
       regs_write: [],
       groups: [],
@@ -115,7 +115,7 @@ test('insn_group', () => {
     size: 4,
     mnemonic: 'scvtf',
     op_str: 'v0.2s, v1.2s, #3',
-    bytes: [32, 228, 61, 15],
+    bytes: new Uint8Array([32, 228, 61, 15]),
     detail: {
       regs_write: [],
       groups: [130],
@@ -167,7 +167,7 @@ test('regs_access', () => {
     size: 4,
     mnemonic: 'msr',
     op_str: 'spsel, #0',
-    bytes: [191, 64, 0, 213],
+    bytes: new Uint8Array([191, 64, 0, 213]),
     detail: {
       regs_write: [4, 10, 11],
       groups: [6],
@@ -221,7 +221,7 @@ test('op_count', () => {
     size: 4,
     mnemonic: 'msr',
     op_str: 'spsel, #0',
-    bytes: [191, 64, 0, 213],
+    bytes: new Uint8Array([191, 64, 0, 213]),
     detail: {
       regs_write: [4, 10, 11],
       groups: [6],
@@ -272,7 +272,7 @@ test('op_index', () => {
     size: 4,
     mnemonic: 'msr',
     op_str: 'dbgdtrtx_el0, x12',
-    bytes: [12, 5, 19, 213],
+    bytes: new Uint8Array([12, 5, 19, 213]),
     detail: {
       regs_write: [],
       groups: [6],

@@ -182,6 +182,7 @@ interface cs_insn {
 
 // cs_detail object. NOTE: detail object is only valid when both requirements below are met: (1) CS_OP_DETAIL = CS_OPT_ON (2) Engine is not in Skipdata mode (CS_OP_SKIPDATA option set to CS_OPT_ON)
 interface cs_detail {
+  [index: string]: any;
   regs_read: cs_regs; // list of implicit registers read by this insn
   regs_read_count: number; // number of implicit registers read by this insn
   regs_write: cs_regs; // list of implicit registers modified by this insn
@@ -221,11 +222,11 @@ interface cs_opt_skipdata {
 
 // fmt() options
 interface cs_opt_fmt {
-  hex_comment: boolean; // Specifies if the output should include decimal comments for hexadecimal imm
-  colors: boolean; // Specifies if the output should include coloring
-  bytes: boolean; // Specifies if the formatted string should have the instructions bytes.
-  address: boolean; // Specifies if the formatted string should include the instructions address.
-  ASCII: boolean; // Specifies if the formatted string should include the bytes ASCII representation.
+  hex_comment?: boolean; // Specifies if the output should include decimal comments for hexadecimal imm
+  colors?: boolean; // Specifies if the output should include coloring
+  bytes?: boolean; // Specifies if the formatted string should have the instructions bytes.
+  address?: boolean; // Specifies if the formatted string should include the instructions address.
+  ASCII?: boolean; // Specifies if the formatted string should include the bytes ASCII representation.
 }
 
 // Customize mnemonic for instructions with alternative name.
@@ -556,7 +557,8 @@ namespace CS {
           for (let i = 0; i < code_size; i++)
             code.push(Memory.read(parseInt(code_ptr), 'u8'));
           return callback(code, code_size, offset /* TODO: user_data*/);
-        }, 'iiiii');
+        },
+        'iiiii');
         Memory.write(callback_ptr, cb_ptr, '*');
       }
 
@@ -1096,12 +1098,12 @@ namespace CS {
                       Memory.write(op_ptr, op.register_bits, 'i32');
                     break;
                   case M68K.OP_BR_DISP:
-                    op.disp !== undefined &&
-                      op.disp !== null &&
-                      Memory.write(op_ptr + 36, op.disp, 'i32');
-                    op.disp_size !== undefined &&
-                      op.disp_size !== null &&
-                      Memory.write(op_ptr + 40, op.disp_size, 'ubyte');
+                    op.br_disp.disp !== undefined &&
+                      op.br_disp.disp !== null &&
+                      Memory.write(op_ptr + 36, op.br_disp.disp, 'i32');
+                    op.br_disp.disp_size !== undefined &&
+                      op.br_disp.disp_size !== null &&
+                      Memory.write(op_ptr + 40, op.br_disp.disp_size, 'ubyte');
                     break;
                   case M68K.OP_MEM:
                     const mem = op.mem;
@@ -1341,9 +1343,9 @@ namespace CS {
                     break;
                   case WASM.OP_IMM:
                     for (let i = 0; i < 2; i++) {
-                      op.imm[i] !== undefined &&
-                        op.imm[i] !== null &&
-                        Memory.write(op_ptr + 8 + i, op.imm[i], 'u32');
+                      op.immediate[i] !== undefined &&
+                        op.immediate[i] !== null &&
+                        Memory.write(op_ptr + 8 + i, op.immediate[i], 'u32');
                     }
                     break;
                   case WASM.OP_BRTABLE:
@@ -1648,7 +1650,9 @@ namespace CS {
       );
 
       if (ret !== ERR_OK) {
-        const error = `capstone: Function cs_option failed with code ${ret}:\n${this.strerror(ret)}`;
+        const error = `capstone: Function cs_option failed with code ${ret}:\n${this.strerror(
+          ret,
+        )}`;
         throw new Error(error);
       }
 
@@ -1857,7 +1861,9 @@ namespace CS {
       );
       if (ret != ERR_OK) {
         Memory.write(this.handle_ptr, 0, '*');
-        const error = `capstone: Function regs_access failed with code ${ret}:\n${this.strerror(ret)}`;
+        const error = `capstone: Function regs_access failed with code ${ret}:\n${this.strerror(
+          ret,
+        )}`;
         throw new Error(error);
       }
       const regs_read: cs_regs = [];
@@ -2069,20 +2075,32 @@ namespace CS {
      */
     public fmt(
       instructions: cs_insn | cs_insn[],
-      options: cs_opt_fmt = { hex_comment: true, colors: false, ASCII: false, address: true, bytes: true },
+      options: cs_opt_fmt = {
+        hex_comment: true,
+        colors: false,
+        ASCII: false,
+        address: true,
+        bytes: true,
+      },
     ): string {
       if (!Array.isArray(instructions)) instructions = [instructions];
 
-      const { hex_comment = true, colors = false, ASCII = false, address = true, bytes = true } = options;
+      const {
+        hex_comment = true,
+        colors = false,
+        ASCII = false,
+        address = true,
+        bytes = true,
+      } = options;
       const insn_count = instructions.length;
 
       const format_bytes = (insn_bytes: Uint8Array | number[]): string => {
         if (!bytes) return '';
-        const byte_str = []
+        const byte_str = [];
         for (let j = 0; j < insn_bytes.length; j++) {
           byte_str.push(
             ((insn_bytes[j] >> 4) & 0xf).toString(16) + // upper nibble
-            (insn_bytes[j] & 0xf).toString(16), // lower nibble
+              (insn_bytes[j] & 0xf).toString(16), // lower nibble
           );
         }
         return byte_str.join(' ').padEnd(24);
@@ -2101,19 +2119,24 @@ namespace CS {
         }
         return ascii_str.join('').padEnd(10);
       };
-      
+
       const format_operands = (op_str: string): string => {
-        const match = /#(0x(?:-)?\d+)/.exec(op_str)
+        const match = /#(0x(?:-)?\d+)/.exec(op_str);
         if (match && match[1]) {
-          op_str += `${colors ? "\033[90m" : ""}\t// ${parseInt(match[1])}${colors ? "\033[0m" : ""}`;
+          op_str += `${colors ? '\x1b[90m' : ''}\t// ${parseInt(match[1])}${
+            colors ? '\x1b[0m' : ''
+          }`;
         }
 
-        if (!colors) return op_str
-        op_str.replace(/#(?:0x(?:-)?[a-fA-f0-9]+|\d+)/g, function(match: string): string {
-          return "\033[34m" + match + "\033[0m";
-        });
-        return op_str
-      }
+        if (!colors) return op_str;
+        op_str.replace(
+          /#(?:0x(?:-)?[a-fA-f0-9]+|\d+)/g,
+          function (match: string): string {
+            return '\x1b[34m' + match + '\x1b[0m';
+          },
+        );
+        return op_str;
+      };
 
       let fmt_output = '';
 
@@ -2130,98 +2153,14 @@ namespace CS {
           fmt_output += `0x${insn_address.toString(16)}:\t`;
         }
 
-        fmt_output += `${format_bytes(insn_bytes)}${format_ascii(insn_bytes)}${colors ? "\033[33m" : ""}${mnemonic.padEnd(10)}${colors ? "\033[0m" : ""}${format_operands(operands).padEnd(10)}${i + 1 < insn_count ? '\n' : ''}`;
+        fmt_output += `${format_bytes(insn_bytes)}${format_ascii(insn_bytes)}${
+          colors ? '\x1b[33m' : ''
+        }${mnemonic.padEnd(10)}${colors ? '\x1b[0m' : ''}${format_operands(
+          operands,
+        ).padEnd(10)}${i + 1 < insn_count ? '\n' : ''}`;
       }
 
       return fmt_output;
-    }
-
-    /**
-     * Disassembles a binary file and prints the instructions.
-     *
-     * @public
-     * @param file_path - The path to the binary file to disassemble.
-     * @param skip_invalid - Specifies if invalid bytes will be printed or ignored.
-     * @param offset - Used for skipping dead code inside the binary (i.e. first 5 bytes being 0x7f 0x45 0x4c 0x46 0x02 for .ELF).
-     */
-    public dump(
-      file_path: string,
-      skip_invalid: boolean = true,
-      from: number = 0,
-      to?: number,
-    ): void {
-      const file_buf: Buffer = require('fs').readFileSync(file_path);
-      const buf_len: number = to || file_buf.length;
-      const data: { buffer: Buffer; addr: number; insn: cs_insn } = {
-        buffer: file_buf.slice(from, buf_len),
-        addr: from,
-        insn: {} as cs_insn,
-      };
-      const fmt_options = { ASCII: true, address: true, bytes: true };
-      const invalid_bytes = [];
-
-      let invalid_count = 0;
-
-      // Loop until the end of the file
-      while (data.addr < buf_len) {
-        // If disassembly succeeds, print the instruction and continue
-        if (this.disasm_iter(data)) {
-          if (invalid_count > 0) {
-            const remainder = invalid_count % 4;
-            const batches = [];
-            const first_byte = invalid_bytes[0];
-
-            batches[0] = {
-              id: 0,
-              address: first_byte.address,
-              bytes: [first_byte.byte],
-              size: 1,
-              mnemonic: '',
-              op_str: '',
-            };
-
-            for (let i = 1; i < invalid_count; i++) {
-              const byte_info = invalid_bytes[i];
-              if (i < 4) {
-                batches[0].bytes.push(byte_info.byte);
-                batches[0].size += 1;
-              } else {
-                const batch_index = Math.floor(i / 4);
-                if (!batches[batch_index]) {
-                  batches[batch_index] = {
-                    id: batch_index,
-                    address: byte_info.address,
-                    bytes: [byte_info.byte],
-                    size: 1,
-                    mnemonic: '',
-                    op_str: '',
-                  };
-                } else {
-                  batches[batch_index].bytes.push(byte_info.byte);
-                  batches[batch_index].size += 1;
-                }
-              }
-            }
-
-            console.log(this.fmt(batches, fmt_options));
-            invalid_bytes.length = 0;
-            invalid_count = 0;
-          }
-          console.log(this.fmt(data.insn, fmt_options));
-          continue;
-        }
-
-        const next_addr: number = data.addr + 1;
-
-        invalid_bytes.push({
-          byte: file_buf.readUInt8(data.addr),
-          address: data.addr,
-        });
-        invalid_count += 1;
-
-        data.buffer = file_buf.slice(next_addr, buf_len);
-        data.addr += 1;
-      }
     }
   }
 }
@@ -2275,4 +2214,5 @@ export {
   type cs_wasm_op,
   type cs_x86_op,
   type cs_xcore_op,
+  type cs_opt_fmt,
 };

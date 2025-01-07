@@ -1,8 +1,11 @@
+# ts-capstone
 This module provides bindings for the Capstone disassembly framework.
 
+## Quick Start
 ```bash
-# soon this will be a npm package
-git clone https://github.com/n0thhhing/capstone-wrapper
+npm i ts-capstone
+# or if your using bun
+bun i ts-capstone
 ```
 
 ## Example
@@ -243,7 +246,7 @@ const mnemonic = new TextDecoder("utf-8").decode(truncated_mn)
 // supports all the archs, use CS.ARCH_ALL(true),
 // To check if this library is in 'diet' mode,
 // set query to CS.SUPPORT_DIET(false).
-cs..support(CS.MODE_LITTLE_ENDIAN); // true
+cs.support(CS.MODE_LITTLE_ENDIAN); // true
 
 // version
 
@@ -342,17 +345,6 @@ output:
 0x1008 0c 05 13 d5 .... msr dbgdtrtx_el0, x12
 */
 
-// dump
-
-// The `dump` function disassembles a binary file
-// provided as input, printing the instructions
-// it contains to the console. It iterates through
-// the file, printing each instruction while
-// optionally skipping invalid bytes. Note this
-// is notreally that fast and i recommend
-// not doing this for large files.
-cs.dump("path/to/bin", true /* default */)
-
 // close
 
 // this closes the Capstone instance, because we
@@ -393,13 +385,13 @@ the following.
 
 - [ ] Implement all the options
 - [x] Add support for all small helper functions
-- [ ] Make an npm package
+- [x] Make an npm package
 - [ ] Add better tests
 - [x] Implement cs_detail
 - [x] Make dedicated types
 - [x] Add support for all architectures
 - [x] Update capstone to 5.0
-- [ ] JSDoc
+- [x] JSDoc
 - [ ] Better error handling
 
 ## Documentation

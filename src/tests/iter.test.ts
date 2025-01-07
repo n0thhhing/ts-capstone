@@ -1,4 +1,4 @@
-import CS from '../capstone';
+import CS, { type cs_insn } from '../capstone';
 import { expect, test } from 'bun:test';
 
 test('disasm_iter ARM', () => {
@@ -20,7 +20,7 @@ test('disasm_iter ARM', () => {
   const arm_ret = {
     buffer: armBuffer,
     addr: 0x1000,
-    insn: {},
+    insn: {} as cs_insn,
   };
 
   const expectedInstructions = [
@@ -123,7 +123,7 @@ test('disasm_iter ARM64', () => {
   const arm64_ret = {
     buffer: arm64Buffer,
     addr: 0x4db43dc,
-    insn: {},
+    insn: {} as cs_insn,
   };
 
   const expectedInstructions = [

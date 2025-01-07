@@ -22,6 +22,10 @@
     /* Declarations */
     "declaration": true,
     "declarationDir": "src/types",
-    "emitDeclarationOnly": true
+    "emitDeclarationOnly": true,
+    "strictNullChecks": false,
+  },
+  "rules": {
+    "no-octal-escape": "off"
   }
 }

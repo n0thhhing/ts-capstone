@@ -1,14 +1,14 @@
 import { expect, test, afterAll } from 'bun:test';
-import CS, { X86 } from '../capstone';
+import CS, { X86, type cs_insn } from '../capstone';
 const cs = new CS.CAPSTONE(CS.ARCH_X86, CS.MODE_16);
-const insns = [
+const insns: cs_insn[] = [
   {
     id: 332,
     address: 4096,
     size: 3,
     mnemonic: 'lea',
     op_str: 'cx, [si + 0x32]',
-    bytes: [141, 76, 50],
+    bytes: new Uint8Array([141, 76, 50]),
     detail: {
       regs_write: [],
       groups: [],
@@ -70,7 +70,7 @@ const insns = [
     size: 2,
     mnemonic: 'or',
     op_str: 'byte ptr [bx + di], al',
-    bytes: [8, 1],
+    bytes: new Uint8Array([8, 1]),
     detail: {
       regs_write: [25],
       groups: [],
@@ -132,7 +132,7 @@ const insns = [
     size: 4,
     mnemonic: 'fadd',
     op_str: 'dword ptr [bx + di + 0x34c6]',
-    bytes: [216, 129, 198, 52],
+    bytes: new Uint8Array([216, 129, 198, 52]),
     detail: {
       regs_write: [31],
       groups: [169],
