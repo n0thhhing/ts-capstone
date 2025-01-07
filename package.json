@@ -1,7 +1,7 @@
 {
   "name": "ts-capstone",
   "author": "n0thhhing",
-  "version": "0.1.4",
+  "version": "0.1.5",
   "module": "src/capstone.ts",
   "main": "src/capstone.ts",
   "devDependencies": {
