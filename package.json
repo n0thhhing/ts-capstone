@@ -11,6 +11,11 @@
   },
   "type": "module",
   "types": "capstone.d.ts",
+  "homepage": "https://github.com/n0thhhing/ts-capstone",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/n0thhhing/ts-capstone"
+  },
   "keywords": [
     "capstone",
     "disassembler",
