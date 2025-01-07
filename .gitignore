@@ -192,3 +192,4 @@ compare
 .tokeignore
 capstone
 src/tests/dump.test.ts
+test-package
