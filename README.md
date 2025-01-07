@@ -4,14 +4,14 @@ This module provides bindings for the Capstone disassembly framework.
 ## Quick Start
 ```bash
 npm i ts-capstone
-# or if your using bun
+# or if your using bun...
 bun i ts-capstone
 ```
 
 ## Example
 
 ```typescript
-import CS, { cs_arch, cs_mode, cs_insn, ARM64 } from './path/to/capstone.ts'; // soon this will be a package to import via npm, bun, yarn ect ...
+import CS, { cs_arch, cs_mode, cs_insn, ARM64 } from './path/to/capstone.ts';
 
 const arch: cs_arch = CS.ARCH_ARM64; // or CS.ARCH_AARCH64.
 const mode: cs_mode = CS.MODE_ARCH;
