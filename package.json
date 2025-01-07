@@ -47,5 +47,6 @@
     "bindings",
     "port",
     "emcc"
-  ]
+  ],
+  "license": "MIT"
 }

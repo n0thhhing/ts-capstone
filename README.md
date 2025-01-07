@@ -394,19 +394,6 @@ the following.
 - [x] JSDoc
 - [ ] Better error handling
 
-## Documentation
-
-For detailed documentation on available constants and methods, refer to the source code comments or the Capstone website:
-
-- [Function Reference](https://code.dlang.org/packages/d-capstone) for constants and function documentation
-- [Capstone Website](https://www.capstone-engine.org/iteration.html) capstone website
-- [Source](https://github.com/capstone-engine/capstone) source code for capstone
-
-## Credits
-
-- [capstone](https://github.com/capstone-engine/capstone)
-- [emscripten](https://emscripten.org/docs/getting_started/downloads.html#sdk-download-and-install)
-
 ## Building
 
 ### Prerequisites
@@ -470,3 +457,20 @@ Before opening a new issue, please ensure that:
 - Make sure this isnt something to do with your JavaScript runtime, or your typescript transpiler
 
 When opening a new issue, please use a clear and descriptive title and provide as much context as possible to help understand the issue or suggestion.
+
+## License
+
+This project is licensed under the `MIT` License. See the [LICENSE](LICENSE) file for more information.
+
+## Documentation
+
+For detailed documentation on available constants and methods, refer to the source code comments or the Capstone website:
+
+- [Function Reference](https://code.dlang.org/packages/d-capstone) for constants and function documentation
+- [Capstone Website](https://www.capstone-engine.org/iteration.html) capstone website
+- [Source](https://github.com/capstone-engine/capstone) source code for capstone
+
+## Credits
+
+- [capstone](https://github.com/capstone-engine/capstone)
+- [emscripten](https://emscripten.org/docs/getting_started/downloads.html#sdk-download-and-install)
