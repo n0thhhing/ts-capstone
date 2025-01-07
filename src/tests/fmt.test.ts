@@ -16,6 +16,7 @@ test('fmt', () => {
 
   const options = {
     ASCII: true,
+    colors: true,
   };
 
   console.log(disassembler.fmt(insns, options));
