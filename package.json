@@ -1,5 +1,6 @@
 {
-  "name": "capstone-wrapper",
+  "name": "ts-capstone",
+  "version": "0.1.0",
   "module": "src/capstone.ts",
   "devDependencies": {
     "@types/emscripten": "^1.39.10",
