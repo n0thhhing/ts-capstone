@@ -26,8 +26,12 @@ type:
 compare:
 	sh build/scripts/compare.sh
 
+.PHONY: publish
+publish:
+	npm publish
+
 .DEFAULT_GOAL := help
 
 .PHONY: help
 help:
-	@echo "Usage: make [format|build|compile]"
+	@echo "Usage: make [publish|format|build|compile|compare|type|bundle]"
